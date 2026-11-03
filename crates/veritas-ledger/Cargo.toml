@@ -1,0 +1,31 @@
+[package]
+name = "veritas-ledger"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Hash-chained, Ed25519-signed chain-of-custody ledger with an independent verifier"
+
+[[bin]]
+name = "veritas-verify"
+path = "src/bin/veritas-verify.rs"
+
+[dependencies]
+veritas-hash = { path = "../veritas-hash" }
+serde.workspace = true
+serde_json.workspace = true
+hex.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+chrono.workspace = true
+ed25519-dalek.workspace = true
+rand.workspace = true
+sha2.workspace = true
+argon2 = "0.5"
+chacha20poly1305 = "0.10"
+zeroize = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+tempfile.workspace = true
