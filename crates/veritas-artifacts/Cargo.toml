@@ -5,15 +5,27 @@ edition.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
+description = "Windows, Linux and macOS artifact parsers (REGF, EVTX, prefetch, LNK, shell items, jump lists, journald, plist, ...)"
+
+[[bin]]
+name = "veritas-artifacts-dump"
+path = "src/bin/dump.rs"
 
 [dependencies]
 veritas-hash = { path = "../veritas-hash" }
+veritas-timeline = { path = "../veritas-timeline" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 hex.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
+flate2.workspace = true
+clap.workspace = true
+encoding_rs = "0.8"
+roxmltree = "0.20"
+uuid.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+proptest.workspace = true
