@@ -1,0 +1,29 @@
+[package]
+name = "veritas-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "veritas"
+path = "src/main.rs"
+
+[dependencies]
+veritas-hash = { path = "../veritas-hash" }
+veritas-ledger = { path = "../veritas-ledger" }
+veritas-store = { path = "../veritas-store" }
+veritas-ewf = { path = "../veritas-ewf" }
+veritas-fs = { path = "../veritas-fs" }
+veritas-artifacts = { path = "../veritas-artifacts" }
+veritas-timeline = { path = "../veritas-timeline" }
+veritas-agent = { path = "../veritas-agent" }
+anyhow.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+hex.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
