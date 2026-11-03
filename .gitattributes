@@ -1,0 +1,15 @@
+* text=auto eol=lf
+*.png binary
+*.pf binary
+*.lnk binary
+*.evtx binary
+*.raw binary
+*.E01 binary
+*.dat binary
+*.DAT binary
+*.db binary
+*.hve binary
+*.pcap binary
+*.journal binary
+*.plist binary
+*.sqlite binary
