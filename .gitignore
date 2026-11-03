@@ -1,0 +1,34 @@
+# build outputs
+/target/
+**/target/
+node_modules/
+.next/
+dist/
+build/
+*.pyc
+__pycache__/
+.pytest_cache/
+.coverage
+coverage/
+htmlcov/
+.venv/
+*.egg-info/
+# local runtime state (never commit evidence)
+/var/
+*.e01
+*.E01
+*.raw
+*.dd
+*.vhd
+*.vhdx
+*.qcow2
+!testdata/small/**
+# secrets
+*.pem
+*.key
+!testdata/keys/**
+.env
+.env.*
+# fuzz
+fuzz/artifacts/
+fuzz/corpus/
