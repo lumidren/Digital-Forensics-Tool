@@ -24,7 +24,7 @@ WANT = {
            "ios/Accounts3.sqlite","ios/DataUsage.sqlite","ios/NoteStore.sqlite","ios/com.apple.wifi.known-networks.plist","ios/com.apple.MobileBackup.plist","ios/netusage.sqlite",
            "macos/knowledgec-10.14.db","macos/knowledgec-10.13.db","macos/TCC-test.db","macos/application_usage.sqlite","recycler/$I103S5F.jpg","recycler/$II3DF3L.zip","recycler/INFO2",
            "android/mmssms.db","android/contacts2.db","android/downloads.db","android/webview.db","msiecf/nfury_index.dat","2019.09.26.asl","apple.bsm","openbsm.bsm","wifi.log","santa.log","appfirewall.log","macos_launchd.log",
-           "ext4.raw","vsstest.qcow2","image.E01","image-split.E01","image-split.E02","tsk_volume_system.raw","ímynd.dd","syslog_image.dd"],
+           "ext4.raw","vsstest.qcow2","image.E01","image-split.E01","image-split.E02","tsk_volume_system.raw","syslog_image.dd"],
  "dfvfs": ["ntfs.raw","ext4.raw","ext2.raw","fat12.raw","apfs.raw","apfs_encrypted.dmg","mbr.raw","gpt.raw","gpt_in_mbr.raw","ext2.E01","ext2.split.E01","ext2.split.E02",
            "ext2.splitraw.000","ext2.splitraw.001","vss.raw","bdetogo.raw","luks1.raw","luks2.raw","hfsplus.raw","iso9660.raw","lvm.raw","xfs.raw"],
 }
