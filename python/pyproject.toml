@@ -1,0 +1,89 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "veritas-dfir"
+version = "0.1.0"
+description = "Veritas DFIR platform: parsers, pipeline, analytics, API and reporting"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.12"
+authors = [{ name = "lumidren" }]
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.7",
+    "sqlalchemy>=2.0",
+    "httpx>=0.27",
+    "python-multipart>=0.0.9",
+    "pynacl>=1.5",
+    "cryptography>=43",
+    "reportlab>=4.2",
+    "python-docx>=1.1",
+    "stix2>=3.0",
+    "dpkt>=1.9",
+    "yara-python>=4.5",
+    "pefile>=2024.8",
+    "lief>=0.15",
+    "volatility3>=2.7",
+    "libpff-python>=20231205",
+    "libesedb-python>=20240420",
+    "libbde-python>=20240502",
+    "libluksde-python>=20240502",
+    "libfsapfs-python>=20240508",
+    "libvshadow-python>=20240504",
+    "pyjwt>=2.8",
+    "argon2-cffi>=23.1",
+    "prometheus-client>=0.20",
+    "opentelemetry-api>=1.25",
+    "opentelemetry-sdk>=1.25",
+    "python-dateutil>=2.9",
+    "PyYAML>=6.0",
+    "websockets>=12",
+]
+
+[project.optional-dependencies]
+parity = [
+    "libevtx-python",
+    "libregf-python",
+    "libscca-python",
+    "liblnk-python",
+    "libfwsi-python",
+    "libewf-python",
+    "libfsntfs-python",
+    "libolecf-python",
+    "libfsext-python",
+    "libfsfat-python",
+    "pytsk3",
+    "dissect.ntfs",
+    "dissect.regf",
+    "dissect.esedb",
+]
+cluster = ["boto3>=1.34", "psycopg[binary]>=3.1", "clickhouse-connect>=0.7"]
+dev = ["pytest>=8", "pytest-cov>=5", "hypothesis>=6", "ruff>=0.5", "mypy>=1.10", "bandit>=1.7", "pip-audit>=2.7"]
+
+[project.scripts]
+veritas-api = "veritas.api.main:run"
+veritas-worker = "veritas.pipeline.worker:run"
+veritas-parity = "veritas.parity.harness:main"
+
+[tool.setuptools.packages.find]
+include = ["veritas*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "parity: compares against reference tools (needs the parity extra)",
+    "slow: long-running",
+    "needs_images: needs the reference image corpus (testdata/fetch.py)",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.coverage.run]
+source = ["veritas"]
+omit = ["veritas/api/main.py"]
