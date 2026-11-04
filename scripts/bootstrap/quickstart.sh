@@ -5,7 +5,7 @@
 #   3. start the API on 127.0.0.1:${VERITAS_PORT:-8000} with data in ./var
 #   4. run scripts/bootstrap/sample_case.py against it
 #   5. print the web URL
-# Usage: scripts/bootstrap/quickstart.sh [--full] [--no-build]
+# Usage: scripts/bootstrap/quickstart.sh [--intrusion] [--full] [--no-build]
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -18,6 +18,7 @@ for arg in "$@"; do
   case "$arg" in
     --no-build) BUILD=0 ;;
     --full) SAMPLE_ARGS+=("--full") ;;
+    --intrusion) SAMPLE_ARGS+=("--intrusion") ;;
     *) echo "unknown argument: $arg" >&2; exit 2 ;;
   esac
 done

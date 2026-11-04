@@ -15,6 +15,7 @@ param(
     [int]$Port = 8000,
     [string]$WebUrl = "http://localhost:3000",
     [switch]$Full,
+    [switch]$Intrusion,
     [switch]$NoBuild
 )
 $ErrorActionPreference = "Stop"
@@ -70,6 +71,7 @@ if (Test-Ready) {
 Write-Host "==> [4/5] sample case"
 $sampleArgs = @("scripts\bootstrap\sample_case.py", "--api", "http://127.0.0.1:$Port", "--web-url", $WebUrl)
 if ($Full) { $sampleArgs += "--full" }
+if ($Intrusion) { $sampleArgs += "--intrusion" }
 & $VenvPy @sampleArgs
 $sampleExit = $LASTEXITCODE
 
