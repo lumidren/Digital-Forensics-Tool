@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" font-family="Segoe UI, Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">Custody ledger hash chain</title>
+  <desc id="d">Each custody entry carries the hash of the previous entry and an Ed25519 signature. Changing any entry breaks every later link, which veritas-verify reports as FAIL.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b1220"/><stop offset="1" stop-color="#141b30"/></linearGradient>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#a78bfa"/></marker>
+  </defs>
+  <rect width="1200" height="400" rx="18" fill="url(#bg)"/>
+  <text x="40" y="50" fill="#e6edf7" font-size="22" font-weight="700">Chain of custody you can verify offline</text>
+  <text x="40" y="76" fill="#8aa4c8" font-size="14">entry_hash = SHA-256( canonical_json(body) ‖ Ed25519_signature )  ·  next.prev_hash = entry_hash</text>
+
+  <g font-size="12.5">
+    <!-- entry template repeated -->
+    <g transform="translate(40,110)">
+      <rect width="200" height="190" rx="12" fill="#1b2a45" stroke="#64748b"/>
+      <rect width="200" height="34" rx="12" fill="#25385c"/><rect y="22" width="200" height="12" fill="#25385c"/>
+      <text x="14" y="23" fill="#e6edf7" font-weight="700">#0  genesis</text>
+      <text x="14" y="58" fill="#9fb3d1">case C-2026-FB7C41</text>
+      <text x="14" y="80" fill="#9fb3d1">actor  examiner</text>
+      <text x="14" y="112" fill="#64748b">prev  0000…0000</text>
+      <text x="14" y="134" fill="#c4b5fd">hash  58fe…3673</text>
+      <rect x="14" y="152" width="80" height="22" rx="11" fill="#2a1d3d"/><text x="25" y="167" fill="#c4b5fd" font-size="11.5">✍ signed</text>
+    </g>
+    <g transform="translate(290,110)">
+      <rect width="200" height="190" rx="12" fill="#1b2a45" stroke="#3b82f6"/>
+      <rect width="200" height="34" rx="12" fill="#1e3a6b"/><rect y="22" width="200" height="12" fill="#1e3a6b"/>
+      <text x="14" y="23" fill="#e6edf7" font-weight="700">#1  ingest</text>
+      <text x="14" y="58" fill="#9fb3d1">EV-5A1C laptop.E01</text>
+      <text x="14" y="80" fill="#9fb3d1">sha256 96be…ec31</text>
+      <text x="14" y="112" fill="#c4b5fd">prev  58fe…3673</text>
+      <text x="14" y="134" fill="#c4b5fd">hash  1a7c…90d2</text>
+      <rect x="14" y="152" width="80" height="22" rx="11" fill="#2a1d3d"/><text x="25" y="167" fill="#c4b5fd" font-size="11.5">✍ signed</text>
+    </g>
+    <g transform="translate(540,110)">
+      <rect width="200" height="190" rx="12" fill="#1b2a45" stroke="#f472b6"/>
+      <rect width="200" height="34" rx="12" fill="#4a1d3a"/><rect y="22" width="200" height="12" fill="#4a1d3a"/>
+      <text x="14" y="23" fill="#e6edf7" font-weight="700">#41  access</text>
+      <text x="14" y="58" fill="#9fb3d1">parse with prefetch</text>
+      <text x="14" y="80" fill="#9fb3d1">CAIN.EXE-23D61279.pf</text>
+      <text x="14" y="112" fill="#c4b5fd">prev  e04b…71aa</text>
+      <text x="14" y="134" fill="#c4b5fd">hash  b3ab…d1a3</text>
+      <rect x="14" y="152" width="80" height="22" rx="11" fill="#2a1d3d"/><text x="25" y="167" fill="#c4b5fd" font-size="11.5">✍ signed</text>
+    </g>
+    <g transform="translate(790,110)">
+      <rect width="200" height="190" rx="12" fill="#1b2a45" stroke="#e5e7eb"/>
+      <rect width="200" height="34" rx="12" fill="#374151"/><rect y="22" width="200" height="12" fill="#374151"/>
+      <text x="14" y="23" fill="#e6edf7" font-weight="700">#262  transform</text>
+      <text x="14" y="58" fill="#9fb3d1">signed report (PDF)</text>
+      <text x="14" y="80" fill="#9fb3d1">sha256 73aa…5dbf</text>
+      <text x="14" y="112" fill="#c4b5fd">prev  9c21…0b4e</text>
+      <text x="14" y="134" fill="#c4b5fd">hash  3611…3393</text>
+      <rect x="14" y="152" width="80" height="22" rx="11" fill="#2a1d3d"/><text x="25" y="167" fill="#c4b5fd" font-size="11.5">✍ signed</text>
+    </g>
+  </g>
+  <path d="M240 205 H290" stroke="#a78bfa" stroke-width="2.5" marker-end="url(#a)"/>
+  <path d="M490 205 H515" stroke="#a78bfa" stroke-width="2.5"/>
+  <text x="517" y="210" fill="#a78bfa" font-size="18">⋯</text>
+  <path d="M540 205 H540" stroke="#a78bfa" stroke-width="2.5"/>
+  <path d="M740 205 H765" stroke="#a78bfa" stroke-width="2.5"/>
+  <text x="767" y="210" fill="#a78bfa" font-size="18">⋯</text>
+
+  <!-- verifier -->
+  <rect x="1020" y="110" width="150" height="190" rx="12" fill="#13261f" stroke="#34d399"/>
+  <text x="1036" y="140" fill="#d1fae5" font-size="15" font-weight="700">veritas-verify</text>
+  <text x="1036" y="166" fill="#a7f3d0" font-size="12">✓ dense sequence</text>
+  <text x="1036" y="188" fill="#a7f3d0" font-size="12">✓ hash links</text>
+  <text x="1036" y="210" fill="#a7f3d0" font-size="12">✓ signatures</text>
+  <text x="1036" y="232" fill="#a7f3d0" font-size="12">✓ key windows</text>
+  <text x="1036" y="254" fill="#a7f3d0" font-size="12">✓ anchors</text>
+  <rect x="1036" y="266" width="58" height="22" rx="11" fill="#065f46"/><text x="1048" y="282" fill="#d1fae5" font-size="12.5" font-weight="700">PASS</text>
+
+  <rect x="40" y="322" width="1130" height="52" rx="10" fill="#2a1414" stroke="#7f1d1d"/>
+  <text x="58" y="353" fill="#fecaca" font-size="13.5">Edit, delete, reorder or re-sign any entry with an unenrolled key → its hash changes → every later prev_hash breaks → verifier prints FAIL with the first broken entry.</text>
+</svg>

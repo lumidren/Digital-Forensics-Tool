@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620" font-family="Segoe UI, Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">Veritas DFIR architecture</title>
+  <desc id="d">Acquisition agent uploads over mTLS to the API, which stores evidence write-once, records custody in a signed ledger, and queues processing in sandboxed workers that feed the timeline, analytics and reports; the examiner UI sits on the API and the offline verifier checks custody exports.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b1220"/><stop offset="1" stop-color="#111a2e"/></linearGradient>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8aa4c8"/></marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#34d399"/></marker>
+    <filter id="s" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000" flood-opacity=".35"/></filter>
+  </defs>
+  <rect width="1200" height="620" rx="18" fill="url(#bg)"/>
+  <text x="40" y="52" fill="#e6edf7" font-size="26" font-weight="700">Veritas DFIR</text>
+  <text x="40" y="78" fill="#8aa4c8" font-size="15">From seizure to court: every byte hashed, every access signed, every parser validated</text>
+
+  <!-- zones -->
+  <rect x="30" y="110" width="250" height="470" rx="14" fill="#0f1a2c" stroke="#22324d"/>
+  <text x="50" y="138" fill="#8aa4c8" font-size="12" font-weight="600" letter-spacing="1.5">FIELD</text>
+  <rect x="300" y="110" width="600" height="470" rx="14" fill="#0f1a2c" stroke="#22324d"/>
+  <text x="320" y="138" fill="#8aa4c8" font-size="12" font-weight="600" letter-spacing="1.5">PLATFORM</text>
+  <rect x="920" y="110" width="250" height="470" rx="14" fill="#0f1a2c" stroke="#22324d"/>
+  <text x="940" y="138" fill="#8aa4c8" font-size="12" font-weight="600" letter-spacing="1.5">PEOPLE &amp; COURT</text>
+
+  <!-- field -->
+  <g filter="url(#s)">
+    <rect x="55" y="160" width="200" height="120" rx="12" fill="#1b2a45" stroke="#3b82f6"/>
+    <text x="75" y="190" fill="#e6edf7" font-size="16" font-weight="700">veritas-agent</text>
+    <text x="75" y="212" fill="#9fb3d1" font-size="12.5">Rust · Windows/Linux/macOS</text>
+    <text x="75" y="234" fill="#9fb3d1" font-size="12.5">triage · memory · E01 imaging</text>
+    <text x="75" y="256" fill="#9fb3d1" font-size="12.5">MD5 + SHA-256 + SHA3 in one pass</text>
+    <rect x="55" y="310" width="200" height="90" rx="12" fill="#1b2a45" stroke="#64748b"/>
+    <text x="75" y="340" fill="#e6edf7" font-size="16" font-weight="700">Evidence</text>
+    <text x="75" y="362" fill="#9fb3d1" font-size="12.5">disk · memory · logs · pcap</text>
+    <text x="75" y="383" fill="#9fb3d1" font-size="12.5">cloud · mobile backups</text>
+  </g>
+  <rect x="55" y="430" width="200" height="120" rx="12" fill="#13261f" stroke="#34d399"/>
+  <text x="75" y="460" fill="#d1fae5" font-size="15" font-weight="700">Write-block check</text>
+  <text x="75" y="482" fill="#a7f3d0" font-size="12.5">NTP clock offset</text>
+  <text x="75" y="504" fill="#a7f3d0" font-size="12.5">bad-sector map</text>
+  <text x="75" y="526" fill="#a7f3d0" font-size="12.5">signed acquire entry</text>
+
+  <!-- platform -->
+  <g filter="url(#s)">
+    <rect x="330" y="160" width="250" height="100" rx="12" fill="#1b2a45" stroke="#3b82f6"/>
+    <text x="350" y="190" fill="#e6edf7" font-size="16" font-weight="700">API</text>
+    <text x="350" y="212" fill="#9fb3d1" font-size="12.5">FastAPI · OIDC · case RBAC</text>
+    <text x="350" y="234" fill="#9fb3d1" font-size="12.5">resumable intake · audit log</text>
+    <rect x="620" y="160" width="250" height="100" rx="12" fill="#2a1d3d" stroke="#a78bfa"/>
+    <text x="640" y="190" fill="#ede9fe" font-size="16" font-weight="700">Custody ledger</text>
+    <text x="640" y="212" fill="#c4b5fd" font-size="12.5">Ed25519 · SHA-256 hash chain</text>
+    <text x="640" y="234" fill="#c4b5fd" font-size="12.5">every read, parse, export</text>
+    <rect x="330" y="290" width="250" height="100" rx="12" fill="#1b2a45" stroke="#f59e0b"/>
+    <text x="350" y="320" fill="#e6edf7" font-size="16" font-weight="700">WORM evidence store</text>
+    <text x="350" y="342" fill="#fcd9a0" font-size="12.5">content-addressed · Object Lock</text>
+    <text x="350" y="364" fill="#fcd9a0" font-size="12.5">per-case XChaCha20 keys</text>
+    <rect x="620" y="290" width="250" height="100" rx="12" fill="#1b2a45" stroke="#f472b6"/>
+    <text x="640" y="320" fill="#e6edf7" font-size="16" font-weight="700">Sandboxed workers</text>
+    <text x="640" y="342" fill="#fbcfe8" font-size="12.5">68 validated parsers · leased DAG</text>
+    <text x="640" y="364" fill="#fbcfe8" font-size="12.5">memory cap · timeout · no network</text>
+    <rect x="330" y="420" width="250" height="130" rx="12" fill="#1b2a45" stroke="#22d3ee"/>
+    <text x="350" y="450" fill="#e6edf7" font-size="16" font-weight="700">Super-timeline</text>
+    <text x="350" y="472" fill="#a5f3fc" font-size="12.5">Plaso-compatible events</text>
+    <text x="350" y="494" fill="#a5f3fc" font-size="12.5">SQLite FTS5 or ClickHouse</text>
+    <text x="350" y="516" fill="#a5f3fc" font-size="12.5">timezone + clock-skew aware</text>
+    <rect x="620" y="420" width="250" height="130" rx="12" fill="#1b2a45" stroke="#f87171"/>
+    <text x="640" y="450" fill="#e6edf7" font-size="16" font-weight="700">Analytics</text>
+    <text x="640" y="472" fill="#fecaca" font-size="12.5">execution · lateral movement</text>
+    <text x="640" y="494" fill="#fecaca" font-size="12.5">timestomp · persistence · IOCs</text>
+    <text x="640" y="516" fill="#fecaca" font-size="12.5">ATT&amp;CK-mapped proposals</text>
+  </g>
+
+  <!-- people -->
+  <g filter="url(#s)">
+    <rect x="945" y="160" width="200" height="110" rx="12" fill="#1b2a45" stroke="#3b82f6"/>
+    <text x="965" y="190" fill="#e6edf7" font-size="16" font-weight="700">Examiner UI</text>
+    <text x="965" y="212" fill="#9fb3d1" font-size="12.5">Next.js · keyboard-first</text>
+    <text x="965" y="234" fill="#9fb3d1" font-size="12.5">timeline · graphs · hex</text>
+    <text x="965" y="256" fill="#9fb3d1" font-size="12.5">two-person review</text>
+    <rect x="945" y="300" width="200" height="100" rx="12" fill="#1b2a45" stroke="#e5e7eb"/>
+    <text x="965" y="330" fill="#e6edf7" font-size="16" font-weight="700">Signed report</text>
+    <text x="965" y="352" fill="#9fb3d1" font-size="12.5">PDF / DOCX, byte-identical</text>
+    <text x="965" y="374" fill="#9fb3d1" font-size="12.5">STIX 2.1 · CSV · Plaso</text>
+  </g>
+  <rect x="945" y="430" width="200" height="120" rx="12" fill="#13261f" stroke="#34d399"/>
+  <text x="965" y="460" fill="#d1fae5" font-size="16" font-weight="700">veritas-verify</text>
+  <text x="965" y="482" fill="#a7f3d0" font-size="12.5">offline, independent</text>
+  <text x="965" y="504" fill="#a7f3d0" font-size="12.5">re-checks every signature</text>
+  <rect x="965" y="516" width="64" height="24" rx="12" fill="#065f46"/>
+  <text x="980" y="533" fill="#d1fae5" font-size="13" font-weight="700">PASS</text>
+
+  <!-- arrows -->
+  <path d="M255 220 H330" stroke="#8aa4c8" stroke-width="2" fill="none" marker-end="url(#a)"/>
+  <text x="262" y="210" fill="#8aa4c8" font-size="11">mTLS</text>
+  <path d="M155 310 V280" stroke="#8aa4c8" stroke-width="2" fill="none" marker-end="url(#a)"/>
+  <path d="M580 210 H620" stroke="#a78bfa" stroke-width="2" fill="none" marker-end="url(#a)"/>
+  <path d="M455 260 V290" stroke="#8aa4c8" stroke-width="2" fill="none" marker-end="url(#a)"/>
+  <path d="M580 340 H620" stroke="#8aa4c8" stroke-width="2" fill="none" marker-end="url(#a)"/>
+  <path d="M700 390 C700 410 520 400 470 420" stroke="#8aa4c8" stroke-width="2" fill="none" marker-end="url(#a)"/>
+  <path d="M580 485 H620" stroke="#8aa4c8" stroke-width="2" fill="none" marker-end="url(#a)"/>
+  <path d="M745 290 V260" stroke="#a78bfa" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#a)"/>
+  <path d="M870 485 C910 485 905 350 945 350" stroke="#8aa4c8" stroke-width="2" fill="none" marker-end="url(#a)"/>
+  <path d="M945 215 H870" stroke="#8aa4c8" stroke-width="2" fill="none" marker-end="url(#a)"/>
+  <path d="M870 240 C920 250 900 470 945 480" stroke="#34d399" stroke-width="2" stroke-dasharray="6 5" fill="none" marker-end="url(#g)"/>
+  <text x="878" y="300" fill="#34d399" font-size="11">custody export</text>
+  <text x="40" y="604" fill="#5b6f8f" font-size="12">Native profile: one workstation, SQLite, no containers. Cluster profile: Kubernetes, Postgres, ClickHouse, S3 Object Lock.</text>
+</svg>
