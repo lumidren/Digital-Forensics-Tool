@@ -1,0 +1,24 @@
+{
+  "fields": {
+    "author": {
+      "agree": 1,
+      "total": 1
+    },
+    "timestamps": {
+      "agree": 2,
+      "total": 2
+    },
+    "title": {
+      "agree": 1,
+      "total": 1
+    }
+  },
+  "notes": "plaso additionally emits olecf:item events for OLE directory entries (not a metadata parser concern).",
+  "parser": "py_olecf_summary",
+  "records_ours": 1,
+  "records_reference": 1,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/Document.doc"
+  ]
+}

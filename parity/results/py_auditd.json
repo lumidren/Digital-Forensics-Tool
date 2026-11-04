@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "serial_and_time": {
+      "agree": 17,
+      "total": 17
+    }
+  },
+  "notes": "plaso has no auditd parser.",
+  "parser": "py_auditd",
+  "records_ours": 17,
+  "records_reference": 17,
+  "reference": "raw text: distinct msg=audit(sec.ms:serial) headers",
+  "samples": [
+    "plaso/audit.log",
+    "plaso/audit_corrupted.log"
+  ]
+}

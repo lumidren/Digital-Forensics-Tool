@@ -1,0 +1,41 @@
+{
+  "parser": "fs_fat_tsk",
+  "reference": "pytsk3 4.15.0",
+  "samples": [
+    "dfvfs/fat12.raw",
+    "dfvfs/bdetogo.raw (decrypted)"
+  ],
+  "records_ours": 18,
+  "records_reference": 18,
+  "fields": {
+    "atime": {
+      "agree": 18,
+      "total": 18
+    },
+    "crtime": {
+      "agree": 18,
+      "total": 18
+    },
+    "crtime_nano": {
+      "agree": 18,
+      "total": 18
+    },
+    "is_allocated": {
+      "agree": 18,
+      "total": 18
+    },
+    "mtime": {
+      "agree": 18,
+      "total": 18
+    },
+    "name_path": {
+      "agree": 18,
+      "total": 18
+    },
+    "size": {
+      "agree": 14,
+      "total": 14
+    }
+  },
+  "notes": "TSK converts FAT wall-clock times with the host time zone; the comparison applies the same mktime conversion. Deleted entries included on both sides. TSK virtual files ($MBR, $FAT1, $FAT2, $OrphanFiles, volume label entry) excluded; directory sizes not compared."
+}

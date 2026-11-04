@@ -1,0 +1,20 @@
+{
+  "fields": {
+    "client": {
+      "agree": 21,
+      "total": 21
+    },
+    "timestamps": {
+      "agree": 21,
+      "total": 21
+    }
+  },
+  "notes": "",
+  "parser": "py_macos_tcc",
+  "records_ours": 21,
+  "records_reference": 21,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/macos/TCC-test.db"
+  ]
+}

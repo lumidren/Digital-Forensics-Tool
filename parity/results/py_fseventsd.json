@@ -1,0 +1,25 @@
+{
+  "fields": {
+    "event_identifier": {
+      "agree": 18,
+      "total": 18
+    },
+    "flags": {
+      "agree": 18,
+      "total": 18
+    },
+    "path": {
+      "agree": 16,
+      "total": 16
+    }
+  },
+  "notes": "Records compared on path/event id/flags; event times are the fseventsd file mtime in both tools.",
+  "parser": "py_fseventsd",
+  "records_ours": 18,
+  "records_reference": 18,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/fsevents/fsevents-00000000001a0b79",
+    "plaso/fsevents/fsevents-0000000002d89b58"
+  ]
+}

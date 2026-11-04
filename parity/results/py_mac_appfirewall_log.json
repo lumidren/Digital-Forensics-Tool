@@ -1,0 +1,20 @@
+{
+  "fields": {
+    "process_name": {
+      "agree": 46,
+      "total": 47
+    },
+    "timestamps": {
+      "agree": 47,
+      "total": 47
+    }
+  },
+  "notes": "Year-less: compared on month..second.",
+  "parser": "py_mac_appfirewall_log",
+  "records_ours": 47,
+  "records_reference": 47,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/appfirewall.log"
+  ]
+}

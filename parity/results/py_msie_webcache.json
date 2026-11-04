@@ -1,0 +1,20 @@
+{
+  "fields": {
+    "timestamps": {
+      "agree": 1372,
+      "total": 1372
+    },
+    "url": {
+      "agree": 313,
+      "total": 313
+    }
+  },
+  "notes": "plaso skips the iecompat, iecompatua and wpnidm containers; they are excluded from the comparison. Pre-1970 FILETIME values are treated as invalid by Veritas.",
+  "parser": "py_msie_webcache",
+  "records_ours": 341,
+  "records_reference": 341,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/msiecf/WebCacheV01.dat"
+  ]
+}

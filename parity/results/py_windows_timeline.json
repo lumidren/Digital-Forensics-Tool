@@ -1,0 +1,16 @@
+{
+  "fields": {
+    "timestamps": {
+      "agree": 112,
+      "total": 112
+    }
+  },
+  "notes": "plaso emits only StartTime; Veritas also emits End, LastModified and Expiration times.",
+  "parser": "py_windows_timeline",
+  "records_ours": 112,
+  "records_reference": 112,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/windows/ActivitiesCache.db"
+  ]
+}

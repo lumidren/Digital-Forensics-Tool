@@ -1,0 +1,23 @@
+{
+  "fields": {
+    "timestamps_month_to_us": {
+      "agree": 96,
+      "total": 96
+    }
+  },
+  "notes": "plaso resolves BSD syslog years at timeline time (date-less log helper), so it cannot be compared in-process. Reference = every line starting with a BSD timestamp.",
+  "parser": "py_syslog_traditional",
+  "records_ours": 96,
+  "records_reference": 96,
+  "reference": "raw text (independent header regex), year-agnostic",
+  "samples": [
+    "plaso/syslog/syslog",
+    "plaso/syslog/syslog_ssh.log",
+    "plaso/syslog/syslog_cron.log",
+    "plaso/syslog/syslog_osx",
+    "plaso/syslog/syslog_cron_debian.log",
+    "plaso/syslog/syslog_crond.log",
+    "plaso/syslog/syslog_sshd_session.log",
+    "plaso/syslog/syslog_sudo_traditional.log"
+  ]
+}

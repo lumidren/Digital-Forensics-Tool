@@ -1,0 +1,77 @@
+{
+  "parser": "regf",
+  "reference": "libregf-python 20260526; dissect.regf 3.14",
+  "samples": [
+    "plaso/NTUSER.DAT",
+    "plaso/NTUSER-WIN7.DAT",
+    "plaso/NTUSER-RunTests.DAT",
+    "plaso/NTUSER-CCLEANER.DAT",
+    "plaso/SYSTEM",
+    "plaso/SOFTWARE",
+    "plaso/regf/NTUSER.DAT",
+    "plaso/regf/UsrClass.dat",
+    "plaso/regf/100_sub_keys.hiv",
+    "plaso/winreg/Amcache.hve",
+    "plaso/winreg/win10-Amcache.hve"
+  ],
+  "records_ours": 165270,
+  "records_reference": 165270,
+  "records_dissect": 165270,
+  "fields": {
+    "key_present": {
+      "agree": 165270,
+      "total": 165270
+    },
+    "last_written": {
+      "agree": 165270,
+      "total": 165270
+    },
+    "class_name": {
+      "agree": 165270,
+      "total": 165270
+    },
+    "value_names": {
+      "agree": 165270,
+      "total": 165270
+    },
+    "value_types": {
+      "agree": 165270,
+      "total": 165270
+    },
+    "value_data": {
+      "agree": 156761,
+      "total": 165270
+    },
+    "value_data_libregf_normalized": {
+      "agree": 165270,
+      "total": 165270
+    }
+  },
+  "fields_dissect": {
+    "key_present": {
+      "agree": 165270,
+      "total": 165270
+    },
+    "last_written": {
+      "agree": 165270,
+      "total": 165270
+    },
+    "class_name": {
+      "agree": 165270,
+      "total": 165270
+    },
+    "value_names": {
+      "agree": 165270,
+      "total": 165270
+    },
+    "value_types": {
+      "agree": 165270,
+      "total": 165270
+    },
+    "value_data": {
+      "agree": 165270,
+      "total": 165270
+    }
+  },
+  "notes": "Keys compared by root-relative path; value data compared by SHA-256 of the raw bytes. value_data vs pyregf is below 100% only because of two libregf-python quirks (resident data < 4 bytes returned as the last n bytes of the 4-byte field; non-resident REG_SZ/REG_EXPAND_SZ cut at the first NUL, dropping in-size slack); value_data_libregf_normalized applies both and agrees 100%, and dissect.regf agrees 100% strictly. "
+}

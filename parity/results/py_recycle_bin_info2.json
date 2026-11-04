@@ -1,0 +1,24 @@
+{
+  "fields": {
+    "original_filename": {
+      "agree": 4,
+      "total": 4
+    },
+    "record_index": {
+      "agree": 4,
+      "total": 4
+    },
+    "timestamps": {
+      "agree": 4,
+      "total": 4
+    }
+  },
+  "notes": "",
+  "parser": "py_recycle_bin_info2",
+  "records_ours": 4,
+  "records_reference": 4,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/recycler/INFO2"
+  ]
+}

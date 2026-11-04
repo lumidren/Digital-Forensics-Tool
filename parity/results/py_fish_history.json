@@ -1,0 +1,20 @@
+{
+  "fields": {
+    "command": {
+      "agree": 10,
+      "total": 10
+    },
+    "timestamps": {
+      "agree": 10,
+      "total": 10
+    }
+  },
+  "notes": "",
+  "parser": "py_fish_history",
+  "records_ours": 10,
+  "records_reference": 10,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/fish_history"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "fields": {
+    "timestamps": {
+      "agree": 206,
+      "total": 208
+    }
+  },
+  "notes": "plaso also emits 'appearance' times equal to the Cocoa epoch (2001-01-01, i.e. unset); Veritas omits them.",
+  "parser": "py_santa",
+  "records_ours": 191,
+  "records_reference": 191,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/santa.log"
+  ]
+}

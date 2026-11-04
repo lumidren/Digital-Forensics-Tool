@@ -1,0 +1,98 @@
+{
+  "parser": "lnk",
+  "reference": "liblnk-python 20260525",
+  "samples": [
+    "plaso/NeroInfoTool.lnk",
+    "plaso/example.lnk",
+    "plaso/unpaired_surrogate.lnk"
+  ],
+  "records_ours": 3,
+  "records_reference": 3,
+  "fields": {
+    "creation_time": {
+      "agree": 3,
+      "total": 3
+    },
+    "modification_time": {
+      "agree": 3,
+      "total": 3
+    },
+    "access_time": {
+      "agree": 3,
+      "total": 3
+    },
+    "file_size": {
+      "agree": 3,
+      "total": 3
+    },
+    "data_flags": {
+      "agree": 3,
+      "total": 3
+    },
+    "local_path": {
+      "agree": 3,
+      "total": 3
+    },
+    "network_path": {
+      "agree": 3,
+      "total": 3
+    },
+    "description": {
+      "agree": 3,
+      "total": 3
+    },
+    "relative_path": {
+      "agree": 3,
+      "total": 3
+    },
+    "working_directory": {
+      "agree": 3,
+      "total": 3
+    },
+    "command_line_arguments": {
+      "agree": 3,
+      "total": 3
+    },
+    "icon_location": {
+      "agree": 3,
+      "total": 3
+    },
+    "environment_variables_location": {
+      "agree": 3,
+      "total": 3
+    },
+    "drive_type": {
+      "agree": 3,
+      "total": 3
+    },
+    "drive_serial_number": {
+      "agree": 3,
+      "total": 3
+    },
+    "volume_label": {
+      "agree": 3,
+      "total": 3
+    },
+    "machine_identifier": {
+      "agree": 3,
+      "total": 3
+    },
+    "droid_volume_identifier": {
+      "agree": 3,
+      "total": 3
+    },
+    "droid_file_identifier": {
+      "agree": 3,
+      "total": 3
+    },
+    "birth_droid_volume_identifier": {
+      "agree": 3,
+      "total": 3
+    },
+    "birth_droid_file_identifier": {
+      "agree": 3,
+      "total": 3
+    }
+  },
+  "notes": "Lone UTF-16 surrogates in pylnk strings are normalized to U+FFFD before comparison (Rust String cannot represent them). "
+}

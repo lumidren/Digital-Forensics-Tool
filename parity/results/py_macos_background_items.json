@@ -1,0 +1,16 @@
+{
+  "fields": {
+    "target_path": {
+      "agree": 1,
+      "total": 1
+    }
+  },
+  "notes": "",
+  "parser": "py_macos_background_items",
+  "records_ours": 1,
+  "records_reference": 1,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/backgrounditems.btm"
+  ]
+}

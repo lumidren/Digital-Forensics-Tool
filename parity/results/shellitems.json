@@ -1,0 +1,55 @@
+{
+  "parser": "shellitems",
+  "reference": "libfwsi-python 20260522",
+  "samples": [
+    "plaso/NTUSER-WIN7.DAT",
+    "plaso/NTUSER.DAT",
+    "plaso/NeroInfoTool.lnk",
+    "plaso/automaticDestinations-ms/1b4dd67f29cb1962.automaticDestinations-ms",
+    "plaso/automaticDestinations-ms/9d1f905ce5044aee.automaticDestinations-ms",
+    "plaso/customDestinations-ms/368d807282ccde9d.customDestinations-ms",
+    "plaso/customDestinations-ms/5afe4de1b92fc382.customDestinations-ms",
+    "plaso/unpaired_surrogate.lnk"
+  ],
+  "records_ours": 94,
+  "records_reference": 94,
+  "fields": {
+    "item_count": {
+      "agree": 31,
+      "total": 31
+    },
+    "category": {
+      "agree": 94,
+      "total": 94
+    },
+    "class_id": {
+      "agree": 25,
+      "total": 25
+    },
+    "name": {
+      "agree": 55,
+      "total": 55
+    },
+    "modification_time": {
+      "agree": 40,
+      "total": 40
+    },
+    "long_name": {
+      "agree": 40,
+      "total": 40
+    },
+    "creation_time": {
+      "agree": 40,
+      "total": 40
+    },
+    "access_time": {
+      "agree": 40,
+      "total": 40
+    },
+    "file_reference": {
+      "agree": 40,
+      "total": 40
+    }
+  },
+  "notes": "31 ID lists (LNK targets, jump-list LNK streams, ShellBags BagMRU blobs). Times compared at 1 s resolution (FAT); lone surrogates normalized to U+FFFD. "
+}

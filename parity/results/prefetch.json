@@ -1,0 +1,55 @@
+{
+  "parser": "prefetch",
+  "reference": "libscca-python 20260527",
+  "samples": [
+    "plaso/winprefetch/AM_DELTA_PATCH_1.443.990.0.EX-7037CF86.pf",
+    "plaso/winprefetch/BYTECODEGENERATOR.EXE-C1E9BCE6.pf",
+    "plaso/winprefetch/CMD.EXE-087B4001.pf",
+    "plaso/winprefetch/NOTEPAD.EXE-D8414F97.pf",
+    "plaso/winprefetch/ONEDRIVE.EXE-7E152375.pf",
+    "plaso/winprefetch/PING.EXE-B29F6629.pf",
+    "plaso/winprefetch/TASKHOST.EXE-3AE259FC.pf",
+    "plaso/winprefetch/WUAUCLT.EXE-830BCC14.pf"
+  ],
+  "records_ours": 8,
+  "records_reference": 8,
+  "fields": {
+    "executable_name": {
+      "agree": 8,
+      "total": 8
+    },
+    "prefetch_hash": {
+      "agree": 8,
+      "total": 8
+    },
+    "run_count": {
+      "agree": 8,
+      "total": 8
+    },
+    "format_version": {
+      "agree": 8,
+      "total": 8
+    },
+    "last_run_times": {
+      "agree": 19,
+      "total": 19
+    },
+    "filenames": {
+      "agree": 8,
+      "total": 8
+    },
+    "volume_device_paths": {
+      "agree": 8,
+      "total": 8
+    },
+    "volume_serial_numbers": {
+      "agree": 8,
+      "total": 8
+    },
+    "volume_creation_times": {
+      "agree": 8,
+      "total": 8
+    }
+  },
+  "notes": "format versions covered: [17, 23, 26, 30, 31]; versions 30/31 are MAM\\x04 (LZXPRESS Huffman) compressed. last_run_times counts each non-zero run time individually."
+}

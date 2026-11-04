@@ -1,0 +1,20 @@
+{
+  "fields": {
+    "ip_address": {
+      "agree": 14,
+      "total": 15
+    },
+    "timestamps": {
+      "agree": 14,
+      "total": 15
+    }
+  },
+  "notes": "Veritas accepts one line plaso rejects; plaso and Veritas both accept requests with embedded quotes.",
+  "parser": "py_apache_access",
+  "records_ours": 15,
+  "records_reference": 14,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/apache_access.log"
+  ]
+}

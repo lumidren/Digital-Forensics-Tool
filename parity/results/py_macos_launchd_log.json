@@ -1,0 +1,16 @@
+{
+  "fields": {
+    "timestamps": {
+      "agree": 36609,
+      "total": 36609
+    }
+  },
+  "notes": "",
+  "parser": "py_macos_launchd_log",
+  "records_ours": 36609,
+  "records_reference": 36609,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/macos_launchd.log"
+  ]
+}

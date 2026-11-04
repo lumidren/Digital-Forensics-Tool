@@ -1,0 +1,18 @@
+{
+  "fields": {
+    "timestamps": {
+      "agree": 42,
+      "total": 43
+    }
+  },
+  "notes": "Year-less BSD syslog samples are not comparable in-process (plaso resolves years through its date-less log helper at timeline time); they are verified against the raw text in test_py_handverified. syslog_sudo: Veritas keeps one multi-line sudo record that plaso's grammar rejects.",
+  "parser": "py_syslog",
+  "records_ours": 43,
+  "records_reference": 42,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/syslog/syslog_sudo.log",
+    "plaso/syslog/syslog_rsyslog",
+    "plaso/syslog/syslog_rsyslog_SyslogProtocol23Format"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "fields": {
+    "subject_and_sent_time": {
+      "agree": 3,
+      "total": 3
+    }
+  },
+  "notes": "No mbox sample in the plaso corpus; plaso has no mbox parser.",
+  "parser": "py_mbox",
+  "records_ours": 3,
+  "records_reference": 3,
+  "reference": "python stdlib mailbox.mbox + email.utils",
+  "samples": [
+    "synthetic 3-message mbox (tests/parity/test_py_handverified.py)"
+  ]
+}

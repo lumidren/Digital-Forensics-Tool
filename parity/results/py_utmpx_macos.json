@@ -1,0 +1,20 @@
+{
+  "fields": {
+    "timestamps": {
+      "agree": 6,
+      "total": 6
+    },
+    "username": {
+      "agree": 4,
+      "total": 4
+    }
+  },
+  "notes": "",
+  "parser": "py_utmpx_macos",
+  "records_ours": 6,
+  "records_reference": 6,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/utmpx_mac"
+  ]
+}

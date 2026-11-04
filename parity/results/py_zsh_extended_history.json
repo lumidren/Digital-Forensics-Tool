@@ -1,0 +1,20 @@
+{
+  "fields": {
+    "command": {
+      "agree": 4,
+      "total": 4
+    },
+    "timestamps": {
+      "agree": 4,
+      "total": 4
+    }
+  },
+  "notes": "Multi-line commands: Veritas keeps the newlines, plaso joins with spaces (compared whitespace-normalised).",
+  "parser": "py_zsh_extended_history",
+  "records_ours": 4,
+  "records_reference": 4,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/zsh_extended_history.txt"
+  ]
+}

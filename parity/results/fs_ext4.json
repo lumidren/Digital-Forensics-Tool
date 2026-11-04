@@ -1,0 +1,72 @@
+{
+  "parser": "fs_ext4",
+  "reference": "pyfsext 20260821",
+  "samples": [
+    "dfvfs/ext4.raw#None",
+    "dfvfs/ext2.raw#None",
+    "plaso/ext4.raw#None",
+    "plaso/syslog_image.dd#None",
+    "dfvfs/mbr.raw#0",
+    "dfvfs/mbr.raw#1",
+    "dfvfs/gpt.raw#0",
+    "dfvfs/gpt.raw#1",
+    "plaso/tsk_volume_system.raw#1"
+  ],
+  "records_ours": 46,
+  "records_reference": 46,
+  "fields": {
+    "atime": {
+      "agree": 46,
+      "total": 46
+    },
+    "crtime": {
+      "agree": 46,
+      "total": 46
+    },
+    "ctime": {
+      "agree": 46,
+      "total": 46
+    },
+    "dtime": {
+      "agree": 46,
+      "total": 46
+    },
+    "gid": {
+      "agree": 46,
+      "total": 46
+    },
+    "inode": {
+      "agree": 46,
+      "total": 46
+    },
+    "links": {
+      "agree": 46,
+      "total": 46
+    },
+    "mode": {
+      "agree": 46,
+      "total": 46
+    },
+    "mtime": {
+      "agree": 46,
+      "total": 46
+    },
+    "name_path": {
+      "agree": 46,
+      "total": 46
+    },
+    "size": {
+      "agree": 30,
+      "total": 30
+    },
+    "symlink_target": {
+      "agree": 7,
+      "total": 7
+    },
+    "uid": {
+      "agree": 46,
+      "total": 46
+    }
+  },
+  "notes": "Directory sizes not compared (pyfsext reports 0, i_size is the block-rounded directory length). Times are nanoseconds incl. extra-isize; crtime None on 128-byte inodes (ext2)."
+}

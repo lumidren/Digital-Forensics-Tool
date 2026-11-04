@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "timestamps": {
+      "agree": 104,
+      "total": 104
+    }
+  },
+  "notes": "Compared at one-second resolution: plaso interprets the header32 'milliseconds' field as microseconds (e.g. 1383590180.000381); Veritas follows the OpenBSM spec (1383590180.381).",
+  "parser": "py_bsm_log",
+  "records_ours": 104,
+  "records_reference": 104,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/apple.bsm",
+    "plaso/openbsm.bsm"
+  ]
+}

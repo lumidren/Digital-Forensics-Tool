@@ -1,0 +1,28 @@
+{
+  "fields": {
+    "field_name": {
+      "agree": 3,
+      "total": 3
+    },
+    "timestamps": {
+      "agree": 6,
+      "total": 6
+    },
+    "usage_count": {
+      "agree": 3,
+      "total": 3
+    },
+    "value": {
+      "agree": 3,
+      "total": 3
+    }
+  },
+  "notes": "plaso's chrome_autofill plugin reads only the autofill table; keyword (search engine) events are Veritas-only.",
+  "parser": "py_chromium_webdata",
+  "records_ours": 3,
+  "records_reference": 3,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/chrome/Web Data"
+  ]
+}

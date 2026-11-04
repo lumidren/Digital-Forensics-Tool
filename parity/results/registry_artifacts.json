@@ -1,0 +1,68 @@
+{
+  "parser": "registry_artifacts",
+  "reference": "independent Python decoders over libregf-python 20260526 raw values",
+  "samples": [
+    "plaso/SYSTEM#AppCompatCache",
+    "plaso/NTUSER.DAT#UserAssist",
+    "plaso/NTUSER-WIN7.DAT#UserAssist",
+    "plaso/NTUSER-CCLEANER.DAT#UserAssist",
+    "plaso/regf/NTUSER.DAT#UserAssist"
+  ],
+  "records_ours": 471,
+  "records_reference": 471,
+  "fields": {
+    "shimcache_format": {
+      "agree": 1,
+      "total": 1
+    },
+    "shimcache_count": {
+      "agree": 1,
+      "total": 1
+    },
+    "shimcache_path": {
+      "agree": 330,
+      "total": 330
+    },
+    "shimcache_last_modified": {
+      "agree": 330,
+      "total": 330
+    },
+    "shimcache_executed": {
+      "agree": 330,
+      "total": 330
+    },
+    "shimcache_hand_check": {
+      "agree": 10,
+      "total": 10
+    },
+    "userassist_count_entries": {
+      "agree": 4,
+      "total": 4
+    },
+    "userassist_value_name": {
+      "agree": 141,
+      "total": 141
+    },
+    "userassist_count": {
+      "agree": 141,
+      "total": 141
+    },
+    "userassist_focus_count": {
+      "agree": 141,
+      "total": 141
+    },
+    "userassist_focus_duration_ms": {
+      "agree": 141,
+      "total": 141
+    },
+    "userassist_last_executed_raw": {
+      "agree": 141,
+      "total": 141
+    },
+    "userassist_format": {
+      "agree": 141,
+      "total": 141
+    }
+  },
+  "notes": "shimcache: Mandiant format description, plus hand check of first/last 5 SYSTEM entries; userassist: ROT13 + XP/Win7 layouts."
+}

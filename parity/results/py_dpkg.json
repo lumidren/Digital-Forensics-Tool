@@ -1,0 +1,16 @@
+{
+  "fields": {
+    "timestamps": {
+      "agree": 4,
+      "total": 4
+    }
+  },
+  "notes": "",
+  "parser": "py_dpkg",
+  "records_ours": 4,
+  "records_reference": 4,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/dpkg.log"
+  ]
+}

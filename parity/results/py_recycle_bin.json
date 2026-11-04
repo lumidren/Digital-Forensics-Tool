@@ -1,0 +1,21 @@
+{
+  "fields": {
+    "original_filename": {
+      "agree": 2,
+      "total": 2
+    },
+    "timestamps": {
+      "agree": 2,
+      "total": 2
+    }
+  },
+  "notes": "",
+  "parser": "py_recycle_bin",
+  "records_ours": 2,
+  "records_reference": 2,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/recycler/$I103S5F.jpg",
+    "plaso/recycler/$II3DF3L.zip"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "fields": {
+    "timestamps": {
+      "agree": 16,
+      "total": 16
+    },
+    "username": {
+      "agree": 14,
+      "total": 14
+    }
+  },
+  "notes": "Terminal '~' is rendered 'system boot' by plaso (not compared). wtmp.1: plaso emits 4 records, two of them non-text garbage; Veritas skips those with a warning.",
+  "parser": "py_utmp",
+  "records_ours": 16,
+  "records_reference": 18,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/utmp/utmp",
+    "plaso/utmp/wtmp.1"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "fields": {
+    "application": {
+      "agree": 5,
+      "total": 5
+    },
+    "timestamps": {
+      "agree": 5,
+      "total": 5
+    }
+  },
+  "notes": "",
+  "parser": "py_macos_appusage",
+  "records_ours": 5,
+  "records_reference": 5,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/macos/application_usage.sqlite"
+  ]
+}

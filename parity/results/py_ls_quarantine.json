@@ -1,0 +1,24 @@
+{
+  "fields": {
+    "agent": {
+      "agree": 14,
+      "total": 14
+    },
+    "timestamps": {
+      "agree": 14,
+      "total": 14
+    },
+    "url": {
+      "agree": 14,
+      "total": 14
+    }
+  },
+  "notes": "",
+  "parser": "py_ls_quarantine",
+  "records_ours": 14,
+  "records_reference": 14,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/sqlite/quarantine.db"
+  ]
+}

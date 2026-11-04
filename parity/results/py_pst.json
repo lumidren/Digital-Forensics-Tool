@@ -1,0 +1,20 @@
+{
+  "fields": {
+    "delivery_time": {
+      "agree": 540,
+      "total": 540
+    },
+    "subject": {
+      "agree": 544,
+      "total": 544
+    }
+  },
+  "notes": "plaso has no PST parser; reference is a direct pypff walk of every folder/message.",
+  "parser": "py_pst",
+  "records_ours": 544,
+  "records_reference": 544,
+  "reference": "libpff-python 20260926 (independent folder walk)",
+  "samples": [
+    "plaso/nromanoff@stark-research-labs.com.pst"
+  ]
+}

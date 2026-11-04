@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "timestamps": {
+      "agree": 282,
+      "total": 282
+    }
+  },
+  "notes": "",
+  "parser": "py_knowledgec",
+  "records_ours": 94,
+  "records_reference": 94,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/macos/knowledgec-10.14.db",
+    "plaso/macos/knowledgec-10.13.db"
+  ]
+}

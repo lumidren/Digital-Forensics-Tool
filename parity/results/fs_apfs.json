@@ -1,0 +1,92 @@
+{
+  "parser": "fs_apfs",
+  "reference": "pyfsapfs 20261030",
+  "samples": [
+    "dfvfs/apfs.raw"
+  ],
+  "records_ours": 10,
+  "records_reference": 10,
+  "fields": {
+    "added_time": {
+      "agree": 10,
+      "total": 10
+    },
+    "atime": {
+      "agree": 10,
+      "total": 10
+    },
+    "container_identifier": {
+      "agree": 1,
+      "total": 1
+    },
+    "crtime": {
+      "agree": 10,
+      "total": 10
+    },
+    "ctime": {
+      "agree": 10,
+      "total": 10
+    },
+    "gid": {
+      "agree": 10,
+      "total": 10
+    },
+    "identifier": {
+      "agree": 10,
+      "total": 10
+    },
+    "mode": {
+      "agree": 10,
+      "total": 10
+    },
+    "mtime": {
+      "agree": 10,
+      "total": 10
+    },
+    "name_path": {
+      "agree": 10,
+      "total": 10
+    },
+    "nlink": {
+      "agree": 10,
+      "total": 10
+    },
+    "parent_identifier": {
+      "agree": 10,
+      "total": 10
+    },
+    "size": {
+      "agree": 10,
+      "total": 10
+    },
+    "snapshot_count": {
+      "agree": 1,
+      "total": 1
+    },
+    "symlink_target": {
+      "agree": 1,
+      "total": 1
+    },
+    "uid": {
+      "agree": 10,
+      "total": 10
+    },
+    "volume_count": {
+      "agree": 1,
+      "total": 1
+    },
+    "volume_identifier": {
+      "agree": 1,
+      "total": 1
+    },
+    "volume_name": {
+      "agree": 1,
+      "total": 1
+    },
+    "xattr_names": {
+      "agree": 10,
+      "total": 10
+    }
+  },
+  "notes": "pyfsapfs has no snapshot API; snapshot_count compares our snap_metadata enumeration with the APSB num_snapshots field (0 on the corpus). Encrypted volumes: see python/tests/unit/test_decrypt.py."
+}

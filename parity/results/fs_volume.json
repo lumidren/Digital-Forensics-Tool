@@ -1,0 +1,32 @@
+{
+  "parser": "fs_volume",
+  "reference": "pytsk3 4.15.0 Volume_Info (allocated partitions)",
+  "samples": [
+    "dfvfs/mbr.raw",
+    "dfvfs/gpt.raw",
+    "dfvfs/gpt_in_mbr.raw",
+    "plaso/tsk_volume_system.raw",
+    "dfvfs/apfs_encrypted.dmg"
+  ],
+  "records_ours": 8,
+  "records_reference": 8,
+  "fields": {
+    "description": {
+      "agree": 8,
+      "total": 8
+    },
+    "length": {
+      "agree": 8,
+      "total": 8
+    },
+    "partition_count": {
+      "agree": 5,
+      "total": 5
+    },
+    "start": {
+      "agree": 8,
+      "total": 8
+    }
+  },
+  "notes": "MBR descriptions use TSK's '<name> (0xNN)' format; GPT descriptions are the partition name."
+}

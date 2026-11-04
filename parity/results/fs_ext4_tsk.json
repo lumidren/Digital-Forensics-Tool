@@ -1,0 +1,52 @@
+{
+  "parser": "fs_ext4_tsk",
+  "reference": "pytsk3 4.15.0",
+  "samples": [
+    "dfvfs/ext4.raw#None",
+    "dfvfs/ext2.raw#None",
+    "plaso/ext4.raw#None",
+    "plaso/syslog_image.dd#None",
+    "dfvfs/mbr.raw#0",
+    "dfvfs/mbr.raw#1",
+    "dfvfs/gpt.raw#0",
+    "dfvfs/gpt.raw#1",
+    "plaso/tsk_volume_system.raw#1"
+  ],
+  "records_ours": 46,
+  "records_reference": 46,
+  "fields": {
+    "atime": {
+      "agree": 46,
+      "total": 46
+    },
+    "crtime": {
+      "agree": 46,
+      "total": 46
+    },
+    "ctime": {
+      "agree": 46,
+      "total": 46
+    },
+    "inode": {
+      "agree": 46,
+      "total": 46
+    },
+    "is_allocated": {
+      "agree": 46,
+      "total": 46
+    },
+    "mtime": {
+      "agree": 46,
+      "total": 46
+    },
+    "name_path": {
+      "agree": 46,
+      "total": 46
+    },
+    "size": {
+      "agree": 46,
+      "total": 46
+    }
+  },
+  "notes": "TSK lists lost+found and reports directory i_size, both compared."
+}

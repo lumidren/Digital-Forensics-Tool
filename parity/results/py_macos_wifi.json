@@ -1,0 +1,16 @@
+{
+  "fields": {
+    "timestamps": {
+      "agree": 10,
+      "total": 10
+    }
+  },
+  "notes": "Year-less: compared on month..second.",
+  "parser": "py_macos_wifi",
+  "records_ours": 10,
+  "records_reference": 10,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/wifi.log"
+  ]
+}

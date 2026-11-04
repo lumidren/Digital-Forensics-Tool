@@ -1,0 +1,75 @@
+{
+  "parser": "jumplist",
+  "reference": "libolecf-python 20260526 + liblnk-python 20260525",
+  "samples": [
+    "plaso/automaticDestinations-ms/1b4dd67f29cb1962.automaticDestinations-ms",
+    "plaso/automaticDestinations-ms/9d1f905ce5044aee.automaticDestinations-ms",
+    "plaso/customDestinations-ms/368d807282ccde9d.customDestinations-ms",
+    "plaso/customDestinations-ms/5afe4de1b92fc382.customDestinations-ms"
+  ],
+  "records_ours": 21,
+  "records_reference": 21,
+  "fields": {
+    "stream_names": {
+      "agree": 2,
+      "total": 2
+    },
+    "stream_size": {
+      "agree": 9,
+      "total": 9
+    },
+    "lnk_local_path": {
+      "agree": 9,
+      "total": 9
+    },
+    "lnk_modification_time": {
+      "agree": 9,
+      "total": 9
+    },
+    "lnk_file_size": {
+      "agree": 9,
+      "total": 9
+    },
+    "destlist_entry_count": {
+      "agree": 2,
+      "total": 2
+    },
+    "destlist_entry_number": {
+      "agree": 9,
+      "total": 9
+    },
+    "destlist_path": {
+      "agree": 9,
+      "total": 9
+    },
+    "destlist_last_modification_filetime": {
+      "agree": 9,
+      "total": 9
+    },
+    "destlist_pin_status": {
+      "agree": 9,
+      "total": 9
+    },
+    "custom_entry_count": {
+      "agree": 2,
+      "total": 2
+    },
+    "custom_offset": {
+      "agree": 12,
+      "total": 12
+    },
+    "custom_local_path": {
+      "agree": 12,
+      "total": 12
+    },
+    "custom_description": {
+      "agree": 12,
+      "total": 12
+    },
+    "custom_file_size": {
+      "agree": 12,
+      "total": 12
+    }
+  },
+  "notes": "records = DestList entries + CustomDestinations links. DestList reference is an independent Python reader over the pyolecf stream bytes. "
+}

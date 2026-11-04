@@ -1,0 +1,48 @@
+{
+  "parser": "fs_vss",
+  "reference": "pyvshadow 20260714",
+  "samples": [
+    "dfvfs/vss.raw"
+  ],
+  "records_ours": 2,
+  "records_reference": 2,
+  "fields": {
+    "block_descriptor_count": {
+      "agree": 2,
+      "total": 2
+    },
+    "copy_identifier": {
+      "agree": 2,
+      "total": 2
+    },
+    "copy_set_identifier": {
+      "agree": 2,
+      "total": 2
+    },
+    "creation_time": {
+      "agree": 2,
+      "total": 2
+    },
+    "first_mib_sha256": {
+      "agree": 2,
+      "total": 2
+    },
+    "identifier": {
+      "agree": 2,
+      "total": 2
+    },
+    "store_count": {
+      "agree": 1,
+      "total": 1
+    },
+    "store_size": {
+      "agree": 2,
+      "total": 2
+    },
+    "volume_size": {
+      "agree": 2,
+      "total": 2
+    }
+  },
+  "notes": "Full-store SHA-256 of both stores also matches pyvshadow (Rust test vss_store_data_matches_pyvshadow). store_size compares the shadow-copy size (pyvshadow store.size), i.e. the volume size."
+}

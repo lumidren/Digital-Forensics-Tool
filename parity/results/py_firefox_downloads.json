@@ -1,0 +1,24 @@
+{
+  "fields": {
+    "full_path": {
+      "agree": 1,
+      "total": 1
+    },
+    "timestamps": {
+      "agree": 2,
+      "total": 2
+    },
+    "url": {
+      "agree": 1,
+      "total": 1
+    }
+  },
+  "notes": "",
+  "parser": "py_firefox_downloads",
+  "records_ours": 1,
+  "records_reference": 1,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/firefox/downloads.sqlite"
+  ]
+}

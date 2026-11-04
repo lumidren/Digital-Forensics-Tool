@@ -1,0 +1,60 @@
+{
+  "parser": "fs_usn",
+  "reference": "dissect.ntfs 3.16 UsnJrnl",
+  "samples": [
+    "plaso/UsnJrnl.raw"
+  ],
+  "records_ours": 19,
+  "records_reference": 19,
+  "fields": {
+    "file_attributes": {
+      "agree": 19,
+      "total": 19
+    },
+    "file_reference": {
+      "agree": 19,
+      "total": 19
+    },
+    "filename": {
+      "agree": 19,
+      "total": 19
+    },
+    "major_version": {
+      "agree": 19,
+      "total": 19
+    },
+    "offset": {
+      "agree": 19,
+      "total": 19
+    },
+    "parent_file_reference": {
+      "agree": 19,
+      "total": 19
+    },
+    "reason_flags": {
+      "agree": 19,
+      "total": 19
+    },
+    "record_count": {
+      "agree": 1,
+      "total": 1
+    },
+    "source_info": {
+      "agree": 19,
+      "total": 19
+    },
+    "timestamp_ns": {
+      "agree": 19,
+      "total": 19
+    },
+    "timestamp_raw": {
+      "agree": 19,
+      "total": 19
+    },
+    "usn": {
+      "agree": 19,
+      "total": 19
+    }
+  },
+  "notes": "Raw $J extract (USN_RECORD_V2). V3/V4 decoding is covered by Rust unit tests with hand-built records."
+}

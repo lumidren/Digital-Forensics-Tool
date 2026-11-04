@@ -1,0 +1,20 @@
+{
+  "fields": {
+    "text": {
+      "agree": 10,
+      "total": 10
+    },
+    "timestamps": {
+      "agree": 10,
+      "total": 10
+    }
+  },
+  "notes": "plaso emits only the message date; Veritas also emits read/delivered times.",
+  "parser": "py_imessage",
+  "records_ours": 10,
+  "records_reference": 10,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/sqlite/imessage_chat.db"
+  ]
+}

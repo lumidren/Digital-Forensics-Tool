@@ -1,0 +1,20 @@
+{
+  "fields": {
+    "timestamps": {
+      "agree": 6,
+      "total": 6
+    },
+    "title": {
+      "agree": 6,
+      "total": 6
+    }
+  },
+  "notes": "",
+  "parser": "py_macos_notification_center",
+  "records_ours": 6,
+  "records_reference": 6,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/mac_notificationcenter.db"
+  ]
+}

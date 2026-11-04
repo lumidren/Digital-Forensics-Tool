@@ -1,0 +1,30 @@
+{
+  "fields": {
+    "filename": {
+      "agree": 3,
+      "total": 3
+    },
+    "process": {
+      "agree": 3,
+      "total": 3
+    },
+    "threat_name": {
+      "agree": 3,
+      "total": 3
+    },
+    "timestamps": {
+      "agree": 3,
+      "total": 3
+    }
+  },
+  "notes": "",
+  "parser": "py_windefender_history",
+  "records_ours": 3,
+  "records_reference": 3,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/windefender_history/6AFE33A0-19BA-4FFF-892F-B700539D7D63",
+    "plaso/windefender_history/7C66C39C-49DD-42D7-9822-4039C98CC246",
+    "plaso/windefender_history/FC380697-A68D-4C94-B67F-9B6449039463"
+  ]
+}

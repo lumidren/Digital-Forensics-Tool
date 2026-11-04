@@ -1,0 +1,31 @@
+{
+  "parser": "journald",
+  "reference": "independent pure-Python journal reader (python/tests/parity/test_journald.py); systemd/journalctl not available on Windows",
+  "samples": [
+    "plaso/systemd/journal/system.journal",
+    "plaso/systemd/journal/system.journal.lz4",
+    "plaso/systemd/journal/system@00053f9c9a4c1e0e-2e18a70e8b327fed.journal~",
+    "plaso/systemd/journal/user-1000.journal"
+  ],
+  "records_ours": 4399,
+  "records_reference": 4399,
+  "fields": {
+    "entry_count": {
+      "agree": 4,
+      "total": 4
+    },
+    "seqnum": {
+      "agree": 4399,
+      "total": 4399
+    },
+    "realtime": {
+      "agree": 4399,
+      "total": 4399
+    },
+    "message": {
+      "agree": 4232,
+      "total": 4397
+    }
+  },
+  "notes": "165 MESSAGE fields are XZ-compressed: the reference decodes them with lzma, Veritas reports them as unsupported_fields (no XZ decoder in the Rust crate). ZSTD data objects (user-1000.journal) are unsupported by both. The dirty journal (.journal~) has 45 entry-array references to zeroed objects that both readers skip."
+}

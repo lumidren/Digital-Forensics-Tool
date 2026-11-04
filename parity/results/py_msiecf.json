@@ -1,0 +1,21 @@
+{
+  "fields": {
+    "timestamps": {
+      "agree": 2933,
+      "total": 2962
+    },
+    "url": {
+      "agree": 1048,
+      "total": 1056
+    }
+  },
+  "notes": "Veritas additionally emits records recovered from unallocated blocks (attrs.recovered=true); plaso's 'synchronization_time' is Veritas 'Last Checked Time' (URL record offset 0x50).",
+  "parser": "py_msiecf",
+  "records_ours": 1057,
+  "records_reference": 1058,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/msiecf/nfury_index.dat",
+    "plaso/msiecf/MSHist012013031020130311-index.dat"
+  ]
+}

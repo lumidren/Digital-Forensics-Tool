@@ -1,0 +1,53 @@
+{
+  "parser": "fs_ntfs_tsk",
+  "reference": "pytsk3 4.15.0",
+  "samples": [
+    "dfvfs/ntfs.raw",
+    "dfvfs/vss.raw"
+  ],
+  "records_ours": 56,
+  "records_reference": 54,
+  "fields": {
+    "ads_names": {
+      "agree": 54,
+      "total": 54
+    },
+    "is_allocated": {
+      "agree": 54,
+      "total": 54
+    },
+    "mft_entry": {
+      "agree": 54,
+      "total": 54
+    },
+    "name_path": {
+      "agree": 54,
+      "total": 54
+    },
+    "parent_entry": {
+      "agree": 54,
+      "total": 54
+    },
+    "si_atime": {
+      "agree": 54,
+      "total": 54
+    },
+    "si_crtime": {
+      "agree": 54,
+      "total": 54
+    },
+    "si_ctime": {
+      "agree": 54,
+      "total": 54
+    },
+    "si_mtime": {
+      "agree": 54,
+      "total": 54
+    },
+    "size": {
+      "agree": 45,
+      "total": 45
+    }
+  },
+  "notes": "Directory sizes not compared (TSK reports $I30 allocation size). TSK times are $STANDARD_INFORMATION."
+}

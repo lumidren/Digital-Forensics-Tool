@@ -1,0 +1,74 @@
+{
+  "parser": "fs_ntfs",
+  "reference": "pyfsntfs 20260827",
+  "samples": [
+    "dfvfs/ntfs.raw",
+    "dfvfs/vss.raw",
+    "plaso/MFT"
+  ],
+  "records_ours": 13177,
+  "records_reference": 13177,
+  "fields": {
+    "ads_names": {
+      "agree": 13171,
+      "total": 13171
+    },
+    "fn_atime": {
+      "agree": 13177,
+      "total": 13177
+    },
+    "fn_count": {
+      "agree": 13177,
+      "total": 13177
+    },
+    "fn_crtime": {
+      "agree": 13177,
+      "total": 13177
+    },
+    "fn_ctime": {
+      "agree": 13177,
+      "total": 13177
+    },
+    "fn_mtime": {
+      "agree": 13177,
+      "total": 13177
+    },
+    "is_allocated": {
+      "agree": 13177,
+      "total": 13177
+    },
+    "mft_entry": {
+      "agree": 13177,
+      "total": 13177
+    },
+    "name": {
+      "agree": 13177,
+      "total": 13177
+    },
+    "parent_entry": {
+      "agree": 13177,
+      "total": 13177
+    },
+    "si_atime": {
+      "agree": 13177,
+      "total": 13177
+    },
+    "si_crtime": {
+      "agree": 13177,
+      "total": 13177
+    },
+    "si_ctime": {
+      "agree": 13177,
+      "total": 13177
+    },
+    "si_mtime": {
+      "agree": 13177,
+      "total": 13177
+    },
+    "size": {
+      "agree": 13177,
+      "total": 13177
+    }
+  },
+  "notes": "Records pyfsntfs refuses (no FILE header) are excluded from totals. For the bare plaso $MFT extract pyfsntfs.mft_metadata_file reports size 0 for non-resident data, so size is compared with the unnamed $DATA attribute data_size read through pyfsntfs. ads_names skipped where pyfsntfs raises on inconsistent run lists (6 deleted records)."
+}

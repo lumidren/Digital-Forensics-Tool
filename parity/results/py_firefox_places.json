@@ -1,0 +1,22 @@
+{
+  "fields": {
+    "timestamps": {
+      "agree": 326,
+      "total": 330
+    },
+    "url": {
+      "agree": 193,
+      "total": 193
+    }
+  },
+  "notes": "places.sqlite: Veritas also emits two bookmark rows whose moz_places entry is missing (plaso drops them) and per-annotation events for all moz_items_annos rows (plaso: 3); compared types exclude annotations.",
+  "parser": "py_firefox_places",
+  "records_ours": 210,
+  "records_reference": 208,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/firefox/places.sqlite",
+    "plaso/firefox/places118.sqlite",
+    "plaso/firefox/places118.sqlite"
+  ]
+}

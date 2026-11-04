@@ -1,0 +1,16 @@
+{
+  "fields": {
+    "timestamps": {
+      "agree": 18543,
+      "total": 18543
+    }
+  },
+  "notes": "Compared: application resource usage, network usage, network connectivity. Veritas also decodes the app timeline and energy tables (no plaso equivalent).",
+  "parser": "py_srum",
+  "records_ours": 18283,
+  "records_reference": 18283,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/SRUDB.dat"
+  ]
+}

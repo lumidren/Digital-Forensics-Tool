@@ -1,0 +1,20 @@
+{
+  "fields": {
+    "cookie_name": {
+      "agree": 5,
+      "total": 5
+    },
+    "timestamps": {
+      "agree": 15,
+      "total": 15
+    }
+  },
+  "notes": "",
+  "parser": "py_chromium_cookies",
+  "records_ours": 5,
+  "records_reference": 5,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/chrome/Cookies-68.0.3440.106"
+  ]
+}

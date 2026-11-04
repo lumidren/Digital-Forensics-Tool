@@ -1,0 +1,20 @@
+{
+  "fields": {
+    "label": {
+      "agree": 1,
+      "total": 1
+    },
+    "program": {
+      "agree": 1,
+      "total": 1
+    }
+  },
+  "notes": "plaso attribute 'name' is Veritas 'label'.",
+  "parser": "py_launchd_plist",
+  "records_ours": 1,
+  "records_reference": 1,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/plist/launchd.minimal.plist"
+  ]
+}

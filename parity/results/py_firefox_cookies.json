@@ -1,0 +1,20 @@
+{
+  "fields": {
+    "cookie_name": {
+      "agree": 13,
+      "total": 13
+    },
+    "timestamps": {
+      "agree": 39,
+      "total": 39
+    }
+  },
+  "notes": "",
+  "parser": "py_firefox_cookies",
+  "records_ours": 13,
+  "records_reference": 13,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/firefox/firefox_10_cookies.sqlite"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "fields": {
+    "artifact_and_name": {
+      "agree": 4,
+      "total": 4
+    }
+  },
+  "notes": "No WMI repository in the corpus; carving scanner verified on constructed bytes (UTF-16 and ASCII strings, a class definition decoy and garbage between records).",
+  "parser": "py_wmi_persistence",
+  "records_ours": 4,
+  "records_reference": 4,
+  "reference": "hand-constructed OBJECTS.DATA byte fixture",
+  "samples": [
+    "synthetic (tests/unit/test_parsers_windows.py::_wmi_fixture)"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "parser": "plist",
+  "reference": "CPython 3.12.16 plistlib",
+  "samples": [
+    "plaso/ios/com.apple.MobileBackup.plist",
+    "plaso/ios/com.apple.wifi.known-networks.plist",
+    "plaso/plist/com.apple.airport.preferences.plist",
+    "plaso/plist/com.apple.bluetooth.plist",
+    "plaso/plist/com.apple.loginitems.plist",
+    "plaso/plist/com.apple.SoftwareUpdate.plist",
+    "plaso/plist/com.apple.TimeMachine.plist",
+    "plaso/plist/InstallHistory.plist",
+    "plaso/plist/launchd.minimal.plist",
+    "plaso/plist/NSKeyedArchiver.plist"
+  ],
+  "records_ours": 10,
+  "records_reference": 10,
+  "fields": {
+    "document_equal": {
+      "agree": 10,
+      "total": 10
+    },
+    "leaf_values": {
+      "agree": 762,
+      "total": 762
+    }
+  },
+  "notes": "Dates compared in microseconds (plistlib resolution); reals compared numerically. "
+}

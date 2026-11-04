@@ -1,0 +1,45 @@
+{
+  "parser": "evtx",
+  "reference": "libevtx-python 20260705",
+  "samples": [
+    "plaso/evtx/System.evtx",
+    "plaso/evtx/System2.evtx"
+  ],
+  "records_ours": 5203,
+  "records_reference": 5203,
+  "fields": {
+    "identifier": {
+      "agree": 5203,
+      "total": 5203
+    },
+    "written_time_us": {
+      "agree": 5203,
+      "total": 5203
+    },
+    "event_identifier": {
+      "agree": 5203,
+      "total": 5203
+    },
+    "source_name": {
+      "agree": 5203,
+      "total": 5203
+    },
+    "computer_name": {
+      "agree": 5203,
+      "total": 5203
+    },
+    "event_level": {
+      "agree": 5203,
+      "total": 5203
+    },
+    "strings": {
+      "agree": 5203,
+      "total": 5203
+    },
+    "xml_string": {
+      "agree": 5203,
+      "total": 5203
+    }
+  },
+  "notes": "89 additional records (System2.evtx chunk 2, event-records CRC32 mismatch) are parsed and flagged data_crc_ok=false by Veritas; libevtx omits them, so they are excluded from the comparison. xml_string compared after collapsing whitespace. Empty libevtx strings (None) compared as ''."
+}

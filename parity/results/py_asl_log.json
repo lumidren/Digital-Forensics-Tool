@@ -1,0 +1,24 @@
+{
+  "fields": {
+    "facility": {
+      "agree": 318,
+      "total": 318
+    },
+    "sender": {
+      "agree": 318,
+      "total": 318
+    },
+    "timestamps": {
+      "agree": 319,
+      "total": 319
+    }
+  },
+  "notes": "",
+  "parser": "py_asl_log",
+  "records_ours": 319,
+  "records_reference": 319,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/2019.09.26.asl"
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "parser": "fs_fat",
+  "reference": "pyfsfat 20260826",
+  "samples": [
+    "dfvfs/fat12.raw",
+    "dfvfs/bdetogo.raw (decrypted)"
+  ],
+  "records_ours": 14,
+  "records_reference": 14,
+  "fields": {
+    "atime_month_corrected": {
+      "agree": 14,
+      "total": 14
+    },
+    "atime_raw": {
+      "agree": 0,
+      "total": 14
+    },
+    "attributes": {
+      "agree": 14,
+      "total": 14
+    },
+    "crtime_month_corrected": {
+      "agree": 14,
+      "total": 14
+    },
+    "crtime_raw": {
+      "agree": 0,
+      "total": 14
+    },
+    "identifier": {
+      "agree": 14,
+      "total": 14
+    },
+    "mtime_month_corrected": {
+      "agree": 14,
+      "total": 14
+    },
+    "mtime_raw": {
+      "agree": 0,
+      "total": 14
+    },
+    "name_path": {
+      "agree": 14,
+      "total": 14
+    },
+    "size": {
+      "agree": 14,
+      "total": 14
+    }
+  },
+  "notes": "pyfsfat 20260826 converts FAT dates one calendar month late (raw directory entry: month 4, pyfsfat: month 5; pytsk3 and a manual decode agree with veritas-fs). *_raw fields record that disagreement; *_month_corrected fields show every other component (year, day, time, 10 ms) agrees exactly."
+}

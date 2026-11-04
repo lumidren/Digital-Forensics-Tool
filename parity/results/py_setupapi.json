@@ -1,0 +1,16 @@
+{
+  "fields": {
+    "timestamps": {
+      "agree": 388,
+      "total": 388
+    }
+  },
+  "notes": "",
+  "parser": "py_setupapi",
+  "records_ours": 194,
+  "records_reference": 194,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/setupapi.dev.log"
+  ]
+}

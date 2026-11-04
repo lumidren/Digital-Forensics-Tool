@@ -1,0 +1,27 @@
+{
+  "fields": {
+    "timestamps": {
+      "agree": 80,
+      "total": 80
+    },
+    "title": {
+      "agree": 37,
+      "total": 37
+    },
+    "url": {
+      "agree": 77,
+      "total": 77
+    }
+  },
+  "notes": "",
+  "parser": "py_chromium_history",
+  "records_ours": 77,
+  "records_reference": 77,
+  "reference": "plaso 20261027",
+  "samples": [
+    "plaso/chrome/History",
+    "plaso/chrome/History-57.0.2987.133",
+    "plaso/chrome/History-58.0.3029.96",
+    "plaso/chrome/History-59.0.3071.86"
+  ]
+}
