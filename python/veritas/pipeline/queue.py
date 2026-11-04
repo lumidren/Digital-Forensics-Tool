@@ -104,7 +104,7 @@ class Processor:
                          details={"object_sha256": address, "parser": parser, "parser_version": PARSER_VERSION, "logical_path": logical, "job_id": step.job_id})
         tmp = Path(tempfile.mkdtemp(prefix="veritas-mat-"))
         try:
-            path = self.ctx.store.materialize(address, tmp)
+            path = self.ctx.store.materialize(address, tmp, Path(logical).name if logical else None)
             res = run_parser(parser, path, address, logical, self.limits, extra)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
@@ -163,7 +163,7 @@ class Processor:
         self.ctx.custody(case_id, "veritas-pipeline", "access", "harvest artifacts from image", evidence_id=ev.id, details={"tool": "fs-tool harvest", "job_id": step.job_id})
         tmp = Path(tempfile.mkdtemp(prefix="veritas-harvest-"))
         try:
-            img = self.ctx.store.materialize(ev.sha256, tmp)
+            img = self.ctx.store.materialize(ev.sha256, tmp, ev.name)
             out = tmp / "out"
             import subprocess
 
@@ -171,16 +171,27 @@ class Processor:
             if proc.returncode != 0:
                 raise RuntimeError(proc.stderr.decode("utf-8", "replace")[-2000:])
             manifest = [json.loads(l) for l in (out / "manifest.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]
-            results: dict[str, Any] = {"artifacts": len(manifest), "parsed": 0, "failed": []}
+            results: dict[str, Any] = {"artifacts": len(manifest), "stored": 0, "parsed": 0, "preserved_only": 0, "failed": []}
+            out_root = out.resolve()
             for i, item in enumerate(manifest):
                 step.progress(i / max(1, len(manifest)), f"parsing {item['path']}")
-                local = out / str(item["partition"]) / item["path"]
-                if not local.exists():
+                # `output` is the escaped location fs-tool wrote, relative to --out.
+                local = (out / item.get("output", f"{item['partition']}/{item['path'].lstrip('/')}")).resolve()
+                if not str(local).startswith(str(out_root)) or not local.is_file():
+                    results["failed"].append({"path": item["path"], "error": "harvested file missing or outside the output directory"})
                     continue
-                address = self._ingest_derived(case_id, ev, local, item["path"])
+                logical = f"p{item['partition']}:{item['path']}" if item.get("partition") else item["path"]
+                address = self._ingest_derived(case_id, ev, local, logical)
+                results["stored"] += 1
                 kind = classify(local.open("rb").read(4096), None, item["path"])
                 if item.get("kind") == "ntfs_meta":
-                    kind = {"$mft": "mft", "$j": "usn", "$usnjrnl:$j": "usn", "$logfile": "logfile"}.get(Path(item["path"]).name.lower(), kind)
+                    name = Path(item["path"]).name.lower()
+                    if name == "$mft":
+                        # Already covered by this image's fs_timeline step; preserved, not re-parsed,
+                        # so file events are not duplicated under a second evidence hash.
+                        results["preserved_only"] += 1
+                        continue
+                    kind = {"$j": "usn", "$usnjrnl:$j": "usn", "$logfile": "logfile"}.get(name, kind)
                 try:
                     r = self._parse_object(case_id, ev.id, address, item["path"], kind, clock, step)
                     results["parsed"] += 1
@@ -195,7 +206,7 @@ class Processor:
 
         tmp = Path(tempfile.mkdtemp(prefix="veritas-triage-"))
         try:
-            src = self.ctx.store.materialize(ev.sha256, tmp)
+            src = self.ctx.store.materialize(ev.sha256, tmp, ev.name)
             self.ctx.custody(case_id, "veritas-pipeline", "access", "unpack triage bundle", evidence_id=ev.id, details={"job_id": step.job_id})
             out = tmp / "x"
             parsed, failed = 0, []
