@@ -1,0 +1,22 @@
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <System>
+    <Provider Name="Microsoft-Windows-Security-Auditing" Guid="{54849625-5478-4994-A5BA-3E3B0328C30D}"/>
+    <EventID>4902</EventID>
+    <Version>0</Version>
+    <Level>0</Level>
+    <Task>13568</Task>
+    <Opcode>0</Opcode>
+    <Keywords>0x8020000000000000</Keywords>
+    <TimeCreated SystemTime="2015-08-08T02:06:20.031250000Z"/>
+    <EventRecordID>3</EventRecordID>
+    <Correlation/>
+    <Execution ProcessID="448" ThreadID="516"/>
+    <Channel>Security</Channel>
+    <Computer>37L4247E29-32</Computer>
+    <Security/>
+  </System>
+  <EventData>
+    <Data Name="PuaCount">0</Data>
+    <Data Name="PuaPolicyId">0x000000000002e53e</Data>
+  </EventData>
+</Event>

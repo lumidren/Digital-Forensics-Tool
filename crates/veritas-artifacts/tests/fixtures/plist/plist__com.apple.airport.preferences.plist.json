@@ -1,0 +1,265 @@
+{
+ "RememberedNetworks": [
+  {
+   "AutoLogin": false,
+   "CachedScanRecord": {
+    "80211D_IE": {
+     "IE_KEY_80211D_CHAN_INFO_ARRAY": [
+      {
+       "IE_KEY_80211D_FIRST_CHANNEL": 1,
+       "IE_KEY_80211D_MAX_POWER": 16,
+       "IE_KEY_80211D_NUM_CHANNELS": 11
+      }
+     ],
+     "IE_KEY_80211D_COUNTRY_CODE": "US"
+    },
+    "AGE": 0,
+    "AP_MODE": 2,
+    "BEACON_INT": 100,
+    "BSSID": "0:1d:d2:b8:6e:40",
+    "CAPABILITIES": 3089,
+    "CHANNEL": 6,
+    "CHANNEL_FLAGS": 10,
+    "HT_CAPS_IE": {
+     "AMPDU_PARAMS": 23,
+     "ASEL_CAPS": 0,
+     "CAPS": 12,
+     "EXT_CAPS": 0,
+     "MCS_SET": {
+      "__bytes__": "ffff0000000000000000000000000000"
+     },
+     "TXBF_CAPS": 0
+    },
+    "HT_IE": {
+     "HT_BASIC_MCS_SET": {
+      "__bytes__": "00000000000000000000000000000000"
+     },
+     "HT_DUAL_BEACON": false,
+     "HT_DUAL_CTS_PROT": false,
+     "HT_LSIG_TXOP_PROT_FULL": false,
+     "HT_NON_GF_STAS_PRESENT": true,
+     "HT_OBSS_NON_HT_STAS_PRESENT": false,
+     "HT_OP_MODE": 1,
+     "HT_PCO_ACTIVE": false,
+     "HT_PCO_PHASE": false,
+     "HT_PRIMARY_CHAN": 6,
+     "HT_PSMP_STAS_ONLY": false,
+     "HT_RIFS_MODE": false,
+     "HT_SECONDARY_BEACON": false,
+     "HT_SECONDARY_CHAN_OFFSET": 0,
+     "HT_SERVICE_INT": 0,
+     "HT_STA_CHAN_WIDTH": false,
+     "HT_TX_BURST_LIMIT": false
+    },
+    "IE": {
+     "__bytes__": "00066575726f7061010882848b961224486c0301062a010432040c1830602d1a0c0017ffff0000000000000000000000000000000000000000003d16060005000000000000000000000000000000000000003e0100dd1a0050f20101000050f20202000050f2020050f20401000050f20230180100000fac020200000fac02000fac040100000fac020000dd180050f2020101800003a4000027a4000042435e0062322f000b05020060127a7f0101dd07000c43030000000706555320010b10dd870050f204104a0001101044000102103b000103104700102880288028801880a880001dd2b86e4010210005415252495310230006544738363247102400065254323836301042000831323334353637381054000800060050f204000110110012415252495320544738363220526f7574657210080002210c103c0001011049000600372a000120"
+    },
+    "NOISE": 0,
+    "RATES": [
+     1,
+     2,
+     5,
+     11,
+     9,
+     18,
+     36,
+     54,
+     6,
+     12,
+     24,
+     48
+    ],
+    "RSN_IE": {
+     "IE_KEY_RSN_AUTHSELS": [
+      2
+     ],
+     "IE_KEY_RSN_MCIPHER": 2,
+     "IE_KEY_RSN_UCIPHERS": [
+      2,
+      4
+     ],
+     "IE_KEY_RSN_VERSION": 1
+    },
+    "RSSI": -50,
+    "SCAN_DIRECTED": true,
+    "SSID": {
+     "__bytes__": "6575726f7061"
+    },
+    "SSID_STR": "europa",
+    "WPA_IE": {
+     "IE_KEY_WPA_AUTHSELS": [
+      2
+     ],
+     "IE_KEY_WPA_MCIPHER": 2,
+     "IE_KEY_WPA_UCIPHERS": [
+      2,
+      4
+     ],
+     "IE_KEY_WPA_VERSION": 1
+    },
+    "WPS_PROB_RESP_IE": {
+     "IE_KEY_WPS_CFG_METHODS": 8460,
+     "IE_KEY_WPS_DEV_NAME": "ARRIS TG862 Router",
+     "IE_KEY_WPS_DEV_NAME_DATA": {
+      "__bytes__": "415252495320544738363220526f75746572"
+     },
+     "IE_KEY_WPS_MANUFACTURER": "ARRIS",
+     "IE_KEY_WPS_MODEL_NAME": "TG862G",
+     "IE_KEY_WPS_MODEL_NUM": "RT2860",
+     "IE_KEY_WPS_PRIMARY_DEV_TYPE": {
+      "WPS_DEV_TYPE_CAT": 6,
+      "WPS_DEV_TYPE_OUI": {
+       "__bytes__": "0050f204"
+      },
+      "WPS_DEV_TYPE_SUB_CAT": 1
+     },
+     "IE_KEY_WPS_RESP_TYPE": 3,
+     "IE_KEY_WPS_RF_BANDS": 1,
+     "IE_KEY_WPS_SC_STATE": 2,
+     "IE_KEY_WPS_SERIAL_NUM": "12345678",
+     "IE_KEY_WPS_UUID_E": {
+      "__bytes__": "2880288028801880a880001dd2b86e40"
+     }
+    }
+   },
+   "Captive": false,
+   "Closed": true,
+   "Disabled": false,
+   "LastConnected": {
+    "__date_us__": 1375144166000000
+   },
+   "Passpoint": false,
+   "PossiblyHiddenNetwork": true,
+   "SPRoaming": false,
+   "SSID": {
+    "__bytes__": "6575726f7061"
+   },
+   "SSIDString": "europa",
+   "SecurityType": "WPA/WPA2 Personal",
+   "SystemMode": true,
+   "TemporarilyDisabled": false
+  },
+  {
+   "AutoLogin": false,
+   "CachedScanRecord": {
+    "AGE": 0,
+    "AP_MODE": 2,
+    "BEACON_INT": 100,
+    "BSSID": "0:24:6c:26:a4:1",
+    "CAPABILITIES": 1057,
+    "CHANNEL": 11,
+    "CHANNEL_FLAGS": 10,
+    "HT_CAPS_IE": {
+     "AMPDU_PARAMS": 27,
+     "ASEL_CAPS": 0,
+     "CAPS": 4556,
+     "EXT_CAPS": 0,
+     "MCS_SET": {
+      "__bytes__": "ffff0000000000000000000000000000"
+     },
+     "TXBF_CAPS": 0
+    },
+    "HT_IE": {
+     "HT_BASIC_MCS_SET": {
+      "__bytes__": "ff000000000000000000000000000000"
+     },
+     "HT_DUAL_BEACON": false,
+     "HT_DUAL_CTS_PROT": false,
+     "HT_LSIG_TXOP_PROT_FULL": false,
+     "HT_NON_GF_STAS_PRESENT": false,
+     "HT_OBSS_NON_HT_STAS_PRESENT": true,
+     "HT_OP_MODE": 1,
+     "HT_PCO_ACTIVE": false,
+     "HT_PCO_PHASE": false,
+     "HT_PRIMARY_CHAN": 11,
+     "HT_PSMP_STAS_ONLY": false,
+     "HT_RIFS_MODE": false,
+     "HT_SECONDARY_BEACON": false,
+     "HT_SECONDARY_CHAN_OFFSET": 0,
+     "HT_SERVICE_INT": 0,
+     "HT_STA_CHAN_WIDTH": false,
+     "HT_TX_BURST_LIMIT": true
+    },
+    "IE": {
+     "__bytes__": "000943616d7075734e6574010882840b0c1216182403010b2a010032043048606c2d1acc111bffff0000000000000000000000000000000000000000003d160b0019000000ff000000000000000000000000000000dd1e00904c33cc111bffff000000000000000000000000000000000000000000dd1a00904c340b0019000000ff000000000000000000000000000000dd180050f2020101800003a4000027a4000042435e0062322f00dd0a00037f04010000000000"
+    },
+    "NOISE": 0,
+    "RATES": [
+     1,
+     2,
+     5,
+     6,
+     9,
+     11,
+     12,
+     18,
+     24,
+     36,
+     48,
+     54
+    ],
+    "RSSI": -41,
+    "SCAN_DIRECTED": true,
+    "SSID": {
+     "__bytes__": "43616d7075734e6574"
+    },
+    "SSID_STR": "CampusNet"
+   },
+   "Captive": false,
+   "Closed": false,
+   "Disabled": false,
+   "LastConnected": {
+    "__date_us__": 1386874984000000
+   },
+   "Passpoint": false,
+   "PossiblyHiddenNetwork": false,
+   "SPRoaming": false,
+   "SSID": {
+    "__bytes__": "43616d7075734e6574"
+   },
+   "SSIDString": "CampusNet",
+   "SecurityType": "Open",
+   "SystemMode": true,
+   "TemporarilyDisabled": false
+  },
+  {
+   "AutoLogin": false,
+   "Captive": false,
+   "Closed": false,
+   "Disabled": false,
+   "LastConnected": {
+    "__date_us__": 1386949546000000
+   },
+   "Passpoint": false,
+   "PossiblyHiddenNetwork": false,
+   "SPRoaming": false,
+   "SSID": {
+    "__bytes__": "426f736520536f756e644c696e6b20416972204e6574776f726b"
+   },
+   "SSIDString": "Bose SoundLink Air Network",
+   "SecurityType": "Open",
+   "SystemMode": true,
+   "TemporarilyDisabled": false
+  },
+  {
+   "AutoLogin": false,
+   "Captive": false,
+   "Closed": false,
+   "Disabled": false,
+   "LastConnected": {
+    "__date_us__": 1386950747000000
+   },
+   "Passpoint": false,
+   "PossiblyHiddenNetwork": false,
+   "SPRoaming": false,
+   "SSID": {
+    "__bytes__": "426f696e676f20486f7473706f74"
+   },
+   "SSIDString": "Boingo Hotspot",
+   "SecurityType": "Open",
+   "SystemMode": true,
+   "TemporarilyDisabled": false
+  }
+ ],
+ "Version": 14
+}

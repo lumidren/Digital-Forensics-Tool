@@ -1,0 +1,239 @@
+{
+ "$archiver": "NSKeyedArchiver",
+ "$objects": [
+  "$null",
+  {
+   "$class": {
+    "__uid__": 19
+   },
+   "NS.keys": [
+    {
+     "__uid__": 2
+    },
+    {
+     "__uid__": 4
+    },
+    {
+     "__uid__": 5
+    },
+    {
+     "__uid__": 6
+    },
+    {
+     "__uid__": 7
+    },
+    {
+     "__uid__": 8
+    },
+    {
+     "__uid__": 9
+    },
+    {
+     "__uid__": 10
+    }
+   ],
+   "NS.objects": [
+    {
+     "__uid__": 11
+    },
+    {
+     "__uid__": 13
+    },
+    {
+     "__uid__": 14
+    },
+    {
+     "__uid__": 16
+    },
+    {
+     "__uid__": 18
+    },
+    {
+     "__uid__": 20
+    },
+    {
+     "__uid__": 21
+    },
+    {
+     "__uid__": 22
+    }
+   ],
+   "pytype": 1
+  },
+  {
+   "$class": {
+    "__uid__": 3
+   },
+   "NS.string": "MyArray",
+   "pytype": 1
+  },
+  {
+   "$classes": [
+    "OC_BuiltinPythonUnicode",
+    "OC_PythonUnicode",
+    "NSString",
+    "NSObject"
+   ],
+   "$classhints": [
+    "OC_PythonString",
+    "NSString"
+   ],
+   "$classname": "OC_BuiltinPythonUnicode"
+  },
+  {
+   "$class": {
+    "__uid__": 3
+   },
+   "NS.string": "MyBool",
+   "pytype": 1
+  },
+  {
+   "$class": {
+    "__uid__": 3
+   },
+   "NS.string": "MyData",
+   "pytype": 1
+  },
+  {
+   "$class": {
+    "__uid__": 3
+   },
+   "NS.string": "MyDate",
+   "pytype": 1
+  },
+  {
+   "$class": {
+    "__uid__": 3
+   },
+   "NS.string": "MyDictionary",
+   "pytype": 1
+  },
+  {
+   "$class": {
+    "__uid__": 3
+   },
+   "NS.string": "MyFloat",
+   "pytype": 1
+  },
+  {
+   "$class": {
+    "__uid__": 3
+   },
+   "NS.string": "MyInteger",
+   "pytype": 1
+  },
+  {
+   "$class": {
+    "__uid__": 3
+   },
+   "NS.string": "MyString",
+   "pytype": 1
+  },
+  {
+   "$class": {
+    "__uid__": 12
+   },
+   "NS.objects": [],
+   "pytype": 2
+  },
+  {
+   "$classes": [
+    "OC_BuiltinPythonArray",
+    "OC_PythonArray",
+    "NSMutableArray",
+    "NSArray",
+    "NSObject"
+   ],
+   "$classhints": [
+    "OC_PythonArray",
+    "NSArray"
+   ],
+   "$classname": "OC_BuiltinPythonArray"
+  },
+  true,
+  {
+   "$class": {
+    "__uid__": 15
+   },
+   "NS.data": {
+    "__bytes__": "444154410a"
+   },
+   "pytype": 3
+  },
+  {
+   "$classes": [
+    "OC_BuiltinPythonData",
+    "OC_PythonData",
+    "NSMutableData",
+    "NSData",
+    "NSObject"
+   ],
+   "$classhints": [
+    "OC_PythonData",
+    "NSData"
+   ],
+   "$classname": "OC_BuiltinPythonData"
+  },
+  {
+   "$class": {
+    "__uid__": 17
+   },
+   "NS.time": {
+    "__real__": "729452449.0"
+   },
+   "pytype": 2
+  },
+  {
+   "$classes": [
+    "OC_BuiltinPythonDate",
+    "OC_PythonDate",
+    "NSDate",
+    "NSObject"
+   ],
+   "$classhints": [
+    "OC_PythonDate",
+    "NSDate"
+   ],
+   "$classname": "OC_BuiltinPythonDate"
+  },
+  {
+   "$class": {
+    "__uid__": 19
+   },
+   "NS.keys": [],
+   "NS.objects": [],
+   "pytype": 1
+  },
+  {
+   "$classes": [
+    "OC_BuiltinPythonDictionary",
+    "OC_PythonDictionary",
+    "NSMutableDictionary",
+    "NSDictionary",
+    "NSObject"
+   ],
+   "$classhints": [
+    "OC_PythonDictionary",
+    "NSDictionary"
+   ],
+   "$classname": "OC_BuiltinPythonDictionary"
+  },
+  {
+   "__real__": "2.7"
+  },
+  98,
+  {
+   "$class": {
+    "__uid__": 3
+   },
+   "NS.string": "Some string",
+   "pytype": 1
+  }
+ ],
+ "$top": {
+  "root": {
+   "__uid__": 1
+  }
+ },
+ "$version": 100000
+}

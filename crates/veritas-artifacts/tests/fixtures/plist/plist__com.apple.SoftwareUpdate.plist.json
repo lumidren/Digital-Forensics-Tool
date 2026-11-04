@@ -1,0 +1,33 @@
+{
+ "DidRegisterLocalUpdates": true,
+ "IgnoringUnseenRamped": false,
+ "LastAttemptSystemVersion": "10.9.1 (13B42)",
+ "LastBackgroundCCDSuccessfulDate": {
+  "__date_us__": 1389030241000000
+ },
+ "LastBackgroundSuccessfulDate": {
+  "__date_us__": 1389030241000000
+ },
+ "LastFullSuccessfulDate": {
+  "__date_us__": 1389030228000000
+ },
+ "LastRecommendedUpdatesAvailable": 1,
+ "LastResultCode": 2,
+ "LastSessionSuccessful": true,
+ "LastSuccessfulDate": {
+  "__date_us__": 1389030228000000
+ },
+ "LastUpdatesAvailable": 1,
+ "PrimaryLanguages": [
+  "en"
+ ],
+ "RecommendedUpdates": [
+  {
+   "Display Name": "Digital Camera RAW Compatibility Update",
+   "Display Version": "5.03",
+   "Identifier": "RAWCameraUpdate5.03",
+   "Product Key": "031-2664"
+  }
+ ],
+ "SkipLocalCDN": false
+}

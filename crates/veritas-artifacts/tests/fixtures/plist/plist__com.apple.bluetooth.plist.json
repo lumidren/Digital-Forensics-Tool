@@ -1,0 +1,281 @@
+{
+ "AudioA2DPSourceServiceRecordHandle": 65541,
+ "AudioHeadphones": [
+  "00-0d-fd-00-00-00"
+ ],
+ "BluetoothAutoSeekHIDDevices": true,
+ "BluetoothVersionNumber": 3,
+ "ControllerPowerState": 1,
+ "D2D MAC Address": {
+  "__bytes__": "00000000"
+ },
+ "DaemonControllersConfigurationKey": {
+  "00-23-6c-00-00-00": {
+   "HIDEmulationTrackpad": "b8-f6-b1-00-00-00"
+  }
+ },
+ "DaemonNoRoleSwitchDeviceList": [
+  "00-0d-fd-00-00-00"
+ ],
+ "DeviceCache": {
+  "00-0d-fd-00-00-00": {
+   "ClassOfDevice": 2360324,
+   "ClockOffset": 17461,
+   "InquiryRSSI": 0,
+   "LMPSubversion": {
+    "__real__": "3.0"
+   },
+   "LMPVersion": 3,
+   "LastInquiryUpdate": {
+    "__date_us__": 1351827808261762
+   },
+   "LastNameUpdate": {
+    "__date_us__": 1345251268370453
+   },
+   "LastServicesUpdate": {
+    "__date_us__": 1345251192528750
+   },
+   "Manufacturer": 10,
+   "Name": "BT Headphone",
+   "PageScanMode": 0,
+   "PageScanPeriod": 2,
+   "PageScanRepetitionMode": 1,
+   "Services": {
+    "__bytes__": "00000000"
+   },
+   "SupportedFeatures": {
+    "__bytes__": "8000181bf88bffff"
+   }
+  },
+  "44-00-00-00-00-00": {
+   "ClassOfDevice": 3670276,
+   "ClockOffset": 27790,
+   "LastInquiryUpdate": {
+    "__date_us__": 1341957896010535
+   },
+   "PageScanMode": 0,
+   "PageScanPeriod": 2,
+   "PageScanRepetitionMode": 1
+  },
+  "44-00-00-00-00-01": {
+   "ClassOfDevice": 3670276,
+   "ClockOffset": 14327,
+   "InquiryRSSI": 186,
+   "LastInquiryUpdate": {
+    "__date_us__": 1350666385239662
+   },
+   "LastNameUpdate": {
+    "__date_us__": 1350666391557044
+   },
+   "Name": "test-mac",
+   "PageScanMode": 0,
+   "PageScanPeriod": 0,
+   "PageScanRepetitionMode": 1
+  },
+  "44-00-00-00-00-02": {
+   "ClassOfDevice": 3670276,
+   "ClockOffset": 28180,
+   "LastInquiryUpdate": {
+    "__date_us__": 1341957900020117
+   },
+   "LastNameUpdate": {
+    "__date_us__": 1302199013524275
+   },
+   "Name": "test-macpro",
+   "PageScanMode": 0,
+   "PageScanPeriod": 2,
+   "PageScanRepetitionMode": 1
+  },
+  "44-00-00-00-00-03": {
+   "ClassOfDevice": 3670284,
+   "ClockOffset": 11449,
+   "LastInquiryUpdate": {
+    "__date_us__": 1301012201414766
+   },
+   "PageScanMode": 0,
+   "PageScanPeriod": 2,
+   "PageScanRepetitionMode": 1
+  },
+  "44-00-00-00-00-04": {
+   "BatteryPercent": {
+    "__real__": "0.61"
+   },
+   "ClassOfDevice": 9620,
+   "ClockOffset": 17981,
+   "InquiryRSSI": 198,
+   "LMPSubversion": 796,
+   "LMPVersion": 3,
+   "LastInquiryUpdate": {
+    "__date_us__": 1351818797324095
+   },
+   "LastNameUpdate": {
+    "__date_us__": 1351819298997673
+   },
+   "LastServicesUpdate": {
+    "__date_us__": 1351818803000000
+   },
+   "Manufacturer": 76,
+   "Name": "Apple Magic Trackpad 2",
+   "PageScanMode": 0,
+   "PageScanPeriod": 0,
+   "PageScanRepetitionMode": 1,
+   "Services": {
+    "__bytes__": ""
+   },
+   "SupportedFeatures": {
+    "__bytes__": "00000000"
+   },
+   "displayName": "Apple Magic Trackpad 2"
+  }
+ },
+ "HIDDevices": [
+  "44-00-00-00-00-04"
+ ],
+ "PANInterfaces": [
+  "00-23-6c-00-00-00"
+ ],
+ "PairedDevices": [
+  "44-00-00-00-00-00",
+  "44-00-00-00-00-04"
+ ],
+ "PersistentPorts": {
+  "Bluetooth-Modem": {
+   "BTAddress": {
+    "__bytes__": ""
+   },
+   "BTAuthenticationRequired": 0,
+   "BTName": "Bluetooth-Modem",
+   "BTPSM": 0,
+   "BTRFCOMMChannel": 0,
+   "BTTTYName": "Bluetooth-Modem",
+   "P49SerialPort": 1
+  },
+  "incoming port - Bluetooth-PDA-Sync": {
+   "BTAuthenticationRequired": 0,
+   "BTEncryptionType": 0,
+   "BTName": "incoming port - Bluetooth-PDA-Sync",
+   "BTPSM": 3,
+   "BTRFCOMMChannel": 3,
+   "BTSerialConnectionType": 0,
+   "BTTTYName": "Bluetooth-PDA-Sync",
+   "HiddenPort": 1,
+   "IOTTYBaseName": "Bluetooth-PDA-Sync",
+   "P49SerialPort": 1
+  }
+ },
+ "PersistentPortsServices": {
+  "incoming port - Bluetooth-PDA-Sync": {
+   "0000 - ServiceRecordHandle*": 65540,
+   "0001 - ServiceClassIDList": [
+    {
+     "__bytes__": "1101"
+    }
+   ],
+   "0004 - ProtocolDescriptorList": [
+    [
+     {
+      "__bytes__": "0100"
+     }
+    ],
+    [
+     {
+      "__bytes__": "0003"
+     },
+     {
+      "DataElementSize": 1,
+      "DataElementType": 1,
+      "DataElementValue": 3
+     }
+    ]
+   ],
+   "0005 - BrowseGroupList*": [
+    {
+     "__bytes__": "1002"
+    }
+   ],
+   "0006 - LanguageBaseAttributeIDList*": [
+    {
+     "DataElementSize": 2,
+     "DataElementType": 1,
+     "DataElementValue": 25966
+    },
+    {
+     "DataElementSize": 2,
+     "DataElementType": 1,
+     "DataElementValue": 106
+    },
+    {
+     "DataElementSize": 2,
+     "DataElementType": 1,
+     "DataElementValue": 256
+    }
+   ],
+   "0009 - BluetoothProfileDescriptorList": [
+    [
+     {
+      "__bytes__": "1101"
+     },
+     {
+      "DataElementSize": 2,
+      "DataElementType": 1,
+      "DataElementValue": 256
+     }
+    ]
+   ],
+   "0100 - ServiceName*": "Bluetooth-PDA-Sync"
+  }
+ },
+ "PersistentServices": {
+  "__bytes__": "00000000"
+ },
+ "SCOAudioDevices": {
+  "00-0d-fd-00-00-00": {
+   "AgentPath": "/System/Library/CoreServices/BluetoothAudioAgent.app/Contents/MacOS/BluetoothAudioAgent",
+   "DriverID": "00-0d-fd-00-00-00",
+   "IOAudioControls": [
+    {
+     "IOAudioControlChannelID": 0,
+     "IOAudioControlChannelName": "All Channels",
+     "IOAudioControlSubType": 1986817381,
+     "IOAudioControlType": {
+      "__real__": "1.0"
+     },
+     "IOAudioControlUsage": 1869968496,
+     "IOAudioControlValue": 65535,
+     "IOAudioLevelControlMaxDB": 0,
+     "IOAudioLevelControlMaxValue": 65535,
+     "IOAudioLevelControlMinDB": 4293558272,
+     "IOAudioLevelControlMinValue": 0
+    },
+    {
+     "IOAudioControlChannelID": 0,
+     "IOAudioControlChannelName": "All Channels",
+     "IOAudioControlSubType": 1836414053,
+     "IOAudioControlType": 1953458028,
+     "IOAudioControlUsage": 1869968496,
+     "IOAudioControlValue": 0
+    },
+    {
+     "IOAudioControlChannelID": 0,
+     "IOAudioControlChannelName": "All Channels",
+     "IOAudioControlSubType": 1986817381,
+     "IOAudioControlType": 1818588780,
+     "IOAudioControlUsage": 1768845428,
+     "IOAudioControlValue": 65535,
+     "IOAudioLevelControlMaxDB": 0,
+     "IOAudioLevelControlMaxValue": 65535,
+     "IOAudioLevelControlMinDB": 4293558272,
+     "IOAudioLevelControlMinValue": 0
+    },
+    {
+     "IOAudioControlChannelID": 0,
+     "IOAudioControlChannelName": "All Channels",
+     "IOAudioControlSubType": 1836414053,
+     "IOAudioControlType": 1953458028,
+     "IOAudioControlUsage": 1768845428,
+     "IOAudioControlValue": 0
+    }
+   ]
+  }
+ }
+}

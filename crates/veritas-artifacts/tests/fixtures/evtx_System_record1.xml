@@ -1,0 +1,23 @@
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <System>
+    <Provider Name="Service Control Manager" Guid="{555908d1-a6d7-4695-8e1e-26931d2012f4}" EventSourceName="Service Control Manager"/>
+    <EventID Qualifiers="16384">7036</EventID>
+    <Version>0</Version>
+    <Level>4</Level>
+    <Task>0</Task>
+    <Opcode>0</Opcode>
+    <Keywords>0x8080000000000000</Keywords>
+    <TimeCreated SystemTime="2010-11-21T03:55:59.626427100Z"/>
+    <EventRecordID>1</EventRecordID>
+    <Correlation/>
+    <Execution ProcessID="492" ThreadID="1188"/>
+    <Channel>System</Channel>
+    <Computer>37L4247F27-26</Computer>
+    <Security/>
+  </System>
+  <EventData>
+    <Data Name="param1">Windows Event Log</Data>
+    <Data Name="param2">stopped</Data>
+    <Binary>6500760065006E0074006C006F0067002F0031000000</Binary>
+  </EventData>
+</Event>

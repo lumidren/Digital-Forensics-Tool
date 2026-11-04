@@ -1,0 +1,97 @@
+[
+ {
+  "date": {
+   "__date_us__": 1384225175000000
+  },
+  "displayName": "OS X",
+  "displayVersion": "10.9 (13A603)",
+  "packageIdentifiers": [
+   "com.apple.pkg.BaseSystemBinaries",
+   "com.apple.pkg.BaseSystemResources",
+   "com.apple.pkg.Essentials",
+   "com.apple.pkg.BSD",
+   "com.apple.pkg.JavaTools",
+   "com.apple.pkg.AdditionalEssentials",
+   "com.apple.pkg.AdditionalSpeechVoices",
+   "com.apple.pkg.AsianLanguagesSupport",
+   "com.apple.pkg.MediaFiles",
+   "com.apple.pkg.JavaEssentials",
+   "com.apple.pkg.OxfordDictionaries",
+   "com.apple.pkg.X11redirect",
+   "com.apple.pkg.OSInstall",
+   "com.apple.pkg.update.compatibility.2013.001"
+  ],
+  "processName": "OS X Installer"
+ },
+ {
+  "date": {
+   "__date_us__": 1388205491000000
+  },
+  "displayName": "VMware Tools",
+  "displayVersion": "9.6.1",
+  "packageIdentifiers": [
+   "com.vmware.tools.macos.pkg.files"
+  ],
+  "processName": "Installer"
+ },
+ {
+  "contentType": "config-data",
+  "date": {
+   "__date_us__": 1388232883000000
+  },
+  "displayName": "XProtectPlistConfigData",
+  "displayVersion": "1.0",
+  "packageIdentifiers": [
+   "com.apple.pkg.XProtectPlistConfigData.2-45"
+  ],
+  "processName": "softwareupdated"
+ },
+ {
+  "contentType": "config-data",
+  "date": {
+   "__date_us__": 1388232883000000
+  },
+  "displayName": "Core Services Application Configuration Data",
+  "displayVersion": "1.0.25",
+  "packageIdentifiers": [
+   "com.apple.pkg.CoreServicesAppConfigData.2-9"
+  ],
+  "processName": "softwareupdated"
+ },
+ {
+  "contentType": "config-data",
+  "date": {
+   "__date_us__": 1388232883000000
+  },
+  "displayName": "Incompatible Kernel Extension Configuration Data",
+  "displayVersion": "1.18.2",
+  "packageIdentifiers": [
+   "com.apple.pkg.IncompatibleKextConfigData.3-9"
+  ],
+  "processName": "softwareupdated"
+ },
+ {
+  "contentType": "config-data",
+  "date": {
+   "__date_us__": 1388232883000000
+  },
+  "displayName": "Chinese Word List Update",
+  "displayVersion": "2.1",
+  "packageIdentifiers": [
+   "com.apple.pkg.ChineseWordlistUpdate.5-17"
+  ],
+  "processName": "softwareupdated"
+ },
+ {
+  "contentType": "config-data",
+  "date": {
+   "__date_us__": 1390941528000000
+  },
+  "displayName": "Chinese Word List Update",
+  "displayVersion": "2.2",
+  "packageIdentifiers": [
+   "com.apple.pkg.ChineseWordlistUpdate.5-30"
+  ],
+  "processName": "softwareupdated"
+ }
+]

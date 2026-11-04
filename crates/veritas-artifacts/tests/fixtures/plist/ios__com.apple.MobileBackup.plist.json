@@ -1,0 +1,221 @@
+{
+ "AccountEnabledDate": {
+  "__date_us__": 1681567122481634
+ },
+ "BackupStateInfo": {
+  "date": {
+   "__date_us__": 1681567701008032
+  },
+  "errors": [
+   {
+    "code": 0,
+    "date": {
+     "__date_us__": 1683076313195466
+    },
+    "domain": "MBErrorDomain",
+    "localizedDescription": "Backup succeeded"
+   },
+   {
+    "code": 0,
+    "date": {
+     "__date_us__": 1683251511329024
+    },
+    "domain": "MBErrorDomain",
+    "localizedDescription": "Backup succeeded"
+   },
+   {
+    "code": 0,
+    "date": {
+     "__date_us__": 1683341456368389
+    },
+    "domain": "MBErrorDomain",
+    "localizedDescription": "Backup succeeded"
+   },
+   {
+    "code": 0,
+    "date": {
+     "__date_us__": 1683427894964246
+    },
+    "domain": "MBErrorDomain",
+    "localizedDescription": "Backup succeeded"
+   },
+   {
+    "code": 0,
+    "date": {
+     "__date_us__": 1683563017651853
+    },
+    "domain": "MBErrorDomain",
+    "localizedDescription": "Backup succeeded"
+   },
+   {
+    "code": 0,
+    "date": {
+     "__date_us__": 1683681317994980
+    },
+    "domain": "MBErrorDomain",
+    "localizedDescription": "Backup succeeded"
+   },
+   {
+    "code": 0,
+    "date": {
+     "__date_us__": 1683910940963616
+    },
+    "domain": "MBErrorDomain",
+    "localizedDescription": "Backup succeeded"
+   },
+   {
+    "code": 0,
+    "date": {
+     "__date_us__": 1684153544060502
+    },
+    "domain": "MBErrorDomain",
+    "localizedDescription": "Backup succeeded"
+   },
+   {
+    "code": 0,
+    "date": {
+     "__date_us__": 1684352809108991
+    },
+    "domain": "MBErrorDomain",
+    "localizedDescription": "Backup succeeded"
+   },
+   {
+    "code": 0,
+    "date": {
+     "__date_us__": 1684546855339560
+    },
+    "domain": "MBErrorDomain",
+    "localizedDescription": "Backup succeeded"
+   }
+  ],
+  "estimatedTimeRemaining": 1,
+  "isBackground": false,
+  "isCloud": true,
+  "progress": {
+   "__real__": "1.0"
+  },
+  "state": 4
+ },
+ "FetchMissingKeysAtNextUnlock": 0,
+ "LastOnConditionEvents": [
+  "2023-05-17T18:07:23.222-04:00|1511.560|1|1|1|0|1|0|0|0|9945|0||0|1|0|0",
+  "2023-05-17T18:34:48.075-04:00|2081.645|1|1|1|0|1|0|76319|0|12160|0||0|1|0|0",
+  "2023-05-17T19:09:30.163-04:00|965.908|1|1|1|0|1|0|0|0|13126|0||0|1|0|0",
+  "2023-05-17T19:25:46.095-04:00|73.050|1|1|1|0|1|0|0|0|13210|0||0|1|0|0",
+  "2023-05-17T19:27:45.186-04:00|0.975|1|1|1|0|1|0|0|0|13257|0||0|1|0|0",
+  "2023-05-17T19:31:09.963-04:00|235.357|1|1|1|0|1|0|72938|0|13696|0||0|1|0|0",
+  "2023-05-17T19:35:08.162-04:00|68301.049|1|1|1|0|1|0|0|0|82000|0||0|1|0|0",
+  "2023-05-19T21:38:16.693-04:00|37457.724|1|1|1|0|1|0|120|0|37299|0||0|2|0|0",
+  "2023-05-20T08:02:36.736-04:00|4816.187|1|1|0|1|1|0|0|0|42117|0||0|1|0|0",
+  "2023-05-20T13:00:23.173-04:00|68.723|1|1|1|0|1|0|31230|0|55236|0||0|2|0|0"
+ ],
+ "LocalSnapshotsDisabled": "false",
+ "NotifyDaemonNextTimeKeyBagIsUnlocked": false,
+ "PreflightSizing": {
+  "AppDomain-AlexisBarreyat.BeReal": 65083,
+  "AppDomain-ch.protonmail.protonmail": 326,
+  "AppDomain-com.alltrails.AllTrails": 1465420,
+  "AppDomain-com.apple.AppStore": 37,
+  "AppDomain-com.apple.Maps": 44769,
+  "AppDomain-com.apple.Music": 442906,
+  "AppDomain-com.apple.ScreenshotServicesService": 1935,
+  "AppDomain-com.apple.iBooks": 2512,
+  "AppDomain-com.apple.mobilesafari": 171299,
+  "AppDomain-com.apple.siri": 91,
+  "AppDomain-com.duckduckgo.mobile.ios": 147245,
+  "AppDomain-com.mewe": 669556,
+  "AppDomain-com.microsoft.skype.teams": 775809,
+  "AppDomain-com.skype.skype": 3166,
+  "AppDomain-com.spotify.client": 452471,
+  "AppDomain-com.toyopagroup.picaboo": 7632,
+  "AppDomain-com.viber": 249849,
+  "AppDomain-com.wickr.pro.prod": 4415,
+  "AppDomain-jp.naver.line": 42186,
+  "AppDomain-net.whatsapp.WhatsApp": 2437,
+  "AppDomainGroup-group.BeReal": 418,
+  "AppDomainGroup-group.ch.protonmail.protonmail": 18307,
+  "AppDomainGroup-group.com.apple.Maps": 918705,
+  "AppDomainGroup-group.com.apple.Music": 727556,
+  "AppDomainGroup-group.com.apple.iBooks": 30031,
+  "AppDomainGroup-group.com.apple.mail": 490,
+  "AppDomainGroup-group.com.apple.notes": 385609,
+  "AppDomainGroup-group.com.apple.tips": 110268,
+  "AppDomainGroup-group.com.apple.weather": 4995,
+  "AppDomainGroup-group.com.atebits.Tweetie2": 323584,
+  "AppDomainGroup-group.com.duckduckgo.contentblocker": 1002333,
+  "AppDomainGroup-group.com.duckduckgo.database": 45056,
+  "AppDomainGroup-group.com.linecorp.line": 5829,
+  "AppDomainGroup-group.com.microsoft.shared": 152042,
+  "AppDomainGroup-group.com.microsoft.skype.teams": 233847,
+  "AppDomainGroup-group.com.reddit.Reddit": 1283,
+  "AppDomainGroup-group.com.skype.skype": 5419008,
+  "AppDomainGroup-group.com.spotify.client.notification": 42,
+  "AppDomainGroup-group.com.spotify.client.widget": 2099,
+  "AppDomainGroup-group.com.wickr.pro.prod": 896387,
+  "AppDomainGroup-group.com.zhiliaoapp.shared": 102674,
+  "AppDomainGroup-group.is.workflow.my.app": 178,
+  "AppDomainGroup-group.net.whatsapp.WhatsApp.shared": 1422031,
+  "AppDomainGroup-group.org.joinmastodon.app": 430272,
+  "AppDomainGroup-group.snapchat.picaboo": 9408,
+  "AppDomainGroup-group.viber.share.container": 757798,
+  "AppDomainPlaceholder-com.waze.iphone": 110339,
+  "AppDomainPlugin-com.apple.AppleMediaDiscovery.AMDEngagementExtension": 184320,
+  "AppDomainPlugin-com.apple.Maps.GeneralMapsWidget": 171,
+  "AppDomainPlugin-com.apple.weather.widget": 2047,
+  "AppDomainPlugin-com.atebits.Tweetie2.NotificationServiceExtension": 1076,
+  "HomeDomain": 4824692,
+  "KeyboardDomain": 2965504,
+  "KeychainDomain": 1019791,
+  "ManagedPreferencesDomain": 377,
+  "MediaDomain": 3883008,
+  "MobileDeviceDomain": 65536,
+  "NetworkDomain": 412,
+  "RootDomain": 166103,
+  "SysSharedContainerDomain-systemgroup.com.apple.bluetooth": 145163,
+  "SysSharedContainerDomain-systemgroup.com.apple.configurationprofiles": 26340,
+  "SysSharedContainerDomain-systemgroup.com.apple.icloud.findmydevice.managed": 725,
+  "SystemPreferencesDomain": 28913,
+  "WirelessDomain": 224763,
+  "_TotalSize": 31198674
+ },
+ "RemoteConfiguration": {
+  "BackupPeriod": [
+   "86400.0"
+  ],
+  "BackupWarningPeriod": [
+   "1209600.0"
+  ],
+  "DASIsDisabled": [
+   "false"
+  ],
+  "LocalSnapshotsDisabled": [
+   "false"
+  ],
+  "MBCKStatusReporterEnabled": [
+   "true"
+  ],
+  "MBCKStatusReporterEnabled.BackupConditions": [
+   "true"
+  ],
+  "MBCKStatusReporterEnabled.BackupDrySpell": [
+   "true"
+  ],
+  "MBCKStatusReporterEnabled.MBCKBackupEngine": [
+   "true"
+  ],
+  "MBCKStatusReporterEnabled.MBCKRestoreEngine": [
+   "true"
+  ],
+  "RecurringBackupWarningPeriod": [
+   "604800.0"
+  ],
+  "ServerRestrictedDomains": [
+   ""
+  ]
+ },
+ "RemoteConfigurationExpiration": {
+  "__date_us__": 1684633220804642
+ },
+ "ServerRestrictedDomains": "",
+ "SyncZoneFetched": true
+}

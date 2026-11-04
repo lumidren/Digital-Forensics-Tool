@@ -1,0 +1,72 @@
+[package]
+name = "veritas-artifacts-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+license = "Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+veritas-artifacts = { path = ".." }
+
+# Keep the fuzz crate out of the main workspace (it needs nightly + libFuzzer).
+[workspace]
+
+[[bin]]
+name = "evtx"
+path = "fuzz_targets/evtx.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "prefetch"
+path = "fuzz_targets/prefetch.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "lnk"
+path = "fuzz_targets/lnk.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "shellitems"
+path = "fuzz_targets/shellitems.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "olecf"
+path = "fuzz_targets/olecf.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "journald"
+path = "fuzz_targets/journald.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "plist"
+path = "fuzz_targets/plist.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "regf"
+path = "fuzz_targets/regf.rs"
+test = false
+doc = false
+bench = false
