@@ -1,0 +1,65 @@
+{
+  "parser": "pe_static",
+  "reference": "lief 1.0.0-d05b3499b",
+  "samples": [
+    "plaso/test_pe.exe",
+    "plaso/test_driver.sys"
+  ],
+  "records_ours": 2,
+  "records_reference": 2,
+  "fields": {
+    "machine": {
+      "agree": 2,
+      "total": 2
+    },
+    "timestamp": {
+      "agree": 2,
+      "total": 2
+    },
+    "entry_point": {
+      "agree": 2,
+      "total": 2
+    },
+    "subsystem": {
+      "agree": 2,
+      "total": 2
+    },
+    "is_dll": {
+      "agree": 2,
+      "total": 2
+    },
+    "imphash": {
+      "agree": 2,
+      "total": 2
+    },
+    "signed": {
+      "agree": 2,
+      "total": 2
+    },
+    "section_count": {
+      "agree": 2,
+      "total": 2
+    },
+    "section_name": {
+      "agree": 4,
+      "total": 4
+    },
+    "section_sizes": {
+      "agree": 4,
+      "total": 4
+    },
+    "section_entropy_milli": {
+      "agree": 4,
+      "total": 4
+    },
+    "import_dlls": {
+      "agree": 2,
+      "total": 2
+    },
+    "import_functions": {
+      "agree": 2,
+      "total": 2
+    }
+  },
+  "notes": "delay imports are not compared (LIEF exposes them separately); section entropy compared over LIEF's in-memory range (reports use pefile's raw-size convention)"
+}

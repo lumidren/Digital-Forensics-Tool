@@ -1,0 +1,36 @@
+{
+  "parser": "pcap",
+  "reference": "scapy 2.8.0",
+  "samples": [
+    "plaso/test.pcap"
+  ],
+  "records_ours": 1434,
+  "records_reference": 1434,
+  "fields": {
+    "packet_count": {
+      "agree": 1,
+      "total": 1
+    },
+    "timestamp_ns": {
+      "agree": 1434,
+      "total": 1434
+    },
+    "captured_length": {
+      "agree": 1434,
+      "total": 1434
+    },
+    "flows_5tuple": {
+      "agree": 61,
+      "total": 61
+    },
+    "dns_query_names": {
+      "agree": 13,
+      "total": 13
+    },
+    "http_request_lines": {
+      "agree": 13,
+      "total": 13
+    }
+  },
+  "notes": "DNS compared on port 53 only: we also decode LLMNR (5355) and mDNS (5353) as DNS, scapy dissects them as separate layers; HTTP request lines: ours from reassembled streams"
+}
