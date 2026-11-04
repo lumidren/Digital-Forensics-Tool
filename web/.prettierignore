@@ -1,0 +1,12 @@
+.next
+.next-e2e
+node_modules
+coverage
+playwright-report
+test-results
+.lighthouseci
+lib/openapi.json
+lib/api-schema.d.ts
+next-env.d.ts
+e2e/.state
+.lighthouseci
