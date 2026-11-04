@@ -65,11 +65,12 @@ def _rust(binary: str, args: list[str]) -> Iterable[Event]:
 
 def resolve(parser: str) -> Callable[[str, str, str, list[str]], Iterable[Event]]:
     if parser in RUST_KINDS:
-        kind = "regf" if parser == "regf-events" else parser
+        kind = "registry" if parser == "regf-events" else parser
         return lambda path, sha, logical, extra: _rust("veritas-artifacts-dump", [kind, path, "--events", "--evidence-sha256", sha, *extra])
     if parser in FS_KINDS:
         sub = {"fs-events": "events"}.get(parser, parser)
-        return lambda path, sha, logical, extra: _rust("fs-tool", [sub, path, *extra])
+        flags = [] if sub == "events" else ["--events"]
+        return lambda path, sha, logical, extra: _rust("fs-tool", [sub, path, *flags, *extra])
     if parser in PY_PARSERS:
         mod, attr = PY_PARSERS[parser]
 
