@@ -1,99 +1,131 @@
 /**
- * Layered (Sugiyama-style, simplified) layout for directed graphs: longest-path layering on the
- * graph with back edges ignored, then barycentric ordering inside each layer to reduce crossings.
- * Deterministic for a given input, so screenshots and tests are stable.
+ * Graph shaping for the lateral-movement and provenance views: node classification and
+ * parallel-edge aggregation (so labels never stack on top of each other). Layout lives in
+ * graph-layout.ts.
  */
-export interface LayoutEdge {
+import { TACTICS, techniqueInfo } from "./attack";
+import type { LateralEdge } from "./types";
+
+export type HostKind = "remote" | "ip" | "host";
+
+const IPV4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+
+export function isIpAddress(id: string): boolean {
+  const m = IPV4.exec(id);
+  if (m) return m.slice(1).every((o) => Number(o) <= 255);
+  return id.includes(":") && /^[0-9a-f:.]+$/i.test(id) && id.split(":").length > 2;
+}
+
+/** RFC 1918 / loopback / link-local IPv4, or IPv6 ULA / link-local / loopback. */
+export function isPrivateIp(id: string): boolean {
+  const m = IPV4.exec(id);
+  if (m) {
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    return (
+      a === 10 ||
+      a === 127 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 169 && b === 254)
+    );
+  }
+  const v6 = id.toLowerCase();
+  return v6 === "::1" || v6.startsWith("fc") || v6.startsWith("fd") || v6.startsWith("fe80");
+}
+
+export function classifyHost(id: string): HostKind {
+  if (id.toLowerCase() === "remote") return "remote";
+  return isIpAddress(id) ? "ip" : "host";
+}
+
+export function hostKindLabel(id: string): string {
+  const kind = classifyHost(id);
+  if (kind === "remote") return "Unattributed remote source";
+  if (kind === "ip") return isPrivateIp(id) ? "Internal IP address" : "External IP address";
+  return "Host";
+}
+
+export interface AggregatedEdge {
+  id: string;
   src: string;
   dst: string;
+  kinds: string[];
+  techniques: string[];
+  users: string[];
+  count: number;
+  event_ids: number[];
+  first_ns: number | null;
+  last_ns: number | null;
+  /** Tactic key (ATT&CK) that colours the edge, or "other". */
+  family: string;
 }
 
-export interface Positioned {
-  id: string;
-  layer: number;
-  order: number;
-  x: number;
-  y: number;
-}
+const minN = (a: number | null, b: number | null) => (a === null ? b : b === null ? a : Math.min(a, b));
+const maxN = (a: number | null, b: number | null) => (a === null ? b : b === null ? a : Math.max(a, b));
 
-export interface LayoutOptions {
-  layerGap?: number;
-  nodeGap?: number;
-}
+/** Tie-break order for edge colouring: movement-centric tactics win in this view. */
+export const FAMILY_PREFERENCE = [
+  "lateral-movement",
+  "credential-access",
+  "execution",
+  "initial-access",
+  "persistence",
+  "privilege-escalation",
+  "defense-evasion",
+  "command-and-control",
+];
 
-export function assignLayers(nodes: string[], edges: LayoutEdge[]): Map<string, number> {
-  const ids = [...new Set(nodes)].sort();
-  const out = new Map<string, string[]>(ids.map((id) => [id, []]));
-  const indeg = new Map<string, number>(ids.map((id) => [id, 0]));
-  for (const e of edges) {
-    if (e.src === e.dst || !out.has(e.src) || !out.has(e.dst)) continue;
-    out.get(e.src)?.push(e.dst);
-    indeg.set(e.dst, (indeg.get(e.dst) ?? 0) + 1);
+/** Tactic shared by most of the techniques (all their tactics count); ties use FAMILY_PREFERENCE. */
+export function edgeFamily(techniques: string[]): string {
+  const counts = new Map<string, number>();
+  for (const t of techniques) {
+    for (const tac of techniqueInfo(t).tactics) counts.set(tac, (counts.get(tac) ?? 0) + 1);
   }
-  // Kahn's algorithm; nodes left in cycles are released in id order and treated as sources.
-  const layer = new Map<string, number>();
-  const remaining = new Map(indeg);
-  const queue = ids.filter((id) => remaining.get(id) === 0);
-  const done = new Set<string>();
-  const release = () => {
-    const next = ids.find((id) => !done.has(id) && !queue.includes(id));
-    if (next !== undefined) queue.push(next);
-  };
-  if (!queue.length) release();
-  while (done.size < ids.length) {
-    const id = queue.shift();
-    if (id === undefined) {
-      release();
+  const order = [
+    ...FAMILY_PREFERENCE,
+    ...TACTICS.map((t) => t.key).filter((k) => !FAMILY_PREFERENCE.includes(k)),
+  ];
+  let best = "other";
+  let bestN = 0;
+  for (const key of order) {
+    const n = counts.get(key) ?? 0;
+    if (n > bestN) {
+      best = key;
+      bestN = n;
+    }
+  }
+  return best;
+}
+
+/** Merge edges with the same source and destination into one, keeping every attribute. */
+export function aggregateEdges(edges: LateralEdge[]): AggregatedEdge[] {
+  const groups = new Map<string, AggregatedEdge>();
+  for (const e of edges) {
+    const key = `${e.src}\u0000${e.dst}`;
+    const g = groups.get(key);
+    if (!g) {
+      groups.set(key, {
+        id: `e${groups.size}`,
+        src: e.src,
+        dst: e.dst,
+        kinds: [e.kind],
+        techniques: e.technique ? [e.technique] : [],
+        users: e.user ? [e.user] : [],
+        count: e.count,
+        event_ids: [...e.event_ids],
+        first_ns: e.first_ns,
+        last_ns: e.last_ns,
+        family: "other",
+      });
       continue;
     }
-    if (done.has(id)) continue;
-    done.add(id);
-    const l = layer.get(id) ?? 0;
-    layer.set(id, l);
-    for (const d of out.get(id) ?? []) {
-      if (done.has(d)) continue;
-      layer.set(d, Math.max(layer.get(d) ?? 0, l + 1));
-      const r = (remaining.get(d) ?? 0) - 1;
-      remaining.set(d, r);
-      if (r <= 0 && !queue.includes(d)) queue.push(d);
-    }
+    if (!g.kinds.includes(e.kind)) g.kinds.push(e.kind);
+    if (e.technique && !g.techniques.includes(e.technique)) g.techniques.push(e.technique);
+    if (e.user && !g.users.includes(e.user)) g.users.push(e.user);
+    g.count += e.count;
+    for (const id of e.event_ids) if (!g.event_ids.includes(id)) g.event_ids.push(id);
+    g.first_ns = minN(g.first_ns, e.first_ns);
+    g.last_ns = maxN(g.last_ns, e.last_ns);
   }
-  return layer;
-}
-
-export function layeredLayout(
-  nodes: string[],
-  edges: LayoutEdge[],
-  opts: LayoutOptions = {},
-): Map<string, Positioned> {
-  const layerGap = opts.layerGap ?? 260;
-  const nodeGap = opts.nodeGap ?? 90;
-  const layers = assignLayers(nodes, edges);
-  const byLayer = new Map<number, string[]>();
-  for (const [id, l] of [...layers.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    byLayer.set(l, [...(byLayer.get(l) ?? []), id]);
-  }
-  const order = new Map<string, number>();
-  const sortedLayers = [...byLayer.keys()].sort((a, b) => a - b);
-  for (const l of sortedLayers) {
-    const members = byLayer.get(l) ?? [];
-    if (l > 0) {
-      const bary = (id: string) => {
-        const preds = edges.filter((e) => e.dst === id && order.has(e.src)).map((e) => order.get(e.src) ?? 0);
-        return preds.length ? preds.reduce((s, x) => s + x, 0) / preds.length : Number.MAX_SAFE_INTEGER;
-      };
-      members.sort((a, b) => bary(a) - bary(b) || a.localeCompare(b));
-    }
-    members.forEach((id, i) => order.set(id, i));
-  }
-  const maxSize = Math.max(1, ...[...byLayer.values()].map((m) => m.length));
-  const result = new Map<string, Positioned>();
-  for (const l of sortedLayers) {
-    const members = byLayer.get(l) ?? [];
-    const offset = ((maxSize - members.length) * nodeGap) / 2;
-    members.forEach((id, i) => {
-      result.set(id, { id, layer: l, order: i, x: l * layerGap, y: offset + i * nodeGap });
-    });
-  }
-  return result;
+  return [...groups.values()].map((g) => ({ ...g, family: edgeFamily(g.techniques) }));
 }

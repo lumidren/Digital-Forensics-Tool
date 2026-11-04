@@ -23,7 +23,6 @@ import {
   shortHash,
   stringifyValue,
 } from "./format";
-import { assignLayers, layeredLayout } from "./graph";
 import { activeSection, caseIdFromPath, forgetCase, lastCase, rememberCase, shortcutTarget } from "./nav";
 import { pageOf, pagesForRange } from "./paging";
 import type { Finding } from "./types";
@@ -232,58 +231,6 @@ describe("findings helpers", () => {
     expect(parseIdList("")).toEqual([]);
     expect(parseIdList("1, x")).toBeNull();
     expect(parseTechniques("t1021.002, T1078 junk T12")).toEqual(["T1021.002", "T1078"]);
-  });
-});
-
-describe("graph layout", () => {
-  it("layers a DAG by longest path", () => {
-    const layers = assignLayers(
-      ["a", "b", "c", "d"],
-      [
-        { src: "a", dst: "b" },
-        { src: "b", dst: "c" },
-        { src: "a", dst: "c" },
-        { src: "x", dst: "a" },
-        { src: "d", dst: "d" },
-      ],
-    );
-    expect(Object.fromEntries(layers)).toEqual({ a: 0, b: 1, c: 2, d: 0 });
-  });
-  it("terminates on cycles", () => {
-    const layers = assignLayers(
-      ["a", "b"],
-      [
-        { src: "a", dst: "b" },
-        { src: "b", dst: "a" },
-      ],
-    );
-    expect(layers.get("a")).toBe(0);
-    expect(layers.get("b")).toBe(1);
-  });
-  it("positions nodes and centers smaller layers", () => {
-    const pos = layeredLayout(
-      ["s1", "s2", "t"],
-      [
-        { src: "s1", dst: "t" },
-        { src: "s2", dst: "t" },
-      ],
-      { layerGap: 100, nodeGap: 10 },
-    );
-    expect(pos.get("s1")).toEqual({ id: "s1", layer: 0, order: 0, x: 0, y: 0 });
-    expect(pos.get("s2")).toEqual({ id: "s2", layer: 0, order: 1, x: 0, y: 10 });
-    expect(pos.get("t")).toEqual({ id: "t", layer: 1, order: 0, x: 100, y: 5 });
-    expect(layeredLayout([], []).size).toBe(0);
-  });
-  it("orders a layer by the barycenter of its predecessors", () => {
-    const pos = layeredLayout(
-      ["a", "b", "y", "z"],
-      [
-        { src: "b", dst: "y" },
-        { src: "a", dst: "z" },
-      ],
-    );
-    expect(pos.get("z")?.order).toBe(0);
-    expect(pos.get("y")?.order).toBe(1);
   });
 });
 
