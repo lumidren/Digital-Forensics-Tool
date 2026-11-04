@@ -26,18 +26,20 @@ STORE_BYTES = Gauge("veritas_store_bytes", "Bytes held in the evidence store")
 STORE_OBJECTS = Gauge("veritas_store_objects", "Objects held in the evidence store")
 TIMELINE_EVENTS = Gauge("veritas_timeline_events", "Timeline events per case", ["case_id"])
 
-_SECRET_PATTERNS = [
-    re.compile(r"(?i)(authorization|password|passphrase|secret|token|api[_-]?key)(\"?\s*[:=]\s*\"?)([^\s\",]+)"),
+# Order matters: whole-token patterns run before key=value so "Authorization: Bearer <t>" loses <t>.
+_TOKEN_PATTERNS = [
     re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"),
-    re.compile(r"(?i)bearer\s+[A-Za-z0-9._-]{16,}"),
+    re.compile(r"(?i)(?<=bearer )[A-Za-z0-9._~+/=-]{16,}"),
+    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----", re.S),
 ]
+_KV_PATTERN = re.compile(r"(?i)\b(password|passphrase|secret|token|access_token|api[_-]?key|client_secret)(\"?\s*[:=]\s*\"?)([^\s\"&,]+)")
 
 
 def scrub_text(s: str) -> str:
     """Remove secret-looking values before a log line is written."""
-    for p in _SECRET_PATTERNS:
-        s = p.sub(lambda m: (m.group(1) + m.group(2) + "[redacted]") if m.lastindex and m.lastindex >= 3 else "[redacted]", s)
-    return s
+    for p in _TOKEN_PATTERNS:
+        s = p.sub("[redacted]", s)
+    return _KV_PATTERN.sub(lambda m: m.group(1) + m.group(2) + "[redacted]", s)
 
 
 class JsonFormatter(logging.Formatter):
