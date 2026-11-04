@@ -33,10 +33,10 @@ export function Alert({
     <div
       data-slot="alert"
       className={cn(
-        "rounded-md border px-3 py-2 text-sm",
-        variant === "destructive" && "border-destructive text-destructive",
-        variant === "success" && "border-success text-success",
-        variant === "warning" && "border-warning text-warning",
+        "rounded-lg border px-3 py-2 text-sm",
+        variant === "destructive" && "border-destructive/50 bg-destructive-soft text-destructive",
+        variant === "success" && "border-success/50 bg-success-soft text-success",
+        variant === "warning" && "border-warning/50 bg-warning-soft text-warning",
         className,
       )}
       {...props}
@@ -48,11 +48,31 @@ export function Separator({ className, ...props }: React.ComponentProps<"hr">) {
   return <hr className={cn("border-border", className)} {...props} />;
 }
 
-export function EmptyState({ title, children }: { title: string; children?: React.ReactNode }) {
+export function EmptyState({
+  title,
+  children,
+  icon: Icon,
+  className,
+}: {
+  title: string;
+  children?: React.ReactNode;
+  icon?: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+  className?: string;
+}) {
   return (
-    <div className="rounded-md border border-dashed p-6 text-center">
+    <div
+      className={cn(
+        "bg-dot-grid flex flex-col items-center rounded-lg border border-dashed px-6 py-8 text-center",
+        className,
+      )}
+    >
+      {Icon ? (
+        <span className="bg-card text-muted-foreground mb-3 grid size-10 place-items-center rounded-full border shadow-xs">
+          <Icon className="size-5" aria-hidden />
+        </span>
+      ) : null}
       <p className="text-sm font-medium">{title}</p>
-      {children ? <div className="text-muted-foreground mt-1 text-sm">{children}</div> : null}
+      {children ? <div className="text-muted-foreground mt-1 max-w-md text-sm">{children}</div> : null}
     </div>
   );
 }

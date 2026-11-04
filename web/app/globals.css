@@ -5,7 +5,7 @@
 
 :root {
   --radius: 0.375rem;
-  --background: oklch(0.995 0 0);
+  --background: oklch(0.985 0.002 260);
   --foreground: oklch(0.18 0.01 260);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.18 0.01 260);
@@ -23,7 +23,7 @@
   --destructive-foreground: oklch(0.99 0 0);
   --success: oklch(0.45 0.12 150);
   --warning: oklch(0.5 0.12 75);
-  --border: oklch(0.88 0.006 260);
+  --border: oklch(0.9 0.006 260);
   --input: oklch(0.8 0.008 260);
   --ring: oklch(0.45 0.15 255);
   --sev-critical: oklch(0.45 0.19 20);
@@ -33,12 +33,35 @@
   --sev-info: oklch(0.45 0.02 260);
   --chart-bar: oklch(0.5 0.13 255);
   --chart-selected: oklch(0.55 0.17 40);
+  --sev-critical-soft: oklch(0.96 0.025 20);
+  --sev-high-soft: oklch(0.965 0.03 45);
+  --sev-medium-soft: oklch(0.97 0.04 85);
+  --sev-low-soft: oklch(0.965 0.025 235);
+  --sev-info-soft: oklch(0.96 0.006 260);
+  --success-soft: oklch(0.965 0.03 150);
+  --warning-soft: oklch(0.97 0.04 85);
+  --destructive-soft: oklch(0.96 0.025 25);
+  /* Data-type categories: validated categorical order (identity, never rank). */
+  --cat-1: #2a78d6;
+  --cat-2: #eb6834;
+  --cat-3: #1baf7a;
+  --cat-4: #eda100;
+  --cat-5: #e87ba4;
+  --cat-6: #008300;
+  --cat-7: #6250d6;
+  --cat-8: #e34948;
+  --cat-other: oklch(0.62 0.012 260);
+  --chart-grid: oklch(0.92 0.005 260);
+  --chart-area: oklch(0.55 0.15 255);
+  --brand-from: oklch(0.5 0.17 262);
+  --brand-to: oklch(0.6 0.13 200);
+  --surface-raised: oklch(0.985 0.003 260);
 }
 
 .dark {
-  --background: oklch(0.16 0.01 260);
+  --background: oklch(0.155 0.012 262);
   --foreground: oklch(0.94 0.005 260);
-  --card: oklch(0.2 0.012 260);
+  --card: oklch(0.192 0.013 262);
   --card-foreground: oklch(0.94 0.005 260);
   --popover: oklch(0.21 0.012 260);
   --popover-foreground: oklch(0.94 0.005 260);
@@ -54,7 +77,7 @@
   --destructive-foreground: oklch(0.16 0.02 260);
   --success: oklch(0.76 0.14 150);
   --warning: oklch(0.8 0.13 80);
-  --border: oklch(0.33 0.012 260);
+  --border: oklch(0.3 0.014 262);
   --input: oklch(0.45 0.012 260);
   --ring: oklch(0.74 0.13 255);
   --sev-critical: oklch(0.75 0.15 20);
@@ -64,6 +87,28 @@
   --sev-info: oklch(0.8 0.02 260);
   --chart-bar: oklch(0.7 0.12 255);
   --chart-selected: oklch(0.78 0.15 50);
+  --sev-critical-soft: oklch(0.29 0.07 20);
+  --sev-high-soft: oklch(0.29 0.06 45);
+  --sev-medium-soft: oklch(0.29 0.05 85);
+  --sev-low-soft: oklch(0.29 0.05 235);
+  --sev-info-soft: oklch(0.28 0.012 260);
+  --success-soft: oklch(0.28 0.05 150);
+  --warning-soft: oklch(0.29 0.05 85);
+  --destructive-soft: oklch(0.29 0.07 25);
+  --cat-1: #3987e5;
+  --cat-2: #d95926;
+  --cat-3: #199e70;
+  --cat-4: #c98500;
+  --cat-5: #d55181;
+  --cat-6: #008300;
+  --cat-7: #9085e9;
+  --cat-8: #e66767;
+  --cat-other: oklch(0.55 0.01 260);
+  --chart-grid: oklch(0.3 0.01 260);
+  --chart-area: oklch(0.72 0.13 255);
+  --brand-from: oklch(0.68 0.15 262);
+  --brand-to: oklch(0.74 0.12 200);
+  --surface-raised: oklch(0.225 0.013 260);
 }
 
 @theme inline {
@@ -95,6 +140,28 @@
   --color-sev-info: var(--sev-info);
   --color-chart-bar: var(--chart-bar);
   --color-chart-selected: var(--chart-selected);
+  --color-sev-critical-soft: var(--sev-critical-soft);
+  --color-sev-high-soft: var(--sev-high-soft);
+  --color-sev-medium-soft: var(--sev-medium-soft);
+  --color-sev-low-soft: var(--sev-low-soft);
+  --color-sev-info-soft: var(--sev-info-soft);
+  --color-success-soft: var(--success-soft);
+  --color-warning-soft: var(--warning-soft);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-cat-1: var(--cat-1);
+  --color-cat-2: var(--cat-2);
+  --color-cat-3: var(--cat-3);
+  --color-cat-4: var(--cat-4);
+  --color-cat-5: var(--cat-5);
+  --color-cat-6: var(--cat-6);
+  --color-cat-7: var(--cat-7);
+  --color-cat-8: var(--cat-8);
+  --color-cat-other: var(--cat-other);
+  --color-chart-grid: var(--chart-grid);
+  --color-chart-area: var(--chart-area);
+  --color-brand-from: var(--brand-from);
+  --color-brand-to: var(--brand-to);
+  --color-surface-raised: var(--surface-raised);
   --radius-sm: calc(var(--radius) - 2px);
   --radius-md: var(--radius);
   --radius-lg: calc(var(--radius) + 2px);
@@ -139,5 +206,62 @@
 @layer utilities {
   .tabular {
     font-variant-numeric: tabular-nums;
+  }
+  .bg-brand-gradient {
+    background-image: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+  }
+  .text-brand-gradient {
+    background-image: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+    background-clip: text;
+    color: transparent;
+  }
+  .bg-dot-grid {
+    background-image: radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0);
+    background-size: 16px 16px;
+  }
+  .eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+}
+
+/* React Flow: theme the canvas with app tokens. */
+.react-flow {
+  --xy-background-color: transparent;
+  --xy-minimap-background-color: var(--card);
+  --xy-controls-button-background-color: var(--card);
+  --xy-controls-button-background-color-hover: var(--accent);
+  --xy-controls-button-color: var(--foreground);
+  --xy-controls-button-border-color: var(--border);
+  --xy-edge-label-background-color: var(--card);
+}
+
+@keyframes veritas-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+@keyframes veritas-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .motion-grow {
+    transform-box: fill-box;
+    transform-origin: bottom;
+    animation: veritas-grow 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .motion-grow-x {
+    transform-origin: left;
+    animation: veritas-grow-x 480ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
 }
