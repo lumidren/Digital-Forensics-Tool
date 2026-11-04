@@ -65,3 +65,24 @@ def test_keyring_from_env(monkeypatch):
     assert CaseKeyring.from_env() is None
     with pytest.raises(ValueError):
         CaseKeyring(b"short")
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(not os.environ.get("S3_ENDPOINT_URL") or not os.environ.get("VERITAS_S3_BUCKET"), reason="needs an Object Lock bucket (CI MinIO service)")
+def test_s3_store_object_lock_roundtrip(tmp_path):
+    import boto3
+
+    ring = CaseKeyring(bytes(range(32)))
+    store = S3Store(os.environ["VERITAS_S3_BUCKET"], ring, retention_days=1)
+    data = os.urandom(FRAME_SIZE + 99)
+    src = tmp_path / "ev.bin"
+    src.write_bytes(data)
+    meta = store.put_file("CASE-S3", src, "ev.bin")
+    assert store.exists(meta.address) and store.open(meta.address).read() == data and store.verify(meta.address)
+    assert store.put_file("CASE-S3", src).address == meta.address
+    s3 = boto3.client("s3", endpoint_url=os.environ["S3_ENDPOINT_URL"])
+    head = s3.head_object(Bucket=os.environ["VERITAS_S3_BUCKET"], Key=store._key(meta.address))
+    assert head["ObjectLockMode"] == "COMPLIANCE"
+    versions = s3.list_object_versions(Bucket=os.environ["VERITAS_S3_BUCKET"], Prefix=store._key(meta.address))["Versions"]
+    with pytest.raises(Exception):  # WORM: a locked version cannot be deleted
+        s3.delete_object(Bucket=os.environ["VERITAS_S3_BUCKET"], Key=store._key(meta.address), VersionId=versions[0]["VersionId"])
