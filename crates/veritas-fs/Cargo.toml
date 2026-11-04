@@ -13,6 +13,7 @@ path = "src/bin/fs-tool.rs"
 
 [dependencies]
 veritas-hash = { path = "../veritas-hash" }
+veritas-ewf = { path = "../veritas-ewf" }
 veritas-timeline = { path = "../veritas-timeline" }
 serde.workspace = true
 serde_json.workspace = true

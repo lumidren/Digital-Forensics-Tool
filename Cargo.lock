@@ -1935,6 +1935,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror",
+ "veritas-ewf",
  "veritas-hash",
  "veritas-timeline",
 ]

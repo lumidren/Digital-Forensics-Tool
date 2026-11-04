@@ -9,7 +9,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use veritas_fs::image::{self, AnyFs, FsKind, ImageVolume};
-use veritas_fs::io::{read_vec_padded, FileSource, Source};
+use veritas_fs::io::{read_vec_padded, Source};
 use veritas_fs::ntfs::{self, Ntfs};
 use veritas_fs::{carve, events, harvest, recover, vss, FsError};
 
@@ -129,7 +129,7 @@ enum Cmd {
 type R<T> = Result<T, Box<dyn std::error::Error>>;
 
 fn open(p: &Path) -> R<Source> {
-    Ok(FileSource::source(p)?)
+    Ok(veritas_fs::io::open_evidence(p)?)
 }
 
 fn jl<T: Serialize>(out: &mut impl Write, v: &T) -> R<()> {

@@ -156,3 +156,50 @@ impl ReadAt for SubSource {
         self.inner.read_at(self.start + offset, &mut buf[..n])
     }
 }
+
+/// Media of an Expert Witness (E01) segment set, read through `veritas-ewf`.
+pub struct EwfSource {
+    reader: Mutex<veritas_ewf::reader::EwfReader>,
+    size: u64,
+}
+
+impl EwfSource {
+    pub fn open(first_segment: &Path) -> Result<Self> {
+        let r = veritas_ewf::reader::EwfReader::open(first_segment).map_err(|e| FsError::Io(format!("E01: {e}")))?;
+        let size = r.media_size();
+        Ok(Self { reader: Mutex::new(r), size })
+    }
+}
+
+impl ReadAt for EwfSource {
+    fn size(&self) -> u64 {
+        self.size
+    }
+    fn read_at(&self, offset: u64, buf: &mut [u8]) -> Result<usize> {
+        if offset >= self.size {
+            return Ok(0);
+        }
+        let mut r = self.reader.lock().map_err(|_| FsError::Io("EWF reader lock poisoned".into()))?;
+        let want = buf.len().min((self.size - offset) as usize);
+        let mut done = 0;
+        while done < want {
+            let n = r.read_at(offset + done as u64, &mut buf[done..want]).map_err(|e| FsError::Io(format!("E01: {e}")))?;
+            if n == 0 {
+                break;
+            }
+            done += n;
+        }
+        Ok(done)
+    }
+}
+
+/// Open an evidence file: E01 segment sets are read as their media; anything else as raw bytes.
+pub fn open_evidence(path: &Path) -> Result<Source> {
+    let mut sig = [0u8; 8];
+    let is_ewf = File::open(path).and_then(|mut f| f.read_exact(&mut sig)).is_ok() && &sig == b"EVF\x09\x0d\x0a\xff\x00";
+    if is_ewf {
+        Ok(Arc::new(EwfSource::open(path)?))
+    } else {
+        FileSource::source(path)
+    }
+}
