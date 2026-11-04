@@ -60,9 +60,45 @@ def test_dag_failure_skips_dependents_and_resume(tmp_path):
     # Resume after the fault is fixed: only failed/skipped steps rerun.
     flag["fail"] = False
     store.set_job("J", "pending")
-    with store._conn:
-        store._conn.execute("UPDATE steps SET state='pending' WHERE state IN ('failed','skipped')")
+    store.reset_failed_steps("J")
     assert execute(dag, store, "J", "C", "e" * 64) == DONE
+
+
+def test_concurrent_claims_are_exclusive(tmp_path):
+    import threading
+
+    db = tmp_path / "jobs.db"
+    JobStore(db).create_job("J1", "C", "e" * 64, "disk")
+    JobStore(db).create_job("J2", "C", "f" * 64, "triage")
+    winners: list[tuple] = []
+    lock = threading.Lock()
+
+    def worker(i):
+        s = JobStore(db, worker_id=f"w{i}")
+        while (j := s.next_job()) is not None:
+            with lock:
+                winners.append((j[0], s.worker_id))
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(8)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+    assert sorted(w[0] for w in winners) == ["J1", "J2"]  # each job claimed exactly once
+    s = JobStore(db, worker_id="late")
+    assert s.next_job() is None
+    # An expired lease makes a running job claimable again (crashed worker).
+    s._x("UPDATE jobs SET lease_until = :t WHERE job_id = 'J1'", t="2000-01-01T00:00:00.000000Z")
+    assert s.next_job()[0] == "J1" and s.job("J1")["claimed_by"] == "late"
+    s.set_job("J1", "done")
+    assert s.job("J1")["claimed_by"] is None
+
+
+def test_priority_order(tmp_path):
+    s = JobStore(tmp_path / "j.db")
+    s.create_job("disk", "C", "a" * 64, "disk")
+    s.create_job("tri", "C", "b" * 64, "triage")
+    assert s.next_job()[0] == "tri" and s.next_job()[0] == "disk"
 
 
 def test_dag_rejects_cycles_and_unknown():
