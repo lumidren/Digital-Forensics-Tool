@@ -39,7 +39,7 @@ def test_timestomp_indicators():
 
 def test_engine_runs_all_rules_and_only_proposes():
     events = [
-        ev("fs:stat:ntfs", "f", si_crtime_ns=T0, fn_crtime_ns=T0 + 10 * NS),
+        ev("fs:stat:ntfs", "f", file_reference="70-1", path="/Users/bob/Desktop/payload.exe", si_crtime_ns=T0, fn_crtime_ns=T0 + 10 * NS + 1234),
         evtx(1102, rn=5),
         evtx(4688, rn=6, NewProcessName="C:\\Tools\\mimikatz.exe", process_name="C:\\Tools\\mimikatz.exe", command_line="mimikatz.exe"),
         evtx(4624, rn=7, LogonType="10", IpAddress="10.0.0.5", TargetUserName="admin", logon_type="10", ip_address="10.0.0.5", target_user_name="admin"),
@@ -122,3 +122,28 @@ def test_ioc_matcher_and_loader():
     with pytest.raises(ValueError):
         Indicator("md5", "zz")
     assert load_indicators('[{"ioc_type":"domain","value":"X.Y."}]')[0].value == "x.y"
+
+
+def test_timestomp_grading():
+    from veritas.analytics.timestomp import TimestompRule
+
+    def ntfs(ref, path, si_cr, fn_cr, si_m=None):
+        return ev("fs:stat:ntfs", path, file_reference=ref, path=path, si_crtime_ns=si_cr, fn_crtime_ns=fn_cr, si_mtime_ns=si_m or si_cr)
+
+    base = T0 + 5 * NS
+    events = [
+        ntfs("10-1", "/Users/bob/Desktop/payload.exe", T0, base + 77),           # isolated anomaly
+        ntfs("11-1", "/Users/bob/Desktop/notes.txt", base, base + 1),            # normal sibling
+        ntfs("12-1", "/Users/bob/Desktop/report.docx", base, base + 2),          # normal sibling
+        ntfs("20-1", "/Program Files/App/a.dll", T0, base + 5),                  # installer tree
+        ntfs("21-1", "/ntldr", T0, base + 9),                                   # setup root file
+        ntfs("30-1", "/Users/bob/doc.pdf", base + 3, base + 3, si_m=T0),        # USN contradiction below
+        ev("fs:ntfs:usn_change", "usn", ts=T0 + 100 * NS, file_reference="30-1", update_reason="DATA_OVERWRITE|CLOSE"),
+    ]
+    fs = list(TimestompRule().run(iter_stored(events)))
+    titles = {f.title: f for f in fs}
+    assert titles["Timestamps contradicted by USN journal: /Users/bob/doc.pdf"].severity == "high"
+    assert titles["Possible timestomping: /Users/bob/Desktop/payload.exe"].severity == "medium"
+    agg = next(f for f in fs if "installation or bulk-copied" in f.title)
+    assert agg.severity == "low" and agg.details["total"] == 2
+    assert not any("a.dll" in f.title or "ntldr" in f.title for f in fs if f.severity != "low")
