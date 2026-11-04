@@ -1,0 +1,89 @@
+name: Deploy
+
+# main -> staging automatically after CI passes; production behind the `production` GitHub Environment
+# (required reviewers). Each stage: helm upgrade --atomic (failed rollout rolls back by itself), then a
+# smoke test (/healthz, /readyz, canary search, public path); a failed smoke test runs `helm rollback`.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Image tag to deploy (defaults to sha-<commit>)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  NAMESPACE: veritas
+  RELEASE: veritas
+  AWS_REGION: eu-west-1
+
+jobs:
+  images:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/images.yml
+    with:
+      tag: ${{ inputs.image_tag || format('sha-{0}', github.event.workflow_run.head_sha || github.sha) }}
+
+  staging:
+    name: Deploy to staging
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: staging
+      url: https://${{ vars.VERITAS_HOST }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: ./.github/actions/helm-deploy
+        with:
+          environment: staging
+          image-tag: ${{ needs.images.outputs.tag }}
+          aws-role-arn: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          host: ${{ vars.VERITAS_HOST }}
+          namespace: ${{ env.NAMESPACE }}
+          release: ${{ env.RELEASE }}
+
+  production:
+    name: Deploy to production
+    needs: [images, staging]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: production
+      url: https://${{ vars.VERITAS_HOST }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: ./.github/actions/helm-deploy
+        with:
+          environment: prod
+          image-tag: ${{ needs.images.outputs.tag }}
+          aws-role-arn: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          host: ${{ vars.VERITAS_HOST }}
+          namespace: ${{ env.NAMESPACE }}
+          release: ${{ env.RELEASE }}

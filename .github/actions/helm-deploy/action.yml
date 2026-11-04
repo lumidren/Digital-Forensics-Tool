@@ -1,0 +1,91 @@
+name: Veritas Helm deploy
+description: Verify image signatures, render account values from Terraform, helm upgrade --atomic, smoke test, roll back on failure.
+
+inputs:
+  environment:
+    description: staging or prod (selects values-<env>.yaml and the Terraform environment)
+    required: true
+  image-tag:
+    description: Image tag published by images.yml
+    required: true
+  aws-role-arn:
+    description: IAM role assumed through GitHub OIDC (EKS access entry + Terraform state read)
+    required: true
+  aws-region:
+    description: AWS region
+    required: true
+  host:
+    description: Public host name for the smoke test
+    required: true
+  namespace:
+    description: Kubernetes namespace
+    required: true
+  release:
+    description: Helm release name
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ inputs.aws-role-arn }}
+        aws-region: ${{ inputs.aws-region }}
+        role-session-name: veritas-deploy-${{ inputs.environment }}
+    - uses: azure/setup-helm@v4
+      with:
+        version: v3.16.2
+    - uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.9.8
+        terraform_wrapper: false
+    - uses: sigstore/cosign-installer@v3
+    - name: Verify image signatures (cosign keyless)
+      shell: bash
+      env:
+        TAG: ${{ inputs.image-tag }}
+      run: |
+        set -euo pipefail
+        for img in api worker web; do
+          cosign verify "ghcr.io/${GITHUB_REPOSITORY_OWNER}/veritas-${img}:${TAG}" \
+            --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com > /dev/null
+          echo "signature OK: veritas-${img}:${TAG}"
+        done
+    - name: Render Terraform outputs into Helm values
+      shell: bash
+      working-directory: deploy/terraform/aws/environments/${{ inputs.environment }}
+      run: |
+        set -euo pipefail
+        cp backend.hcl.example backend.hcl
+        terraform init -input=false -backend-config=backend.hcl > /dev/null
+        terraform output -json stack | python3 "$GITHUB_WORKSPACE/deploy/scripts/helm_values_from_terraform.py" > "$RUNNER_TEMP/account-values.yaml"
+        echo "CLUSTER_NAME=$(terraform output -json stack | python3 -c 'import json,sys; print(json.load(sys.stdin)["cluster_name"])')" >> "$GITHUB_ENV"
+    - name: Kubeconfig
+      shell: bash
+      run: aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "${{ inputs.aws-region }}"
+    - name: helm upgrade --atomic
+      shell: bash
+      env:
+        TAG: ${{ inputs.image-tag }}
+      run: |
+        set -euo pipefail
+        helm upgrade --install "${{ inputs.release }}" deploy/helm/veritas \
+          --namespace "${{ inputs.namespace }}" \
+          -f "deploy/helm/veritas/values-${{ inputs.environment }}.yaml" \
+          -f "$RUNNER_TEMP/account-values.yaml" \
+          --set image.tag="$TAG" \
+          --set global.imageRegistry="ghcr.io/${GITHUB_REPOSITORY_OWNER}" \
+          --atomic --wait --timeout 15m --history-max 20
+    - name: Smoke test
+      id: smoke
+      shell: bash
+      run: bash deploy/scripts/smoke.sh "${{ inputs.namespace }}" "${{ inputs.release }}" "${{ inputs.host }}"
+    - name: Roll back on failed smoke test
+      if: failure() && steps.smoke.outcome == 'failure'
+      shell: bash
+      run: |
+        helm rollback "${{ inputs.release }}" --namespace "${{ inputs.namespace }}" --wait --timeout 10m
+        helm history "${{ inputs.release }}" --namespace "${{ inputs.namespace }}" --max 5
+        echo "::error title=deploy::smoke test failed on ${{ inputs.environment }}; rolled back to the previous release"
+        exit 1

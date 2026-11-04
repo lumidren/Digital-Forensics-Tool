@@ -1,0 +1,491 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  rust:
+    name: Rust fmt, clippy, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+      # THREAT:T7.4 Cargo.lock is committed; every cargo invocation in CI uses --locked so a dependency
+      # change can only arrive through a reviewed lockfile diff.
+      - name: cargo clippy (deny warnings)
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: cargo test
+        run: cargo test --workspace --locked
+
+  cargo-audit:
+    name: cargo-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      # THREAT:T7.1 RustSec advisories fail the build (cargo-audit exits non-zero on any vulnerability).
+      - name: cargo audit
+        run: cargo audit --deny unsound --deny yanked
+
+  python:
+    name: Python lint, types, tests (coverage >= 90%), bandit, pip-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build Rust binaries used by cross-language tests
+        run: cargo build --release --locked --bins
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: python/pyproject.toml
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e "python[dev,cluster]"
+      - name: ruff
+        run: ruff check python scripts
+      - name: mypy
+        run: mypy --ignore-missing-imports python/veritas
+      - name: pytest with coverage gate
+        working-directory: python
+        env:
+          VERITAS_BIN_DIR: ${{ github.workspace }}/target/release
+        run: >
+          pytest -m "not parity and not integration"
+          --cov=veritas --cov-report=term-missing:skip-covered --cov-report=xml
+          --cov-fail-under=90
+      - name: Backup/restore round trip (DR drill)
+        env:
+          VERITAS_BIN_DIR: ${{ github.workspace }}/target/release
+        run: pytest -q python/tests/unit/test_backup_restore.py -p no:cacheprovider
+      - name: Threat model references resolve
+        run: python scripts/check_threat_model.py
+      # THREAT:T7.1 Bandit (medium severity and above) and pip-audit (any known vulnerability) fail the build.
+      - name: bandit
+        run: bandit -r python/veritas scripts -ll -q
+      - name: pip-audit
+        run: pip-audit --strict --skip-editable --progress-spinner off
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: python/coverage.xml
+          retention-days: 14
+
+  parity:
+    name: Parity with reference tools
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked --bins
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: python/pyproject.toml
+      - name: Install with parity extra
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e "python[dev,parity]"
+      - name: Cache reference corpus
+        uses: actions/cache@v4
+        with:
+          path: testdata/corpus
+          key: corpus-${{ hashFiles('testdata/MANIFEST.json') }}
+      - name: Fetch and verify corpus
+        run: python testdata/fetch.py
+      - name: pytest -m parity
+        working-directory: python
+        env:
+          VERITAS_BIN_DIR: ${{ github.workspace }}/target/release
+        run: pytest -m parity
+      - name: Parity gate (no regression against parity/baseline.json)
+        run: python scripts/parity_gate.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: parity-results
+          path: parity/results
+          retention-days: 30
+
+  determinism:
+    name: Determinism (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked --bins
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: python/pyproject.toml
+      - run: pip install -e python
+      - uses: actions/cache@v4
+        with:
+          path: testdata/corpus
+          key: corpus-${{ hashFiles('testdata/MANIFEST.json') }}
+      - run: python testdata/fetch.py
+      - name: Run every parser twice and hash the output
+        env:
+          VERITAS_BIN_DIR: ${{ github.workspace }}/target/release
+        run: python scripts/determinism_check.py --out determinism/${{ runner.os }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: determinism-${{ runner.os }}
+          path: determinism/${{ runner.os }}.json
+
+  determinism-compare:
+    name: Determinism across operating systems
+    needs: determinism
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: determinism-*
+          path: determinism
+          merge-multiple: true
+      - name: Compare Linux and Windows output hashes
+        run: python scripts/determinism_check.py --compare determinism/Linux.json determinism/Windows.json
+
+  fuzz:
+    name: Fuzz smoke (60 s per target)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
+      - name: Run every cargo-fuzz target for 60 seconds
+        shell: bash
+        run: |
+          set -euo pipefail
+          found=0
+          while IFS= read -r dir; do
+            crate="$(dirname "$dir")"
+            for target in $(cd "$crate" && cargo +nightly fuzz list); do
+              found=$((found + 1))
+              echo "::group::fuzz $crate $target"
+              (cd "$crate" && cargo +nightly fuzz run "$target" -- -max_total_time=60 -rss_limit_mb=4096)
+              echo "::endgroup::"
+            done
+          done < <(find crates -mindepth 2 -maxdepth 2 -type d -name fuzz -exec test -f '{}/Cargo.toml' ';' -print)
+          echo "fuzzed $found target(s)"
+          test "$found" -gt 0
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: fuzz-crashes
+          path: crates/*/fuzz/artifacts
+
+  web:
+    name: Web lint, types, unit, build, E2E, accessibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      # THREAT:T7.4 npm ci installs exactly package-lock.json and fails if it is out of date.
+      - run: npm ci --no-fund
+      # THREAT:T7.1 npm audit fails on HIGH or CRITICAL advisories in production dependencies.
+      - name: npm audit
+        run: npm audit --omit=dev --audit-level=high
+      - run: npm run lint
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Unit tests (vitest)
+        run: npx vitest run
+      - name: Build
+        run: npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: python/pyproject.toml
+      - name: Start the API natively (no containers)
+        working-directory: .
+        env:
+          VERITAS_DATA_DIR: ${{ runner.temp }}/veritas
+          VERITAS_ADMIN_PASSWORD: e2e-admin-password-not-secret
+          VERITAS_USER_PASSWORD: e2e-user-password-not-secret
+        run: |
+          pip install -e python
+          python -m veritas.api.manage create-admin --id admin --name "E2E Admin"
+          python -m veritas.api.manage create-user --id examiner --name "E2E Examiner"
+          python -m veritas.api.manage create-user --id reviewer --name "E2E Reviewer"
+          nohup python -m uvicorn veritas.api.main:create_app --factory --host 127.0.0.1 --port 8000 > "$RUNNER_TEMP/api.log" 2>&1 &
+          for _ in $(seq 1 60); do curl -fsS http://127.0.0.1:8000/readyz && exit 0; sleep 1; done
+          cat "$RUNNER_TEMP/api.log"; exit 1
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - name: Playwright E2E
+        env:
+          VERITAS_API_URL: http://127.0.0.1:8000
+          NEXT_PUBLIC_API_BASE: http://127.0.0.1:8000
+          E2E_ADMIN_PASSWORD: e2e-admin-password-not-secret
+          E2E_USER_PASSWORD: e2e-user-password-not-secret
+        run: npx playwright test
+      - name: Accessibility (axe-core via Playwright)
+        env:
+          VERITAS_API_URL: http://127.0.0.1:8000
+          NEXT_PUBLIC_API_BASE: http://127.0.0.1:8000
+        run: npx playwright test --grep "@a11y|axe"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            web/playwright-report
+            ${{ runner.temp }}/api.log
+
+  semgrep:
+    name: Semgrep
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    container:
+      image: semgrep/semgrep:1.90.0
+    steps:
+      - uses: actions/checkout@v4
+      # THREAT:T7.1 Semgrep rule packs plus .semgrep.yml; findings of severity ERROR (high/critical) fail the build.
+      - name: semgrep scan
+        run: >
+          semgrep scan --metrics=off --error --severity ERROR
+          --config p/default --config p/python --config p/rust --config p/typescript --config p/secrets
+          --config .semgrep.yml
+          --sarif --output semgrep.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+  trivy:
+    name: Trivy filesystem and IaC scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      # THREAT:T7.1 Vulnerable dependencies (fs) and misconfigurations (Dockerfiles, Helm, Kubernetes,
+      # Terraform) of severity HIGH or CRITICAL fail the build; accepted risks live in .trivyignore.
+      - name: Trivy fs (dependencies and secrets)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          trivyignores: .trivyignore
+          skip-dirs: testdata/corpus,target,web/node_modules
+      - name: Trivy config (IaC)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          trivyignores: .trivyignore
+
+  deploy-lint:
+    name: Validate deployment assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: actionlint
+        uses: raven-actions/actionlint@v2
+      - name: hadolint
+        run: |
+          curl -fsSL -o /usr/local/bin/hadolint https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64
+          chmod +x /usr/local/bin/hadolint
+          for f in deploy/docker/Dockerfile.*; do hadolint --config deploy/docker/.hadolint.yaml "$f"; done
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.2
+      - name: helm lint and kubeconform
+        run: |
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar -xz -C /usr/local/bin kubeconform
+          for v in "" "-f deploy/helm/veritas/values-staging.yaml" "-f deploy/helm/veritas/values-prod.yaml"; do
+            # shellcheck disable=SC2086
+            helm lint --strict deploy/helm/veritas $v
+            # shellcheck disable=SC2086
+            helm template veritas deploy/helm/veritas --namespace veritas $v \
+              | kubeconform -strict -summary -kubernetes-version 1.31.0 -schema-location default \
+                -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+          done
+      - name: Rendered manifests are up to date
+        run: |
+          for e in staging prod; do
+            { echo "# Rendered from deploy/helm/veritas with values-$e.yaml - do not edit by hand."
+              echo "# Regenerate: helm template veritas deploy/helm/veritas --namespace veritas -f deploy/helm/veritas/values-$e.yaml > deploy/k8s/$e/veritas.yaml"
+              helm template veritas deploy/helm/veritas --namespace veritas -f "deploy/helm/veritas/values-$e.yaml"; } > "/tmp/$e.yaml"
+            diff -u "deploy/k8s/$e/veritas.yaml" "/tmp/$e.yaml"
+          done
+      - name: Alert rules (promtool) and chart copy
+        run: |
+          curl -fsSL https://github.com/prometheus/prometheus/releases/download/v2.54.1/prometheus-2.54.1.linux-amd64.tar.gz \
+            | tar -xz --strip-components=1 -C /usr/local/bin prometheus-2.54.1.linux-amd64/promtool
+          promtool check rules deploy/observability/prometheus/alerts.yml
+          (cd deploy/observability/prometheus && promtool test rules alerts.test.yml)
+          cmp deploy/observability/prometheus/alerts.yml deploy/helm/veritas/files/alerts.yml
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.53.0
+      - name: terraform fmt, validate, tflint
+        working-directory: deploy/terraform/aws
+        run: |
+          terraform fmt -check -recursive
+          tflint --init
+          for d in environments/staging environments/prod state-backend; do
+            terraform -chdir="$d" init -backend=false -input=false
+            terraform -chdir="$d" validate
+          done
+          tflint --recursive --format compact --config "$PWD/.tflint.hcl" --call-module-type=none
+
+  integration:
+    name: Integration (Postgres, ClickHouse, MinIO Object Lock)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16.4-alpine
+        env:
+          POSTGRES_DB: veritas
+          POSTGRES_USER: veritas
+          POSTGRES_PASSWORD: ci-postgres-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U veritas -d veritas"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      clickhouse:
+        image: clickhouse/clickhouse-server:24.8.4.13-alpine
+        env:
+          CLICKHOUSE_DB: veritas
+          CLICKHOUSE_USER: veritas
+          CLICKHOUSE_PASSWORD: ci-clickhouse-password
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+        ports: ["8123:8123"]
+        options: >-
+          --health-cmd "wget -qO- http://127.0.0.1:8123/ping"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      minio:
+        image: bitnami/minio:2024.10.13
+        env:
+          MINIO_ROOT_USER: ci-minio-root
+          MINIO_ROOT_PASSWORD: ci-minio-root-password
+        ports: ["9000:9000"]
+        options: >-
+          --health-cmd "curl -fsS http://127.0.0.1:9000/minio/health/live"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      VERITAS_DATABASE_URL: postgresql+psycopg://veritas:ci-postgres-password@127.0.0.1:5432/veritas
+      VERITAS_TIMELINE_URL: clickhouse://veritas:ci-clickhouse-password@127.0.0.1:8123/veritas
+      CLICKHOUSE_URL: http://veritas:ci-clickhouse-password@127.0.0.1:8123
+      VERITAS_STORE: s3
+      VERITAS_S3_BUCKET: veritas-evidence-ci
+      S3_ENDPOINT_URL: http://127.0.0.1:9000
+      AWS_ACCESS_KEY_ID: ci-minio-root
+      AWS_SECRET_ACCESS_KEY: ci-minio-root-password
+      AWS_DEFAULT_REGION: us-east-1
+      VERITAS_MASTER_KEY: "1111111111111111111111111111111111111111111111111111111111111111"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: python/pyproject.toml
+      - run: pip install -e "python[dev,cluster]"
+      - name: Create the Object Lock (COMPLIANCE) evidence bucket
+        run: |
+          python - <<'PY'
+          import os, boto3
+          s3 = boto3.client("s3", endpoint_url=os.environ["S3_ENDPOINT_URL"])
+          b = os.environ["VERITAS_S3_BUCKET"]
+          s3.create_bucket(Bucket=b, ObjectLockEnabledForBucket=True)
+          s3.put_object_lock_configuration(Bucket=b, ObjectLockConfiguration={
+              "ObjectLockEnabled": "Enabled", "Rule": {"DefaultRetention": {"Mode": "COMPLIANCE", "Days": 1}}})
+          print(s3.get_object_lock_configuration(Bucket=b)["ObjectLockConfiguration"])
+          PY
+      - name: pytest -m integration
+        working-directory: python
+        run: |
+          set +e
+          pytest -m integration
+          rc=$?
+          if [ "$rc" -eq 5 ]; then
+            echo "::warning title=integration::no tests are marked 'integration' yet"
+            exit 0
+          fi
+          exit "$rc"
+
+  sbom:
+    name: SBOM (CycloneDX)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: veritas-source.cdx.json
+          artifact-name: veritas-source.cdx.json
