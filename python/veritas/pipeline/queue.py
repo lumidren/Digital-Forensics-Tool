@@ -34,7 +34,7 @@ PARSER_VERSION = "0.1.0"
 MAGIC: list[tuple[int, bytes, str]] = [
     (0, b"EVF\x09\x0d\x0a\xff\x00", "disk"),
     (0, b"ElfFile\x00", "evtx"),
-    (0, b"LfLe", "evt"),
+    (4, b"LfLe", "evt"),
     (4, b"SCCA", "prefetch"),
     (0, b"MAM\x04", "prefetch"),
     (0, b"regf", "regf-events"),
@@ -100,12 +100,22 @@ class Processor:
     def _clock(self, ev) -> HostClock:
         return HostClock(ev.sha256, ev.tz_name, int(ev.clock_skew_ms or 0) * 1_000_000)
 
-    def _parse_object(self, case_id: str, evidence_id: str, address: str, logical: str, parser: str, clock: HostClock, step: StepContext, extra: list[str] | None = None) -> dict[str, Any]:
+    def _materialize_evidence(self, ev, tmp: Path) -> Path:
+        """Primary object plus any further segments (E02, ...) side by side under their original names."""
+        path = self.ctx.store.materialize(ev.sha256, tmp, ev.name)
+        for seg in ev.segments or []:
+            self.ctx.store.materialize(seg["sha256"], tmp, seg["name"])
+        return path
+
+    def _parse_object(self, case_id: str, evidence_id: str, address: str, logical: str, parser: str, clock: HostClock, step: StepContext, extra: list[str] | None = None, ev=None) -> dict[str, Any]:
         self.ctx.custody(case_id, "veritas-pipeline", "access", f"parse with {parser}", evidence_id=evidence_id,
                          details={"object_sha256": address, "parser": parser, "parser_version": PARSER_VERSION, "logical_path": logical, "job_id": step.job_id})
         tmp = Path(tempfile.mkdtemp(prefix="veritas-mat-"))
         try:
-            path = self.ctx.store.materialize(address, tmp, Path(logical).name if logical else None)
+            if ev is not None and ev.segments:
+                path = self._materialize_evidence(ev, tmp)
+            else:
+                path = self.ctx.store.materialize(address, tmp, Path(logical).name if logical else None)
             res = run_parser(parser, path, address, logical, self.limits, extra)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
@@ -129,16 +139,18 @@ class Processor:
 
         def verify_step(step: StepContext) -> dict[str, Any]:
             step.progress(0.0, "re-hashing evidence")
-            ok = self.ctx.store.verify(ev.sha256)
-            if not ok:
-                raise RuntimeError("stored object no longer matches its acquisition hash")
-            return {"verified": True}
+            objects = [ev.sha256] + [s["sha256"] for s in (ev.segments or [])]
+            for i, address in enumerate(objects):
+                step.progress(i / len(objects), f"re-hashing object {i + 1} of {len(objects)}")
+                if not self.ctx.store.verify(address):
+                    raise RuntimeError(f"stored object {address} no longer matches its acquisition hash")
+            return {"verified": True, "objects": len(objects)}
 
         steps.append(Step("verify", verify_step, version="1"))
 
         if kind == "disk":
             def fs_timeline(step: StepContext) -> dict[str, Any]:
-                return self._parse_object(case_id, ev.id, ev.sha256, ev.name, "fs-events", clock, step)
+                return self._parse_object(case_id, ev.id, ev.sha256, ev.name, "fs-events", clock, step, ev=ev)
 
             def harvest(step: StepContext) -> dict[str, Any]:
                 return self._harvest(case_id, ev, clock, step)
@@ -169,7 +181,7 @@ class Processor:
         self.ctx.custody(case_id, "veritas-pipeline", "access", "harvest artifacts from image", evidence_id=ev.id, details={"tool": "fs-tool harvest", "job_id": step.job_id})
         tmp = Path(tempfile.mkdtemp(prefix="veritas-harvest-"))
         try:
-            img = self.ctx.store.materialize(ev.sha256, tmp, ev.name)
+            img = self._materialize_evidence(ev, tmp)
             out = tmp / "out"
             import subprocess
 
@@ -190,6 +202,11 @@ class Processor:
                 address = self._ingest_derived(case_id, ev, local, logical)
                 results["stored"] += 1
                 kind = classify(local.open("rb").read(4096), None, item["path"])
+                lower_name = Path(item["path"]).name.lower()
+                if item.get("kind") == "registry" and lower_name.endswith((".log", ".log1", ".log2")):
+                    # Registry transaction logs are preserved with their hive; they are not hives.
+                    results["preserved_only"] += 1
+                    continue
                 if item.get("kind") == "ntfs_meta":
                     name = Path(item["path"]).name.lower()
                     if name == "$mft":
