@@ -1,12 +1,20 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookmarkIcon, FilterIcon } from "lucide-react";
+import {
+  BookmarkIcon,
+  ClockIcon,
+  FileCode2Icon,
+  FilterIcon,
+  FingerprintIcon,
+  MessageSquareTextIcon,
+  TableIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { ArtifactViewer } from "@/components/artifact-viewers";
-import { Mono, QueryStatus } from "@/components/common";
+import { CopyButton, Mono, QueryStatus } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
@@ -14,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { api } from "@/lib/api-instance";
 import { viewerKind } from "@/lib/artifacts";
+import { dataTypeCategory, groupAttributes } from "@/lib/data-types";
 import { attrFilterValue } from "@/lib/filters";
 import { formatDate, formatNs, stringifyValue } from "@/lib/format";
 import type { Access } from "@/lib/roles";
@@ -65,9 +74,9 @@ function ProvRow({
   onPivot?: (c: string, v: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-[8rem_1fr] items-center gap-x-2">
+    <div className="grid min-h-8 grid-cols-[7.5rem_1fr] items-center gap-x-2 border-b px-3 last:border-0">
       <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className="flex min-w-0 items-center justify-between gap-1">
+      <dd className="flex min-w-0 items-center justify-between gap-1 text-sm">
         <span className="min-w-0">{children}</span>
         {pivot && onPivot ? (
           <PivotButton column={pivot.column} value={pivot.value} onPivot={onPivot} />
@@ -161,9 +170,32 @@ export function EventDrawer({
           <QueryStatus isLoading={ev.isLoading} error={ev.error}>
             {e ? (
               <div className="grid gap-5">
-                <p className="text-sm break-words">{e.message}</p>
+                <div className="grid gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge variant="outline" className="gap-1.5">
+                      <span
+                        aria-hidden
+                        className="size-2 rounded-full"
+                        style={{ background: dataTypeCategory(e.data_type).color }}
+                      />
+                      {dataTypeCategory(e.data_type).label}
+                    </Badge>
+                    <Badge variant="muted" className="font-mono">
+                      {e.data_type}
+                    </Badge>
+                    {e.host ? <Badge variant="outline">{e.host}</Badge> : null}
+                    {e.user ? <Badge variant="outline">{e.user}</Badge> : null}
+                  </div>
+                  <p className="flex items-center gap-1.5 font-mono text-xs">
+                    <ClockIcon aria-hidden className="text-muted-foreground size-3.5" />
+                    {formatNs(e.timestamp)}
+                    <span className="text-muted-foreground font-sans">· {e.timestamp_desc}</span>
+                  </p>
+                  <p className="bg-muted/40 rounded-lg border px-3 py-2 text-sm break-words">{e.message}</p>
+                </div>
                 <section aria-labelledby="ev-artifact" className="grid gap-2">
-                  <h3 id="ev-artifact" className="text-sm font-semibold">
+                  <h3 id="ev-artifact" className="flex items-center gap-2 text-sm font-semibold">
+                    <FileCode2Icon aria-hidden className="text-muted-foreground size-4" />
                     {viewerKind(e.data_type) === "generic"
                       ? "Artifact"
                       : `Artifact (${viewerKind(e.data_type)})`}
@@ -171,11 +203,12 @@ export function EventDrawer({
                   <ArtifactViewer event={e} />
                 </section>
 
-                <section aria-labelledby="ev-prov" className="grid gap-1">
-                  <h3 id="ev-prov" className="text-sm font-semibold">
+                <section aria-labelledby="ev-prov" className="grid gap-2">
+                  <h3 id="ev-prov" className="flex items-center gap-2 text-sm font-semibold">
+                    <FingerprintIcon aria-hidden className="text-primary size-4" />
                     Provenance
                   </h3>
-                  <dl className="grid gap-y-0.5 text-sm">
+                  <dl className="bg-card overflow-hidden rounded-lg border shadow-[inset_3px_0_0_var(--primary)]">
                     <ProvRow label="Evidence">
                       {evidenceItem ? (
                         <Link
@@ -195,7 +228,14 @@ export function EventDrawer({
                       }
                       onPivot={onPivot}
                     >
-                      <Mono>{e.evidence_sha256 || "—"}</Mono>
+                      <span className="flex items-center gap-0.5">
+                        <Mono className="truncate break-normal" title={e.evidence_sha256}>
+                          {e.evidence_sha256 || "—"}
+                        </Mono>
+                        {e.evidence_sha256 ? (
+                          <CopyButton text={e.evidence_sha256} label="evidence SHA-256" />
+                        ) : null}
+                      </span>
                     </ProvRow>
                     <ProvRow label="Path">
                       <Mono>{e.evidence_path || "—"}</Mono>
@@ -242,37 +282,49 @@ export function EventDrawer({
                   </dl>
                 </section>
 
-                <section aria-labelledby="ev-attrs" className="grid gap-1">
-                  <h3 id="ev-attrs" className="text-sm font-semibold">
+                <section aria-labelledby="ev-attrs" className="grid gap-2">
+                  <h3 id="ev-attrs" className="flex items-center gap-2 text-sm font-semibold">
+                    <TableIcon aria-hidden className="text-muted-foreground size-4" />
                     All attributes ({Object.keys(e.attrs).length})
                   </h3>
-                  <table className="w-full text-sm" aria-labelledby="ev-attrs">
-                    <tbody>
-                      {Object.entries(e.attrs).map(([k, v]) => {
-                        const fv = attrFilterValue(v);
-                        return (
-                          <tr key={k} className="border-b last:border-0">
-                            <th
-                              scope="row"
-                              className="text-muted-foreground w-40 py-1 pr-2 text-left align-top font-mono text-xs font-medium"
-                            >
-                              {k}
-                            </th>
-                            <td className="py-1 font-mono text-xs break-all">{stringifyValue(v)}</td>
-                            <td className="w-8 py-0.5 align-top">
-                              {fv !== null ? (
-                                <PivotButton column={`attrs.${k}`} value={fv} onPivot={onPivot} />
-                              ) : null}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  {groupAttributes(e.attrs).map((g) => (
+                    <div key={g.key} className="overflow-hidden rounded-lg border">
+                      <h4
+                        id={`ev-attrs-${g.key}`}
+                        className="eyebrow text-muted-foreground bg-muted/50 border-b px-3 py-1.5"
+                      >
+                        {g.label} <span className="tabular font-normal">({g.entries.length})</span>
+                      </h4>
+                      <table className="w-full text-sm" aria-labelledby={`ev-attrs-${g.key}`}>
+                        <tbody>
+                          {g.entries.map(([k, v]) => {
+                            const fv = attrFilterValue(v);
+                            return (
+                              <tr key={k} className="hover:bg-muted/40 border-b last:border-0">
+                                <th
+                                  scope="row"
+                                  className="text-muted-foreground w-40 py-1 pr-2 pl-3 text-left align-top font-mono text-xs font-medium break-all"
+                                >
+                                  {k}
+                                </th>
+                                <td className="py-1 font-mono text-xs break-all">{stringifyValue(v)}</td>
+                                <td className="w-9 py-0.5 pr-1 align-top">
+                                  {fv !== null ? (
+                                    <PivotButton column={`attrs.${k}`} value={fv} onPivot={onPivot} />
+                                  ) : null}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
                 </section>
 
                 <section aria-labelledby="ev-bm" className="grid gap-2">
-                  <h3 id="ev-bm" className="text-sm font-semibold">
+                  <h3 id="ev-bm" className="flex items-center gap-2 text-sm font-semibold">
+                    <BookmarkIcon aria-hidden className="text-muted-foreground size-4" />
                     Bookmarks and tags
                   </h3>
                   {myBookmarks.length ? (
@@ -314,7 +366,8 @@ export function EventDrawer({
                 </section>
 
                 <section aria-labelledby="ev-notes" className="grid gap-2">
-                  <h3 id="ev-notes" className="text-sm font-semibold">
+                  <h3 id="ev-notes" className="flex items-center gap-2 text-sm font-semibold">
+                    <MessageSquareTextIcon aria-hidden className="text-muted-foreground size-4" />
                     Notes
                   </h3>
                   {(notes.data ?? []).length ? (

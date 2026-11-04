@@ -2,6 +2,7 @@
 
 import { useReducer, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { compactNumber, type StackedBucket } from "@/lib/charts";
 import { formatDuration, formatNs, formatNsShort } from "@/lib/format";
 import {
   brushReducer,
@@ -15,20 +16,29 @@ import {
 import type { HistogramBucket } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const HEIGHT = 72;
+const HEIGHT = 84;
+
+export interface HistogramStack {
+  /** One entry per layer, bottom to top; "other" is drawn last in the neutral colour. */
+  layers: { key: string; label: string; color: string }[];
+  /** Aligned with `buckets`. */
+  rows: StackedBucket[];
+}
 
 export interface HistogramProps {
   buckets: HistogramBucket[];
   bucketNs: number;
   onRange: (range: { start_ns: number; end_ns: number }) => void;
   loading?: boolean;
+  /** Optional per-category breakdown; without it bars use a single colour. */
+  stack?: HistogramStack | null;
 }
 
 /**
  * Event-count histogram with mouse and keyboard brushing. Focus the chart, move with the arrow
  * keys, hold Shift to extend a selection, press Enter to filter to it and Escape to clear.
  */
-export function Histogram({ buckets, bucketNs, onRange, loading }: HistogramProps) {
+export function Histogram({ buckets, bucketNs, onRange, loading, stack }: HistogramProps) {
   const [brush, dispatch] = useReducer(brushReducer, { cursor: 0, anchor: null } satisfies BrushState);
   const [showTable, setShowTable] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -97,12 +107,21 @@ export function Histogram({ buckets, bucketNs, onRange, loading }: HistogramProp
   };
 
   if (!n) {
-    return (
-      <p className="text-muted-foreground text-xs">
-        {loading ? "Loading histogram…" : "No timed events match the current filters."}
+    return loading ? (
+      <div className="bg-card grid gap-1 rounded-lg border p-2" aria-busy="true">
+        <span className="sr-only" role="status">
+          Loading histogram…
+        </span>
+        <div className="bg-muted h-[84px] animate-pulse rounded-md" />
+      </div>
+    ) : (
+      <p className="text-muted-foreground bg-card rounded-lg border border-dashed px-3 py-4 text-center text-xs">
+        No timed events match the current filters.
       </p>
     );
   }
+  const stackRows = stack && stack.rows.length === n ? stack.rows : null;
+  const hasOther = stackRows?.some((r) => r.other > 0) ?? false;
 
   const first = buckets[0];
   const last = buckets[n - 1];
@@ -119,31 +138,82 @@ export function Histogram({ buckets, bucketNs, onRange, loading }: HistogramProp
         onKeyDown={onKeyDown}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        className="bg-card focus-visible:ring-ring rounded-md border p-1 focus-visible:ring-2 focus-visible:outline-none"
+        className="bg-card focus-visible:ring-ring relative rounded-lg border px-1.5 pt-1.5 pb-1 focus-visible:ring-2 focus-visible:outline-none"
         data-testid="histogram"
       >
+        <span
+          aria-hidden
+          className="text-muted-foreground tabular pointer-events-none absolute top-1 left-2 text-[10px]"
+        >
+          {compactNumber(max)}
+        </span>
         <svg
           ref={svgRef}
           viewBox={`0 0 100 ${HEIGHT}`}
           preserveAspectRatio="none"
-          className="block h-[72px] w-full touch-none select-none"
+          className="block h-[84px] w-full touch-none select-none"
           aria-hidden="true"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
         >
+          {[0.25, 0.5, 0.75].map((f) => (
+            <line
+              key={f}
+              x1={0}
+              x2={100}
+              y1={HEIGHT - f * (HEIGHT - 2)}
+              y2={HEIGHT - f * (HEIGHT - 2)}
+              stroke="var(--chart-grid)"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+          {bounds ? (
+            <rect
+              x={bounds[0] * barW}
+              width={(bounds[1] - bounds[0] + 1) * barW}
+              y={0}
+              height={HEIGHT}
+              className="fill-chart-selected"
+              opacity={0.16}
+            />
+          ) : null}
           {buckets.map((b, i) => {
             const h = b.count ? Math.max(1.5, (b.count / max) * (HEIGHT - 2)) : 0;
             const selected = bounds !== null && i >= bounds[0] && i <= bounds[1];
+            const x = i * barW + barW * 0.1;
+            const w = barW * 0.8;
+            const row = stackRows?.[i];
+            if (!row || !h) {
+              return (
+                <rect
+                  key={b.start_ns}
+                  x={x}
+                  width={w}
+                  y={HEIGHT - h}
+                  height={h}
+                  className={cn("motion-grow", selected ? "fill-chart-selected" : "fill-chart-bar")}
+                />
+              );
+            }
+            let y = HEIGHT;
+            const segs = [
+              ...row.layers.map((c, li) => ({ c, color: stack?.layers[li]?.color })),
+              {
+                c: row.other,
+                color: "var(--cat-other)",
+              },
+            ];
             return (
-              <rect
-                key={b.start_ns}
-                x={i * barW + barW * 0.08}
-                width={barW * 0.84}
-                y={HEIGHT - h}
-                height={h}
-                className={cn(selected ? "fill-chart-selected" : "fill-chart-bar")}
-              />
+              <g key={b.start_ns} className="motion-grow" opacity={bounds && !selected ? 0.55 : 1}>
+                {segs.map((sg, si) => {
+                  if (!sg.c) return null;
+                  const sh = (sg.c / row.total) * h;
+                  y -= sh;
+                  return <rect key={si} x={x} width={w} y={y} height={sh} fill={sg.color} />;
+                })}
+              </g>
             );
           })}
           {focused ? (
@@ -160,15 +230,15 @@ export function Histogram({ buckets, bucketNs, onRange, loading }: HistogramProp
         </svg>
       </div>
       <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-2 text-xs">
-        <span>{first ? formatNsShort(first.start_ns) : ""}</span>
+        <span className="font-mono text-[11px]">{first ? formatNsShort(first.start_ns) : ""}</span>
         <span id="histogram-status" role="status" aria-live="polite" className="text-foreground">
           {focused || bounds
             ? describe()
             : `${totalCount(buckets).toLocaleString()} events, ${formatDuration(bucketNs)} per bar`}
         </span>
-        <span>{last ? formatNsShort(last.start_ns + bucketNs) : ""}</span>
+        <span className="font-mono text-[11px]">{last ? formatNsShort(last.start_ns + bucketNs) : ""}</span>
       </div>
-      <div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <Button
           variant="link"
           size="sm"
@@ -178,8 +248,31 @@ export function Histogram({ buckets, bucketNs, onRange, loading }: HistogramProp
         >
           {showTable ? "Hide histogram data table" : "Show histogram data table"}
         </Button>
+        {stackRows && stack ? (
+          <ul
+            className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs"
+            aria-label="Histogram legend"
+          >
+            {stack.layers.map((l) => (
+              <li key={l.key} className="flex items-center gap-1.5">
+                <span aria-hidden className="size-2.5 rounded-sm" style={{ background: l.color }} />
+                {l.label}
+              </li>
+            ))}
+            {hasOther ? (
+              <li className="flex items-center gap-1.5">
+                <span
+                  aria-hidden
+                  className="size-2.5 rounded-sm"
+                  style={{ background: "var(--cat-other)" }}
+                />
+                Other
+              </li>
+            ) : null}
+          </ul>
+        ) : null}
         {showTable ? (
-          <div className="max-h-60 overflow-auto rounded-md border">
+          <div className="max-h-60 w-full overflow-auto rounded-md border">
             <table className="w-full text-xs">
               <caption className="sr-only">Events per time bucket</caption>
               <thead>
@@ -190,6 +283,13 @@ export function Histogram({ buckets, bucketNs, onRange, loading }: HistogramProp
                   <th scope="col" className="px-2 py-1 text-right">
                     Events
                   </th>
+                  {stackRows && stack
+                    ? [...stack.layers.map((l) => l.label), ...(hasOther ? ["Other"] : [])].map((label) => (
+                        <th key={label} scope="col" className="px-2 py-1 text-right font-normal">
+                          {label}
+                        </th>
+                      ))
+                    : null}
                   <th scope="col" className="px-2 py-1">
                     <span className="sr-only">Filter</span>
                   </th>
@@ -203,6 +303,16 @@ export function Histogram({ buckets, bucketNs, onRange, loading }: HistogramProp
                     <tr key={b.start_ns} className="border-b last:border-0">
                       <td className="px-2 py-0.5 font-mono">{formatNs(b.start_ns)}</td>
                       <td className="tabular px-2 py-0.5 text-right">{b.count.toLocaleString()}</td>
+                      {stackRows
+                        ? [
+                            ...(stackRows[i]?.layers ?? []),
+                            ...(hasOther ? [stackRows[i]?.other ?? 0] : []),
+                          ].map((c, ci) => (
+                            <td key={ci} className="tabular text-muted-foreground px-2 py-0.5 text-right">
+                              {c.toLocaleString()}
+                            </td>
+                          ))
+                        : null}
                       <td className="px-2 py-0.5 text-right">
                         <Button variant="ghost" size="sm" className="h-6" onClick={() => apply(i, i)}>
                           Filter to bucket

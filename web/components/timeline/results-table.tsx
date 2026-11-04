@@ -3,6 +3,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { BookmarkIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { dataTypeCategory } from "@/lib/data-types";
 import { formatNs } from "@/lib/format";
 import type { TimelineEvent } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -31,8 +32,17 @@ function PivotCell({
   onPivot: ResultsTableProps["onPivot"];
 }) {
   if (!value) return <span role="gridcell" className="text-muted-foreground truncate" />;
+  const dot = column === "data_type" ? dataTypeCategory(value) : null;
   return (
-    <span role="gridcell" className="min-w-0">
+    <span role="gridcell" className="flex min-w-0 items-center gap-1.5">
+      {dot ? (
+        <span
+          aria-hidden
+          className="size-2 shrink-0 rounded-full"
+          style={{ background: dot.color }}
+          title={dot.label}
+        />
+      ) : null}
       <button
         type="button"
         tabIndex={-1}
@@ -97,7 +107,10 @@ export function ResultsTable({
         aria-multiselectable={false}
         className="min-w-[72rem]"
       >
-        <div role="rowgroup" className="bg-muted text-muted-foreground sticky top-0 z-10 border-b text-xs">
+        <div
+          role="rowgroup"
+          className="bg-muted/95 text-muted-foreground sticky top-0 z-10 border-b text-[11px] font-medium tracking-wide uppercase backdrop-blur"
+        >
           <div role="row" aria-rowindex={1} className={cn("grid gap-2 px-2 py-1.5", COLS)}>
             <span role="columnheader">Time (UTC)</span>
             <span role="columnheader">Description</span>
@@ -133,7 +146,9 @@ export function ResultsTable({
                 className={cn(
                   "focus-visible:ring-ring absolute left-0 grid w-full cursor-default items-center gap-2 border-b px-2 outline-none focus-visible:ring-2 focus-visible:ring-inset",
                   COLS,
-                  isSel ? "bg-accent text-accent-foreground" : "hover:bg-muted/60",
+                  isSel
+                    ? "bg-accent text-accent-foreground shadow-[inset_3px_0_0_var(--primary)]"
+                    : "hover:bg-muted/60",
                 )}
                 style={{ top: item.start, height: ROW_HEIGHT }}
               >
@@ -165,8 +180,11 @@ export function ResultsTable({
                     </span>
                   </>
                 ) : (
-                  <span role="gridcell" className="text-muted-foreground col-span-6 text-xs">
-                    Loading row {item.index + 1}…
+                  <span role="gridcell" className="col-span-6 flex items-center gap-3">
+                    <span className="sr-only">Loading row {item.index + 1}…</span>
+                    <span aria-hidden className="bg-muted h-3 w-44 animate-pulse rounded" />
+                    <span aria-hidden className="bg-muted h-3 w-28 animate-pulse rounded" />
+                    <span aria-hidden className="bg-muted h-3 flex-1 animate-pulse rounded" />
                   </span>
                 )}
               </div>
