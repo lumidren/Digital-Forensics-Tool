@@ -80,6 +80,7 @@ markers = [
     "parity: compares against reference tools (needs the parity extra)",
     "slow: long-running",
     "needs_images: needs the reference image corpus (testdata/fetch.py)",
+    "integration: needs external services (ClickHouse, MinIO/S3 Object Lock, Postgres); run in CI",
 ]
 
 [tool.ruff]
