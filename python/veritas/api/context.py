@@ -85,7 +85,7 @@ class AppContext:
         self.engine = make_engine(settings.database_url)
         self.Session = make_sessionmaker(self.engine)
         if settings.store_backend == "s3":
-            self.store = S3Store(settings.s3_bucket or "veritas-evidence", self.keyring, settings.retention_days)
+            self.store = S3Store(settings.s3_bucket or "veritas-evidence", self.keyring, settings.retention_days, kms_key_id=os.environ.get("VERITAS_S3_KMS_KEY_ID"))
         else:
             self.store = LocalStore(settings.store_dir, self.keyring)
         self.timeline = open_store(settings.timeline_url)
