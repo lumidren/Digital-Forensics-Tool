@@ -1,0 +1,47 @@
+{
+  "parser": "ewf",
+  "reference": "libewf (pyewf) 20260924",
+  "samples": [
+    "ours:dfvfs/ext2.raw:fast:default",
+    "ours:dfvfs/ext2.raw:none:1048576",
+    "ours:dfvfs/ntfs.raw:best:262144",
+    "ours:random:fast:524288",
+    "reference:dfvfs/ext2.E01",
+    "reference:dfvfs/ext2.split.E01",
+    "reference:plaso/image.E01",
+    "reference:plaso/image-split.E01"
+  ],
+  "records_ours": 8,
+  "records_reference": 8,
+  "fields": {
+    "media_size": {
+      "agree": 8,
+      "total": 8
+    },
+    "md5": {
+      "agree": 8,
+      "total": 8
+    },
+    "sha1": {
+      "agree": 4,
+      "total": 4
+    },
+    "header_values": {
+      "agree": 8,
+      "total": 8
+    },
+    "acquiry_date_present": {
+      "agree": 8,
+      "total": 8
+    },
+    "media_bytes": {
+      "agree": 8,
+      "total": 8
+    },
+    "segment_count": {
+      "agree": 4,
+      "total": 4
+    }
+  },
+  "notes": "Direction 1: images written by veritas-ewf opened with pyewf. Direction 2: corpus images written by EnCase/ewfacquire read by veritas-ewf. Inputs that are not a multiple of 512 bytes are zero-padded to the sector boundary by the writer, as EWF stores whole sectors; comparisons use the padded media."
+}
