@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="430" viewBox="0 0 1200 430" font-family="Segoe UI, Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Throughput by stage</title>
+<desc id="d">Measured GB per hour for hashing, E01 imaging and verification, and end-to-end processing of a real image, plus timeline search latency.</desc>
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b1220"/><stop offset="1" stop-color="#141b30"/></linearGradient></defs>
+<rect width="1200" height="430" rx="18" fill="url(#bg)"/>
+<text x="40" y="50" fill="#e6edf7" font-size="22" font-weight="700">Fast enough for real casework on a laptop</text>
+<text x="40" y="76" fill="#8aa4c8" font-size="14">12th Gen Intel(R) Core(TM) i7-12700H · NVMe SSD · one worker · GB per hour</text>
+<text x="40" y="144" fill="#e6edf7" font-size="14" font-weight="600">Triple hash (MD5+SHA-256+SHA3)</text>
+<rect x="360" y="126" width="690" height="26" rx="6" fill="#1b2a45"/>
+<rect x="360" y="126" width="552.0" height="26" rx="6" fill="#34d399"/>
+<text x="924.0" y="145" fill="#e6edf7" font-size="14" font-weight="700">755 GB/h</text>
+<text x="40" y="194" fill="#e6edf7" font-size="14" font-weight="600">E01 imaging, fast zlib</text>
+<rect x="360" y="176" width="690" height="26" rx="6" fill="#1b2a45"/>
+<rect x="360" y="176" width="307.8" height="26" rx="6" fill="#60a5fa"/>
+<text x="679.8" y="195" fill="#e6edf7" font-size="14" font-weight="700">421 GB/h</text>
+<text x="40" y="244" fill="#e6edf7" font-size="14" font-weight="600">E01 verify</text>
+<rect x="360" y="226" width="690" height="26" rx="6" fill="#1b2a45"/>
+<rect x="360" y="226" width="484.7" height="26" rx="6" fill="#a78bfa"/>
+<text x="856.7" y="245" fill="#e6edf7" font-size="14" font-weight="700">663 GB/h</text>
+<text x="40" y="294" fill="#e6edf7" font-size="14" font-weight="600">End to end: NIST Hacking Case</text>
+<rect x="360" y="276" width="690" height="26" rx="6" fill="#1b2a45"/>
+<rect x="360" y="276" width="95.0" height="26" rx="6" fill="#f472b6"/>
+<text x="467.0" y="295" fill="#e6edf7" font-size="14" font-weight="700">130 GB/h</text>
+<rect x="40" y="340" width="265" height="64" rx="12" fill="#1b2a45" stroke="#22324d"/>
+<text x="58" y="366" fill="#8aa4c8" font-size="12">Search p50</text>
+<text x="58" y="392" fill="#e6edf7" font-size="20" font-weight="700">66 ms</text>
+<rect x="325" y="340" width="265" height="64" rx="12" fill="#1b2a45" stroke="#22324d"/>
+<text x="343" y="366" fill="#8aa4c8" font-size="12">Search p95</text>
+<text x="343" y="392" fill="#e6edf7" font-size="20" font-weight="700">242 ms</text>
+<rect x="610" y="340" width="265" height="64" rx="12" fill="#1b2a45" stroke="#22324d"/>
+<text x="628" y="366" fill="#8aa4c8" font-size="12">Ingest</text>
+<text x="628" y="392" fill="#e6edf7" font-size="20" font-weight="700">28,154/s</text>
+<rect x="895" y="340" width="265" height="64" rx="12" fill="#1b2a45" stroke="#22324d"/>
+<text x="913" y="366" fill="#8aa4c8" font-size="12">Events indexed</text>
+<text x="913" y="392" fill="#e6edf7" font-size="20" font-weight="700">1,000,000</text>
+</svg>
