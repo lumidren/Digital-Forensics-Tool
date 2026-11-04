@@ -113,9 +113,9 @@ worker:
   image:
     repository: veritas-worker
     digest: ""
-  # The job queue (jobs.db) is claimed without a cross-process lock today; keep 1 replica until the
-  # Postgres-backed queue lands (see docs/RUNBOOK.md "Scaling workers").
-  replicas: 1
+  # Jobs live in Postgres (VERITAS_JOBS_URL) and are claimed atomically with an expiring lease,
+  # so workers scale horizontally; see docs/RUNBOOK.md "Scaling workers".
+  replicas: 2
   # Run parsers under gVisor (requires a node pool with the runsc RuntimeClass handler).
   gvisor:
     enabled: false
@@ -141,7 +141,7 @@ worker:
     maxUnavailable: 1
   autoscaling:
     minReplicas: 1
-    maxReplicas: 1
+    maxReplicas: 20
     keda:
       # ScaledObject on the Prometheus veritas_queue_depth gauge plus a CPU trigger; KEDA manages the HPA.
       enabled: true

@@ -1,5 +1,3 @@
-# Rendered from deploy/helm/veritas with values-staging.yaml - do not edit by hand.
-# Regenerate: helm template veritas deploy/helm/veritas --namespace veritas -f deploy/helm/veritas/values-staging.yaml > deploy/k8s/staging/veritas.yaml
 ---
 # Source: veritas/templates/networkpolicies.yaml
 # Default deny: nothing in the release may send or receive traffic unless a policy below allows it.
@@ -569,7 +567,7 @@ spec:
         app.kubernetes.io/part-of: veritas
         app.kubernetes.io/component: api
       annotations:
-        checksum/config: a5c4a1ba371384db87f3d37bf9cc95776f84d84cca42ffd7e7174cf98e7c0762
+        checksum/config: 383891e328b847e066116951472b88edc348821409f10800edd9fe8999f18044
     spec:
       serviceAccountName: veritas-api
       automountServiceAccountToken: false
@@ -622,6 +620,15 @@ spec:
                   name: veritas-runtime
                   key: VERITAS_SERVICE_KEY_SEED
                   optional: true
+            # Job queue in Postgres: JobStore claims jobs with an atomic leased compare-and-set, so any number
+            # of worker pods can poll it. API pods never process jobs in the cluster profile.
+            - name: VERITAS_JOBS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: veritas-runtime
+                  key: VERITAS_DATABASE_URL
+            - name: VERITAS_INPROCESS_WORKER
+              value: "0"
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -816,7 +823,7 @@ spec:
         app.kubernetes.io/part-of: veritas
         app.kubernetes.io/component: worker
       annotations:
-        checksum/config: a5c4a1ba371384db87f3d37bf9cc95776f84d84cca42ffd7e7174cf98e7c0762
+        checksum/config: 383891e328b847e066116951472b88edc348821409f10800edd9fe8999f18044
     spec:
       serviceAccountName: veritas-worker
       automountServiceAccountToken: false
@@ -867,6 +874,15 @@ spec:
                   name: veritas-runtime
                   key: VERITAS_SERVICE_KEY_SEED
                   optional: true
+            # Job queue in Postgres: JobStore claims jobs with an atomic leased compare-and-set, so any number
+            # of worker pods can poll it. API pods never process jobs in the cluster profile.
+            - name: VERITAS_JOBS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: veritas-runtime
+                  key: VERITAS_DATABASE_URL
+            - name: VERITAS_INPROCESS_WORKER
+              value: "0"
             - name: VERITAS_BIN_DIR
               value: /opt/veritas/bin
             - name: VERITAS_MEM_BYTES
@@ -995,6 +1011,15 @@ spec:
                       name: veritas-runtime
                       key: VERITAS_SERVICE_KEY_SEED
                       optional: true
+                # Job queue in Postgres: JobStore claims jobs with an atomic leased compare-and-set, so any number
+                # of worker pods can poll it. API pods never process jobs in the cluster profile.
+                - name: VERITAS_JOBS_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: veritas-runtime
+                      key: VERITAS_DATABASE_URL
+                - name: VERITAS_INPROCESS_WORKER
+                  value: "0"
                 - name: VERITAS_PUSHGATEWAY_URL
                   value: "http://prometheus-pushgateway.monitoring.svc:9091"
               securityContext:
@@ -1119,6 +1144,15 @@ spec:
                       name: veritas-runtime
                       key: VERITAS_SERVICE_KEY_SEED
                       optional: true
+                # Job queue in Postgres: JobStore claims jobs with an atomic leased compare-and-set, so any number
+                # of worker pods can poll it. API pods never process jobs in the cluster profile.
+                - name: VERITAS_JOBS_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: veritas-runtime
+                      key: VERITAS_DATABASE_URL
+                - name: VERITAS_INPROCESS_WORKER
+                  value: "0"
                 - name: VERITAS_BACKUP_RECIPIENT
                   valueFrom:
                     secretKeyRef:
@@ -1462,7 +1496,7 @@ spec:
       app.kubernetes.io/component: api
   namespaceSelector:
     matchNames:
-      - veritas
+      - default
   endpoints:
     - port: http
       path: /metrics

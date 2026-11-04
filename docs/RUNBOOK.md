@@ -102,15 +102,14 @@ evidence replication latency/failures. The replication alarms map to the evidenc
 
 ## 2. Scaling workers
 
-* Current constraint: the processing queue is the SQLite file `jobs.db` in the shared data directory
-  and `JobStore.next_job()` does not claim a job atomically across processes, so two worker pods could
-  pick the same job. Duplicate runs are idempotent for outputs, but they write duplicate `access`
-  custody entries. Keep `worker.autoscaling.maxReplicas: 1` (the chart default) until the
-  Postgres-backed queue (`SELECT ... FOR UPDATE SKIP LOCKED`) described in `docs/ARCHITECTURE.md` lands.
-  Note also that each API pod runs an in-process processor (`create_app(start_processor=True)`).
-* Vertical scaling (safe now): raise `worker.resources` and `worker.memoryBytesPerParser`; the worker
-  node group (`worker_node_scaling` in Terraform) provides the capacity.
-* Once the queue is atomic: set `worker.autoscaling.maxReplicas` > 1. KEDA scales on
+* The job queue lives in Postgres (`VERITAS_JOBS_URL`, set by the chart from the database secret).
+  `JobStore.claim()` is an atomic compare-and-set with a 15-minute lease renewed on every progress
+  report, so exactly one worker runs a job; if a worker dies, its lease expires and another worker
+  resumes the job at its first incomplete step (`test_concurrent_claims_are_exclusive`). API pods set
+  `VERITAS_INPROCESS_WORKER=0` and only enqueue.
+* Vertical scaling: raise `worker.resources` and `worker.memoryBytesPerParser`; the worker node
+  group (`worker_node_scaling` in Terraform) provides the capacity.
+* Horizontal scaling: `worker.autoscaling.maxReplicas` (default 20). KEDA scales on
   `max(veritas_queue_depth)` with 4 jobs per replica, plus a CPU trigger; with KEDA disabled a plain CPU
   HPA is rendered instead. Scale-down is limited to one pod per 5 minutes and the pod has 15 minutes
   (`terminationGracePeriodSeconds`) to finish its step.

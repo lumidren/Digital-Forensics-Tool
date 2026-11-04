@@ -78,6 +78,15 @@ app.kubernetes.io/component: {{ .component }}
       name: {{ .Values.secret.name }}
       key: VERITAS_SERVICE_KEY_SEED
       optional: true
+# Job queue in Postgres: JobStore claims jobs with an atomic leased compare-and-set, so any number
+# of worker pods can poll it. API pods never process jobs in the cluster profile.
+- name: VERITAS_JOBS_URL
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.secret.name }}
+      key: VERITAS_DATABASE_URL
+- name: VERITAS_INPROCESS_WORKER
+  value: "0"
 {{- end -}}
 
 {{- define "veritas.volumeMounts" -}}
