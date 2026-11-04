@@ -1,0 +1,448 @@
+{
+ "evtx": {
+  "computer_name": 1.0,
+  "event_identifier": 1.0,
+  "event_level": 1.0,
+  "identifier": 1.0,
+  "source_name": 1.0,
+  "strings": 1.0,
+  "written_time_us": 1.0,
+  "xml_string": 1.0
+ },
+ "ewf": {
+  "acquiry_date_present": 1.0,
+  "header_values": 1.0,
+  "md5": 1.0,
+  "media_bytes": 1.0,
+  "media_size": 1.0,
+  "segment_count": 1.0,
+  "sha1": 1.0
+ },
+ "fs_apfs": {
+  "added_time": 1.0,
+  "atime": 1.0,
+  "container_identifier": 1.0,
+  "crtime": 1.0,
+  "ctime": 1.0,
+  "gid": 1.0,
+  "identifier": 1.0,
+  "mode": 1.0,
+  "mtime": 1.0,
+  "name_path": 1.0,
+  "nlink": 1.0,
+  "parent_identifier": 1.0,
+  "size": 1.0,
+  "snapshot_count": 1.0,
+  "symlink_target": 1.0,
+  "uid": 1.0,
+  "volume_count": 1.0,
+  "volume_identifier": 1.0,
+  "volume_name": 1.0,
+  "xattr_names": 1.0
+ },
+ "fs_ext4": {
+  "atime": 1.0,
+  "crtime": 1.0,
+  "ctime": 1.0,
+  "dtime": 1.0,
+  "gid": 1.0,
+  "inode": 1.0,
+  "links": 1.0,
+  "mode": 1.0,
+  "mtime": 1.0,
+  "name_path": 1.0,
+  "size": 1.0,
+  "symlink_target": 1.0,
+  "uid": 1.0
+ },
+ "fs_ext4_tsk": {
+  "atime": 1.0,
+  "crtime": 1.0,
+  "ctime": 1.0,
+  "inode": 1.0,
+  "is_allocated": 1.0,
+  "mtime": 1.0,
+  "name_path": 1.0,
+  "size": 1.0
+ },
+ "fs_fat": {
+  "atime_month_corrected": 1.0,
+  "atime_raw": 0.0,
+  "attributes": 1.0,
+  "crtime_month_corrected": 1.0,
+  "crtime_raw": 0.0,
+  "identifier": 1.0,
+  "mtime_month_corrected": 1.0,
+  "mtime_raw": 0.0,
+  "name_path": 1.0,
+  "size": 1.0
+ },
+ "fs_fat_tsk": {
+  "atime": 1.0,
+  "crtime": 1.0,
+  "crtime_nano": 1.0,
+  "is_allocated": 1.0,
+  "mtime": 1.0,
+  "name_path": 1.0,
+  "size": 1.0
+ },
+ "fs_ntfs": {
+  "ads_names": 1.0,
+  "fn_atime": 1.0,
+  "fn_count": 1.0,
+  "fn_crtime": 1.0,
+  "fn_ctime": 1.0,
+  "fn_mtime": 1.0,
+  "is_allocated": 1.0,
+  "mft_entry": 1.0,
+  "name": 1.0,
+  "parent_entry": 1.0,
+  "si_atime": 1.0,
+  "si_crtime": 1.0,
+  "si_ctime": 1.0,
+  "si_mtime": 1.0,
+  "size": 1.0
+ },
+ "fs_ntfs_tsk": {
+  "ads_names": 1.0,
+  "is_allocated": 1.0,
+  "mft_entry": 1.0,
+  "name_path": 1.0,
+  "parent_entry": 1.0,
+  "si_atime": 1.0,
+  "si_crtime": 1.0,
+  "si_ctime": 1.0,
+  "si_mtime": 1.0,
+  "size": 1.0
+ },
+ "fs_usn": {
+  "file_attributes": 1.0,
+  "file_reference": 1.0,
+  "filename": 1.0,
+  "major_version": 1.0,
+  "offset": 1.0,
+  "parent_file_reference": 1.0,
+  "reason_flags": 1.0,
+  "record_count": 1.0,
+  "source_info": 1.0,
+  "timestamp_ns": 1.0,
+  "timestamp_raw": 1.0,
+  "usn": 1.0
+ },
+ "fs_volume": {
+  "description": 1.0,
+  "length": 1.0,
+  "partition_count": 1.0,
+  "start": 1.0
+ },
+ "fs_vss": {
+  "block_descriptor_count": 1.0,
+  "copy_identifier": 1.0,
+  "copy_set_identifier": 1.0,
+  "creation_time": 1.0,
+  "first_mib_sha256": 1.0,
+  "identifier": 1.0,
+  "store_count": 1.0,
+  "store_size": 1.0,
+  "volume_size": 1.0
+ },
+ "journald": {
+  "entry_count": 1.0,
+  "message": 0.962474,
+  "realtime": 1.0,
+  "seqnum": 1.0
+ },
+ "jumplist": {
+  "custom_description": 1.0,
+  "custom_entry_count": 1.0,
+  "custom_file_size": 1.0,
+  "custom_local_path": 1.0,
+  "custom_offset": 1.0,
+  "destlist_entry_count": 1.0,
+  "destlist_entry_number": 1.0,
+  "destlist_last_modification_filetime": 1.0,
+  "destlist_path": 1.0,
+  "destlist_pin_status": 1.0,
+  "lnk_file_size": 1.0,
+  "lnk_local_path": 1.0,
+  "lnk_modification_time": 1.0,
+  "stream_names": 1.0,
+  "stream_size": 1.0
+ },
+ "lnk": {
+  "access_time": 1.0,
+  "birth_droid_file_identifier": 1.0,
+  "birth_droid_volume_identifier": 1.0,
+  "command_line_arguments": 1.0,
+  "creation_time": 1.0,
+  "data_flags": 1.0,
+  "description": 1.0,
+  "drive_serial_number": 1.0,
+  "drive_type": 1.0,
+  "droid_file_identifier": 1.0,
+  "droid_volume_identifier": 1.0,
+  "environment_variables_location": 1.0,
+  "file_size": 1.0,
+  "icon_location": 1.0,
+  "local_path": 1.0,
+  "machine_identifier": 1.0,
+  "modification_time": 1.0,
+  "network_path": 1.0,
+  "relative_path": 1.0,
+  "volume_label": 1.0,
+  "working_directory": 1.0
+ },
+ "pcap": {
+  "captured_length": 1.0,
+  "dns_query_names": 1.0,
+  "flows_5tuple": 1.0,
+  "http_request_lines": 1.0,
+  "packet_count": 1.0,
+  "timestamp_ns": 1.0
+ },
+ "pe_static": {
+  "entry_point": 1.0,
+  "imphash": 1.0,
+  "import_dlls": 1.0,
+  "import_functions": 1.0,
+  "is_dll": 1.0,
+  "machine": 1.0,
+  "section_count": 1.0,
+  "section_entropy_milli": 1.0,
+  "section_name": 1.0,
+  "section_sizes": 1.0,
+  "signed": 1.0,
+  "subsystem": 1.0,
+  "timestamp": 1.0
+ },
+ "plist": {
+  "document_equal": 1.0,
+  "leaf_values": 1.0
+ },
+ "prefetch": {
+  "executable_name": 1.0,
+  "filenames": 1.0,
+  "format_version": 1.0,
+  "last_run_times": 1.0,
+  "prefetch_hash": 1.0,
+  "run_count": 1.0,
+  "volume_creation_times": 1.0,
+  "volume_device_paths": 1.0,
+  "volume_serial_numbers": 1.0
+ },
+ "py_apache_access": {
+  "ip_address": 0.933333,
+  "timestamps": 0.933333
+ },
+ "py_apt_history": {
+  "command_line": 1.0,
+  "timestamps": 1.0
+ },
+ "py_asl_log": {
+  "facility": 1.0,
+  "sender": 1.0,
+  "timestamps": 1.0
+ },
+ "py_auditd": {
+  "serial_and_time": 1.0
+ },
+ "py_bash_history": {
+  "command": 1.0,
+  "timestamps": 1.0
+ },
+ "py_bsm_log": {
+  "timestamps": 1.0
+ },
+ "py_chromium_cookies": {
+  "cookie_name": 1.0,
+  "timestamps": 1.0
+ },
+ "py_chromium_history": {
+  "timestamps": 1.0,
+  "title": 1.0,
+  "url": 1.0
+ },
+ "py_chromium_webdata": {
+  "field_name": 1.0,
+  "timestamps": 1.0,
+  "usage_count": 1.0,
+  "value": 1.0
+ },
+ "py_dpkg": {
+  "timestamps": 1.0
+ },
+ "py_firefox_cookies": {
+  "cookie_name": 1.0,
+  "timestamps": 1.0
+ },
+ "py_firefox_downloads": {
+  "full_path": 1.0,
+  "timestamps": 1.0,
+  "url": 1.0
+ },
+ "py_firefox_places": {
+  "timestamps": 0.987879,
+  "url": 1.0
+ },
+ "py_fish_history": {
+  "command": 1.0,
+  "timestamps": 1.0
+ },
+ "py_fseventsd": {
+  "event_identifier": 1.0,
+  "flags": 1.0,
+  "path": 1.0
+ },
+ "py_imessage": {
+  "text": 1.0,
+  "timestamps": 1.0
+ },
+ "py_knowledgec": {
+  "timestamps": 1.0
+ },
+ "py_launchd_plist": {
+  "label": 1.0,
+  "program": 1.0
+ },
+ "py_ls_quarantine": {
+  "agent": 1.0,
+  "timestamps": 1.0,
+  "url": 1.0
+ },
+ "py_mac_appfirewall_log": {
+  "process_name": 0.978723,
+  "timestamps": 1.0
+ },
+ "py_macos_appusage": {
+  "application": 1.0,
+  "timestamps": 1.0
+ },
+ "py_macos_background_items": {
+  "target_path": 1.0
+ },
+ "py_macos_launchd_log": {
+  "timestamps": 1.0
+ },
+ "py_macos_notification_center": {
+  "timestamps": 1.0,
+  "title": 1.0
+ },
+ "py_macos_tcc": {
+  "client": 1.0,
+  "timestamps": 1.0
+ },
+ "py_macos_wifi": {
+  "timestamps": 1.0
+ },
+ "py_mbox": {
+  "subject_and_sent_time": 1.0
+ },
+ "py_msie_webcache": {
+  "timestamps": 1.0,
+  "url": 1.0
+ },
+ "py_msiecf": {
+  "timestamps": 0.990209,
+  "url": 0.992424
+ },
+ "py_olecf_summary": {
+  "author": 1.0,
+  "timestamps": 1.0,
+  "title": 1.0
+ },
+ "py_ooxml": {
+  "creator": 1.0,
+  "revision": 1.0,
+  "timestamps": 1.0
+ },
+ "py_powershell_transcript": {
+  "timestamps": 1.0
+ },
+ "py_pst": {
+  "delivery_time": 1.0,
+  "subject": 1.0
+ },
+ "py_recycle_bin": {
+  "original_filename": 1.0,
+  "timestamps": 1.0
+ },
+ "py_recycle_bin_info2": {
+  "original_filename": 1.0,
+  "record_index": 1.0,
+  "timestamps": 1.0
+ },
+ "py_santa": {
+  "timestamps": 0.990385
+ },
+ "py_setupapi": {
+  "timestamps": 1.0
+ },
+ "py_srum": {
+  "timestamps": 1.0
+ },
+ "py_syslog": {
+  "timestamps": 0.976744
+ },
+ "py_syslog_traditional": {
+  "timestamps_month_to_us": 1.0
+ },
+ "py_utmp": {
+  "timestamps": 1.0,
+  "username": 1.0
+ },
+ "py_utmpx_macos": {
+  "timestamps": 1.0,
+  "username": 1.0
+ },
+ "py_windefender_history": {
+  "filename": 1.0,
+  "process": 1.0,
+  "threat_name": 1.0,
+  "timestamps": 1.0
+ },
+ "py_windows_timeline": {
+  "timestamps": 1.0
+ },
+ "py_wmi_persistence": {
+  "artifact_and_name": 1.0
+ },
+ "py_zsh_extended_history": {
+  "command": 1.0,
+  "timestamps": 1.0
+ },
+ "regf": {
+  "class_name": 1.0,
+  "key_present": 1.0,
+  "last_written": 1.0,
+  "value_data": 0.948515,
+  "value_data_libregf_normalized": 1.0,
+  "value_names": 1.0,
+  "value_types": 1.0
+ },
+ "registry_artifacts": {
+  "shimcache_count": 1.0,
+  "shimcache_executed": 1.0,
+  "shimcache_format": 1.0,
+  "shimcache_hand_check": 1.0,
+  "shimcache_last_modified": 1.0,
+  "shimcache_path": 1.0,
+  "userassist_count": 1.0,
+  "userassist_count_entries": 1.0,
+  "userassist_focus_count": 1.0,
+  "userassist_focus_duration_ms": 1.0,
+  "userassist_format": 1.0,
+  "userassist_last_executed_raw": 1.0,
+  "userassist_value_name": 1.0
+ },
+ "shellitems": {
+  "access_time": 1.0,
+  "category": 1.0,
+  "class_id": 1.0,
+  "creation_time": 1.0,
+  "file_reference": 1.0,
+  "item_count": 1.0,
+  "long_name": 1.0,
+  "modification_time": 1.0,
+  "name": 1.0
+ }
+}
