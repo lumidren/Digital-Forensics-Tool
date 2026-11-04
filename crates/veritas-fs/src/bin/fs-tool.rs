@@ -56,18 +56,27 @@ enum Cmd {
         input: PathBuf,
         #[arg(long)]
         partition: Option<usize>,
+        /// Emit timeline events instead of native records.
+        #[arg(long)]
+        events: bool,
     },
     /// USN records (raw `$J` extract or NTFS image) as JSON lines.
     Usn {
         input: PathBuf,
         #[arg(long)]
         partition: Option<usize>,
+        /// Emit timeline events instead of native records.
+        #[arg(long)]
+        events: bool,
     },
     /// $LogFile restart areas and log records (raw extract or NTFS image) as JSON.
     Logfile {
         input: PathBuf,
         #[arg(long)]
         partition: Option<usize>,
+        /// Emit timeline events instead of native records.
+        #[arg(long)]
+        events: bool,
     },
     /// Timeline events as JSON lines (sorted).
     Events {
@@ -267,7 +276,7 @@ fn run(cli: Cli) -> R<()> {
             std::fs::write(&dst, &data)?;
             eprintln!("wrote {} bytes to {}", data.len(), dst.display());
         }
-        Cmd::Mft { input, partition } => {
+        Cmd::Mft { input, partition, events: as_events } => {
             let head = read_vec_padded(open(&input)?.as_ref(), 0, 4)?;
             let mut entries = if head == b"FILE" {
                 ntfs::parse_mft_file(&std::fs::read(&input)?)?
@@ -275,11 +284,17 @@ fn run(cli: Cli) -> R<()> {
                 ntfs_volume(open(&input)?, partition)?.1.entries()?
             };
             entries.sort_by_key(|e| e.entry);
-            for e in &entries {
-                jl(&mut out, e)?;
+            if as_events {
+                let ctx = events::Ctx { evidence_sha256: sha256_file(&input)?, volume_prefix: String::new() };
+                let mut evs = events::ntfs_entry_events(&ctx, &entries);
+                veritas_timeline::write_jsonl(&mut evs, &mut out)?;
+            } else {
+                for e in &entries {
+                    jl(&mut out, e)?;
+                }
             }
         }
-        Cmd::Usn { input, partition } => {
+        Cmd::Usn { input, partition, events: as_events } => {
             let src = open(&input)?;
             let recs = match ntfs_volume(src.clone(), partition) {
                 Ok((_, n)) => n.usn_records()?,
@@ -288,11 +303,17 @@ fn run(cli: Cli) -> R<()> {
                     ntfs::usn::parse_usn_records(&d, 0)
                 }
             };
-            for r in &recs {
-                jl(&mut out, r)?;
+            if as_events {
+                let ctx = events::Ctx { evidence_sha256: sha256_file(&input)?, volume_prefix: String::new() };
+                let mut evs = events::usn_events(&ctx, &recs, "$Extend/$UsnJrnl:$J");
+                veritas_timeline::write_jsonl(&mut evs, &mut out)?;
+            } else {
+                for r in &recs {
+                    jl(&mut out, r)?;
+                }
             }
         }
-        Cmd::Logfile { input, partition } => {
+        Cmd::Logfile { input, partition, events: as_events } => {
             let src = open(&input)?;
             let lf = match ntfs_volume(src.clone(), partition) {
                 Ok((_, n)) => n.logfile()?,
@@ -301,9 +322,15 @@ fn run(cli: Cli) -> R<()> {
                     ntfs::logfile::parse_logfile(&d, 4096, 1024)?
                 }
             };
-            jl(&mut out, &serde_json::json!({"page_size": lf.page_size, "record_pages": lf.record_pages, "restart_areas": lf.restart_areas}))?;
-            for r in &lf.records {
-                jl(&mut out, r)?;
+            if as_events {
+                let ctx = events::Ctx { evidence_sha256: sha256_file(&input)?, volume_prefix: String::new() };
+                let mut evs = events::logfile_events(&ctx, &lf.records);
+                veritas_timeline::write_jsonl(&mut evs, &mut out)?;
+            } else {
+                jl(&mut out, &serde_json::json!({"page_size": lf.page_size, "record_pages": lf.record_pages, "restart_areas": lf.restart_areas}))?;
+                for r in &lf.records {
+                    jl(&mut out, r)?;
+                }
             }
         }
         Cmd::Events { image, partition } => {
