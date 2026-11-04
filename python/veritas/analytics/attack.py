@@ -47,6 +47,19 @@ TECHNIQUES: dict[str, str] = {
     "T1560.001": "Archive Collected Data: Archive via Utility",
     "T1048": "Exfiltration Over Alternative Protocol",
     "T1566.001": "Phishing: Spearphishing Attachment",
+    "T1040": "Network Sniffing",
+    "T1046": "Network Service Discovery",
+    "T1090": "Proxy",
+    "T1090.003": "Proxy: Multi-hop Proxy",
+    "T1555": "Credentials from Password Stores",
+    "T1095": "Non-Application Layer Protocol",
+    "T1018": "Remote System Discovery",
+    "T1087": "Account Discovery",
+    "T1482": "Domain Trust Discovery",
+    "T1219": "Remote Access Software",
+    "T1572": "Protocol Tunneling",
+    "T1071": "Application Layer Protocol",
+    "T1547.015": "Boot or Logon Autostart Execution: Login Items",
 }
 
 

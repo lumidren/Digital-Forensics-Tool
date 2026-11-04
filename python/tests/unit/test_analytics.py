@@ -54,7 +54,7 @@ def test_engine_runs_all_rules_and_only_proposes():
     assert all(f.state == PROPOSED for f in findings)
     assert findings[0].severity in ("critical", "high")
     exe = next(f for f in findings if f.rule == "execution" and "mimikatz" in f.title)
-    assert exe.details["proves_execution"] is True and "T1003.001" in exe.attack_techniques
+    assert exe.details["rows"][0]["proves_execution"] is True and "T1003.001" in exe.attack_techniques
     assert attack.describe("T1003.001").startswith("OS Credential Dumping")
 
 
@@ -147,3 +147,32 @@ def test_timestomp_grading():
     agg = next(f for f in fs if "installation or bulk-copied" in f.title)
     assert agg.severity == "low" and agg.details["total"] == 2
     assert not any("a.dll" in f.title or "ntldr" in f.title for f in fs if f.severity != "low")
+
+
+def test_offensive_tool_prefix_matching():
+    from veritas.analytics.execution import suspicious
+
+    assert suspicious("cain25b45.exe") == ("T1040", "high")
+    assert suspicious("ethereal-setup-0.10.6.exe")[0] == "T1040"
+    assert suspicious("netstumblerinstaller_0_4_0.exe")[0] == "T1040"
+    assert suspicious("lookatlan.exe")[0] == "T1046"
+    assert suspicious("tor.exe")[0] == "T1090.003"
+    for benign in ("torrent.exe", "johnny.exe", "explorer.exe", "wcescomm.exe", "abelssoft.exe"):
+        assert suspicious(benign) is None, benign
+
+
+def test_tool_family_groups_spellings():
+    from veritas.analytics.execution import ExecutionCorrelationRule
+
+    events = [
+        ev("windows:prefetch:execution", executable="CAIN.EXE"),
+        ev("windows:prefetch:execution", executable="CAIN25B45.EXE"),
+        ev("windows:registry:userassist", value_name="UEME_RUNPATH:C:\\Documents and Settings\\x\\Start Menu\\Cain v2.5.lnk"),
+        ev("windows:prefetch:execution", executable="NETSTUMBLERINSTALLER_0_4_0.EX"),
+        ev("windows:registry:appcompatcache", path="C:\\Program Files\\Network Stumbler\\NetStumbler.exe"),
+    ]
+    fs = {f.title: f for f in ExecutionCorrelationRule().run(iter_stored(events))}
+    assert set(fs) == {"Dual-use tool observed: cain", "Dual-use tool observed: netstumbler"}
+    cain = fs["Dual-use tool observed: cain"]
+    assert sorted(cain.details["names"]) == ["cain v2.5.lnk", "cain.exe", "cain25b45.exe"] and cain.severity == "high"
+    assert "proven" in cain.description and len(cain.event_ids) == 3

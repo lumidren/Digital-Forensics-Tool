@@ -27,7 +27,64 @@ SUSPICIOUS = {
     "plink.exe": ("T1572", "medium"), "anydesk.exe": ("T1219", "medium"), "teamviewer.exe": ("T1219", "low"), "ngrok.exe": ("T1572", "high"), "cobaltstrike.exe": ("T1071", "critical"),
 }
 
+# Tools matched by name prefix, so installers and renamed builds are caught too
+# (e.g. CAIN25B45.EXE, ETHEREAL-SETUP-0.10.6.EXE, NETSTUMBLERINSTALLER_0_4_0.EXE).
+SUSPICIOUS_PREFIXES: tuple[tuple[str, str, str], ...] = (
+    ("cain", "T1040", "high"),            # Cain & Abel: sniffing, ARP poisoning, password cracking
+    ("abel", "T1003", "high"),
+    ("ethereal", "T1040", "high"),        # packet capture
+    ("wireshark", "T1040", "medium"),
+    ("tshark", "T1040", "medium"),
+    ("windump", "T1040", "high"),
+    ("rawcap", "T1040", "high"),
+    ("netstumbler", "T1040", "high"),     # wireless network discovery
+    ("airsnort", "T1040", "high"),
+    ("aircrack", "T1110", "high"),
+    ("kismet", "T1040", "high"),
+    ("lookatlan", "T1046", "high"),       # LAN host and service discovery
+    ("nmap", "T1046", "high"),
+    ("zenmap", "T1046", "high"),
+    ("superscan", "T1046", "high"),
+    ("angryip", "T1046", "medium"),
+    ("advanced_ip_scanner", "T1046", "medium"),
+    ("netcat", "T1095", "high"),
+    ("pwdump", "T1003", "critical"),
+    ("fgdump", "T1003", "critical"),
+    ("gsecdump", "T1003", "critical"),
+    ("wce", "T1003", "critical"),
+    ("john", "T1110", "high"),
+    ("hashcat", "T1110", "high"),
+    ("l0phtcrack", "T1110", "high"),
+    ("123wasp", "T1555", "high"),        # password recovery
+    ("anonymizer", "T1090", "medium"),
+    ("tor", "T1090.003", "medium"),
+    ("psiphon", "T1090", "medium"),
+)
+
 _BASENAME = re.compile(r"[\\/]([^\\/]+)$")
+
+
+def tool_family(name: str) -> tuple[str, str, str] | None:
+    """(family, technique, severity) for a known dual-use or offensive tool, by exact name or prefix.
+
+    The family groups every spelling of one tool (executable, installer, shortcut, prefetch names
+    truncated at 29 characters) into a single finding.
+    """
+    if name in SUSPICIOUS:
+        tech, sev = SUSPICIOUS[name]
+        return name.rsplit(".", 1)[0], tech, sev
+    stem = name.rsplit(".", 1)[0] if not name.endswith(".lnk") else name[:-4]
+    stem = stem.replace(" ", "")
+    for prefix, tech, sev in SUSPICIOUS_PREFIXES:
+        if stem == prefix or stem.startswith(prefix) and (prefix not in ("tor", "john", "wce", "abel") or stem == prefix):
+            return prefix, tech, sev
+    return None
+
+
+def suspicious(name: str) -> tuple[str, str] | None:
+    """(technique, severity) for a known dual-use or offensive tool, by exact name or prefix."""
+    f = tool_family(name)
+    return (f[1], f[2]) if f else None
 
 
 def basename(path: str) -> str:
@@ -114,16 +171,28 @@ class ExecutionCorrelationRule:
         cached = list(events)
         by_id = {se.id: se for se in cached}
         rows = correlate(cached)
+        families: dict[str, list[tuple[str, ExecutionRow, str, str]]] = defaultdict(list)
         for name, row in sorted(rows.items()):
-            if name in SUSPICIOUS:
-                tech, sev = SUSPICIOUS[name]
-                evs = [by_id[i] for ids in row.sources.values() for i in ids if i in by_id]
-                proof = "proven" if row.proves_execution() else "presence only (ShimCache/Amcache do not prove execution)"
-                yield mk_finding(
-                    self.name, f"Dual-use tool observed: {name}",
-                    f"{name} appears in {', '.join(sorted(row.sources))}; execution {proof}.",
-                    sev if sev != "info" else "low", 0.85 if row.proves_execution() else 0.55, "execution", evs, [tech], row.to_dict(),
-                )
+            fam = tool_family(name)
+            if fam:
+                families[fam[0]].append((name, row, fam[1], fam[2]))
+        order = ("info", "low", "medium", "high", "critical")
+        for family, members in sorted(families.items()):
+            evs = [by_id[i] for _, row, _, _ in members for ids in row.sources.values() for i in ids if i in by_id]
+            sources = sorted({s for _, row, _, _ in members for s in row.sources})
+            proven = any(row.proves_execution() for _, row, _, _ in members)
+            sev = max((m[3] for m in members), key=order.index)
+            techs = sorted({m[2] for m in members})
+            names = [m[0] for m in members]
+            first = min((row.first_ns for _, row, _, _ in members if row.first_ns is not None), default=None)
+            last = max((row.last_ns for _, row, _, _ in members if row.last_ns is not None), default=None)
+            proof = "proven" if proven else "presence only (ShimCache/Amcache do not prove execution)"
+            yield mk_finding(
+                self.name, f"Dual-use tool observed: {family}",
+                f"{family} appears as {', '.join(names)} in {', '.join(sources)}; execution {proof}.",
+                sev if sev != "info" else "low", 0.85 if proven else 0.55, "execution", evs, techs,
+                {"family": family, "names": names, "first_ns": first, "last_ns": last, "rows": [row.to_dict() for _, row, _, _ in members]},
+            )
         # Renamed/masquerading binaries: Amcache SHA-1 shared by two different names.
         by_hash: dict[str, set[str]] = defaultdict(set)
         for name, row in rows.items():
