@@ -11,6 +11,7 @@ import hashlib
 import io
 import json
 import logging
+import os
 import shutil
 import tempfile
 import time
@@ -173,10 +174,14 @@ class IntakeIn(BaseModel):
 
 
 # ----------------------------------------------------------------------------- app factory
-def create_app(settings: Settings | None = None, start_processor: bool = True) -> FastAPI:
+def create_app(settings: Settings | None = None, start_processor: bool | None = None) -> FastAPI:
     settings = settings or load()
     ctx = AppContext(settings)
-    jobs = JobStore(settings.data_dir / "jobs.db")
+    # Cluster profile: VERITAS_JOBS_URL points at Postgres and VERITAS_INPROCESS_WORKER=0, so API pods
+    # only enqueue and dedicated veritas-worker pods claim jobs (atomic leases in JobStore).
+    jobs = JobStore(os.environ.get("VERITAS_JOBS_URL") or settings.data_dir / "jobs.db")
+    if start_processor is None:
+        start_processor = os.environ.get("VERITAS_INPROCESS_WORKER", "1") == "1"
     hub = obs.ProgressHub()
     processor = Processor(ctx, jobs, sink=hub.publish)
     @asynccontextmanager
@@ -550,7 +555,11 @@ def create_app(settings: Settings | None = None, start_processor: bool = True) -
 
     @app.websocket("/api/v1/cases/{case_id}/ws")
     async def ws(websocket: WebSocket, case_id: str):
-        token = websocket.query_params.get("access_token")
+        # Prefer the Sec-WebSocket-Protocol header ("veritas.bearer.<token>") so the token never
+        # appears in a URL; the query parameter remains for older clients and is scrubbed from logs.
+        protocols = [p.strip() for p in websocket.headers.get("sec-websocket-protocol", "").split(",") if p.strip()]
+        header_token = next((p[len("veritas.bearer."):] for p in protocols if p.startswith("veritas.bearer.")), None)
+        token = header_token or websocket.query_params.get("access_token")
         try:
             claims = ctx.tokens.verify(token or "")
         except HTTPException:
@@ -562,7 +571,7 @@ def create_app(settings: Settings | None = None, start_processor: bool = True) -
         if u is None or (m is None and not u.is_admin):
             await websocket.close(code=4404)
             return
-        await websocket.accept()
+        await websocket.accept(subprotocol="veritas.bearer" if header_token else None)
         q = hub.subscribe()
         try:
             while True:
@@ -888,7 +897,10 @@ def create_app(settings: Settings | None = None, start_processor: bool = True) -
 
     @app.post("/api/v1/cases/{case_id}/custody/anchor")
     def custody_anchor(a: CaseAccess = Depends(need("lead"))):
-        return ctx.anchor(a.case_id)
+        try:
+            return ctx.anchor(a.case_id)
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
 
     # ------------------------------------------------------------------ reports
     @app.post("/api/v1/cases/{case_id}/reports", status_code=201)
@@ -939,7 +951,7 @@ def create_app(settings: Settings | None = None, start_processor: bool = True) -
     @app.get("/api/v1/cases/{case_id}/reports")
     def reports_list(a: CaseAccess = Depends(need("viewer"))):
         with ctx.Session() as s:
-            return [{"id": r.id, "format": r.format, "sha256": r.sha256, "state_hash": r.state_hash, "created_by": r.created_by, "created": r.created.isoformat(), "ledger_entry_hash": r.ledger_entry_hash} for r in s.query(Report).filter_by(case_id=a.case_id).order_by(Report.created)]
+            return [{"id": r.id, "format": r.format, "sha256": r.sha256, "state_hash": r.state_hash, "created_by": r.created_by, "created": r.created.isoformat(), "ledger_entry_hash": r.ledger_entry_hash, "signer_key_id": r.signer_key_id, "signature": r.signature} for r in s.query(Report).filter_by(case_id=a.case_id).order_by(Report.created)]
 
     @app.get("/api/v1/cases/{case_id}/reports/{rid}/download")
     def reports_download(rid: str, part: str = Q("document", pattern="^(document|signature)$"), a: CaseAccess = Depends(need("viewer"))):
@@ -1008,4 +1020,7 @@ def _skip(fh, n: int) -> None:
 def run() -> None:
     import uvicorn
 
-    uvicorn.run("veritas.api.main:create_app", factory=True, host="127.0.0.1", port=8000, log_config=None)
+    # JSON logs through the scrubbing formatter, including uvicorn's access log (query strings may
+    # carry access_token for legacy WebSocket clients).
+    obs.configure_logging(os.environ.get("VERITAS_LOG_LEVEL", "INFO"))
+    uvicorn.run("veritas.api.main:create_app", factory=True, host=os.environ.get("VERITAS_HOST", "127.0.0.1"), port=int(os.environ.get("VERITAS_PORT", "8000")), log_config=None)
