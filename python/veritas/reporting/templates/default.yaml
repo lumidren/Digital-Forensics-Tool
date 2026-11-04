@@ -1,0 +1,55 @@
+# Default court-report template. Section order, headings and boilerplate text.
+# Placeholders in {braces} are filled from the report model; unknown placeholders are an error.
+name: default
+version: 1
+title: "Digital Forensic Examination Report"
+sections:
+  - id: executive_summary
+    heading: "1. Executive Summary"
+    intro: >-
+      This report documents the examination of {evidence_count} evidence item(s) in case
+      {case_name} ({case_id}). {approved_count} finding(s) were confirmed by an examiner and
+      approved by an independent reviewer. Proposed findings that were not confirmed are not
+      reported.
+  - id: scope
+    heading: "2. Scope of Examination"
+    intro: "{case_description}"
+  - id: methodology
+    heading: "3. Methodology"
+    intro: >-
+      Evidence was acquired with write protection where available, hashed with MD5, SHA-256 and
+      SHA3-256 at acquisition, and stored in a content-addressed write-once store. All processing
+      was performed on copies addressed by hash. Every access to evidence was recorded in a
+      signed, hash-chained custody ledger. Parsers were validated against reference
+      implementations; field-level agreement is published in PARITY.md and summarized below.
+      Timestamps are reported in UTC; clock-skew corrections, where applied, are listed per
+      evidence item.
+  - id: tools
+    heading: "4. Tools and Versions"
+    intro: "The following tools and parser versions produced the results in this report."
+  - id: evidence
+    heading: "5. Evidence Inventory and Chain of Custody"
+    intro: >-
+      Each evidence item is identified by its hashes and by the custody-ledger entry that recorded
+      its ingestion. The complete ledger is attached as a signed export and can be re-verified
+      independently with the veritas-verify tool.
+  - id: findings
+    heading: "6. Findings"
+    intro: >-
+      Each finding lists the artifacts that support it. Every artifact reference names the
+      evidence hash, the path within the evidence, the record offset, and the custody-ledger
+      entry under which that evidence was ingested.
+  - id: limitations
+    heading: "7. Limitations"
+    intro: >-
+      Absence of evidence is not evidence of absence. Artifacts may have been overwritten,
+      rotated or anti-forensically removed before acquisition. ShimCache and Amcache entries
+      indicate presence of a file and do not by themselves prove execution. Timestamps recorded
+      by the subject system depend on its clock, which may be inaccurate or manipulated.
+  - id: attestation
+    heading: "8. Examiner Attestation"
+    intro: >-
+      I, {examiner_name}, attest that the examination described in this report was performed by me
+      or under my direction, that the findings reflect my professional opinion based on the
+      evidence examined, and that the evidence was handled in accordance with the documented
+      chain of custody.
