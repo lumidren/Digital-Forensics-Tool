@@ -5,15 +5,34 @@ edition.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
+description = "Veritas acquisition agent: live triage, memory capture, disk imaging, write-block check, mTLS upload"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "veritas-agent"
+path = "src/main.rs"
 
 [dependencies]
 veritas-hash = { path = "../veritas-hash" }
+veritas-ewf = { path = "../veritas-ewf" }
+veritas-ledger = { path = "../veritas-ledger" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+anyhow.workspace = true
 hex.workspace = true
-byteorder.workspace = true
 chrono.workspace = true
+clap.workspace = true
+sha2.workspace = true
+uuid.workspace = true
+sysinfo.workspace = true
+tempfile.workspace = true
+zip = { version = "2", default-features = false, features = ["deflate"] }
+ureq = { version = "2", default-features = false, features = ["native-tls"] }
+native-tls = "0.2"
 
 [dev-dependencies]
-tempfile.workspace = true
+proptest.workspace = true
+rand.workspace = true
