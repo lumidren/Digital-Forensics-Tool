@@ -16,7 +16,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 RESULTS = ROOT / "parity" / "results"
 BASELINE = ROOT / "parity" / "baseline.json"
-EPS = 1e-9
+EPS = 1e-6  # baseline ratios are stored rounded to 6 decimals
 
 
 def current() -> dict[str, dict[str, float]]:
