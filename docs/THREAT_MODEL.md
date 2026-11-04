@@ -51,81 +51,81 @@ confirm the reference. Where a threat has several mitigations each has its own r
 
 | # | Mitigation | Location |
 |---|---|---|
-| T1.1 | Three independent digests (MD5, SHA-256, SHA3-256) computed in one streaming pass during acquisition, before bytes leave the agent. | crates/veritas-hash/src/lib.rs |
-| T1.2 | Object store addresses every blob by SHA-256; a modified blob cannot keep its address. | crates/veritas-store/src/lib.rs |
-| T1.3 | Local store marks committed objects read-only and refuses to overwrite an existing address (WORM semantics); the S3 backend requires Object Lock compliance mode. | crates/veritas-store/src/lib.rs |
-| T1.4 | Every read of an evidence object appends a signed Access entry to the ledger; silent reads are impossible through the API. | crates/veritas-ledger/src/lib.rs |
-| T1.5 | Re-verification command re-hashes stored objects and compares against the acquisition entry. | crates/veritas-cli/src/main.rs |
+| T1.1 | Three independent digests (MD5, SHA-256, SHA3-256) computed in one streaming pass during acquisition, before bytes leave the agent. | crates/veritas-hash/src/lib.rs:23 |
+| T1.2 | Object store addresses every blob by SHA-256; a modified blob cannot keep its address. | crates/veritas-store/src/lib.rs:58 |
+| T1.3 | Local store marks committed objects read-only and refuses to overwrite an existing address (WORM semantics); the S3 backend requires Object Lock compliance mode. | crates/veritas-store/src/lib.rs:157 |
+| T1.4 | Every read of an evidence object appends a signed Access entry to the ledger; silent reads are impossible through the API. | crates/veritas-ledger/src/lib.rs:222 |
+| T1.5 | Re-verification command re-hashes stored objects and compares against the acquisition entry. | crates/veritas-cli/src/main.rs:207 |
 
 ### T2 Chain-of-custody forgery
 
 | # | Mitigation | Location |
 |---|---|---|
-| T2.1 | Each entry is Ed25519-signed over its canonical JSON (sorted keys, no floats, no whitespace). | crates/veritas-ledger/src/canonical.rs |
-| T2.2 | Each entry embeds the SHA-256 of the previous entry; deleting or reordering an entry breaks every later hash. | crates/veritas-ledger/src/lib.rs |
-| T2.3 | Sequence numbers must increase by exactly one; the verifier rejects gaps and duplicates. | crates/veritas-ledger/src/verify.rs |
-| T2.4 | A trusted-time record (source identity, measured offset, uncertainty) is captured with each acquisition entry and covered by its signature. | crates/veritas-ledger/src/lib.rs |
-| T2.5 | Independent verifier re-validates from scratch and prints PASS or FAIL; it shares only the canonical-form code with the writer. | crates/veritas-ledger/src/bin/veritas-verify.rs |
-| T2.6 | Periodic anchoring of the chain head into an external append-only anchor file (RFC 3161 TSA adapter optional). | crates/veritas-ledger/src/anchor.rs |
+| T2.1 | Each entry is Ed25519-signed over its canonical JSON (sorted keys, no floats, no whitespace). | crates/veritas-ledger/src/canonical.rs:24 |
+| T2.2 | Each entry embeds the SHA-256 of the previous entry; deleting or reordering an entry breaks every later hash. | crates/veritas-ledger/src/lib.rs:141 |
+| T2.3 | Sequence numbers must increase by exactly one; the verifier rejects gaps and duplicates. | crates/veritas-ledger/src/verify.rs:84 |
+| T2.4 | A trusted-time record (source identity, measured offset, uncertainty) is captured with each acquisition entry and covered by its signature. | crates/veritas-ledger/src/lib.rs:66 |
+| T2.5 | Independent verifier re-validates from scratch and prints PASS or FAIL; it shares only the canonical-form code with the writer. | crates/veritas-ledger/src/bin/veritas-verify.rs:7 |
+| T2.6 | Periodic anchoring of the chain head into an external append-only anchor file (RFC 3161 TSA adapter optional). | crates/veritas-ledger/src/anchor.rs:6 |
 
 ### T3 Malicious evidence exploiting parsers
 
 | # | Mitigation | Location |
 |---|---|---|
-| T3.1 | Binary parsers are safe Rust with `#![forbid(unsafe_code)]`. | crates/veritas-artifacts/src/lib.rs |
-| T3.2 | Every length field is bounds-checked; parsers return errors, never panic, on malformed input. Enforced by fuzz targets. | crates/veritas-artifacts/fuzz/fuzz_targets/prefetch.rs |
-| T3.3 | Parser workers run in a separate process with CPU, memory and wall-clock budgets; a crash fails only that job. | python/veritas/pipeline/worker.py |
-| T3.4 | Workers have no network egress and read only the evidence object assigned to them. | python/veritas/pipeline/worker.py |
-| T3.5 | Output-size caps on decompression (LZXPRESS, zlib) stop decompression bombs. | crates/veritas-artifacts/src/prefetch.rs |
+| T3.1 | Binary parsers are safe Rust with `#![forbid(unsafe_code)]`. | crates/veritas-artifacts/src/lib.rs:2 |
+| T3.2 | Every length field is bounds-checked; parsers return errors, never panic, on malformed input. Enforced by fuzz targets. | crates/veritas-artifacts/fuzz/fuzz_targets/prefetch.rs:2 |
+| T3.3 | Parser workers run in a separate process with CPU, memory and wall-clock budgets; a crash fails only that job. | python/veritas/pipeline/worker.py:124 |
+| T3.4 | Workers have no network egress and read only the evidence object assigned to them. | python/veritas/pipeline/worker.py:60 |
+| T3.5 | Output-size caps on decompression (LZXPRESS, zlib) stop decompression bombs. | crates/veritas-artifacts/src/prefetch.rs:10 |
 
 ### T4 Cross-case data leakage
 
 | # | Mitigation | Location |
 |---|---|---|
-| T4.1 | Every case has its own data-encryption key, wrapped by the master key; one case cannot decrypt another. | crates/veritas-store/src/crypto.rs |
-| T4.2 | Timeline rows carry case_id and every query is scoped by it in the data-access layer, not the UI. | python/veritas/timeline/store.py |
-| T4.3 | RBAC checks case membership on every API route through a shared dependency. | python/veritas/api/auth.py |
+| T4.1 | Every case has its own data-encryption key, wrapped by the master key; one case cannot decrypt another. | crates/veritas-store/src/crypto.rs:7 |
+| T4.2 | Timeline rows carry case_id and every query is scoped by it in the data-access layer, not the UI. | python/veritas/timeline/store.py:203 |
+| T4.3 | RBAC checks case membership on every API route through a shared dependency. | python/veritas/api/auth.py:10 |
 
 ### T5 Examiner privilege abuse
 
 | # | Mitigation | Location |
 |---|---|---|
-| T5.1 | Roles viewer, examiner, reviewer, admin; a finding needs approval by a reviewer other than its author. | python/veritas/api/findings.py |
-| T5.2 | Hash-chained audit log of every read and write, exported with the custody report. | python/veritas/audit/log.py |
-| T5.3 | PII is masked by default; unmasking is a privileged, audited action. | python/veritas/pii/redact.py |
-| T5.4 | Automated findings are created as proposed; nothing is asserted until a human confirms. | python/veritas/analytics/findings.py |
+| T5.1 | Roles viewer, examiner, reviewer, admin; a finding needs approval by a reviewer other than its author. | python/veritas/api/findings.py:9 |
+| T5.2 | Hash-chained audit log of every read and write, exported with the custody report. | python/veritas/audit/log.py:5 |
+| T5.3 | PII is masked by default; unmasking is a privileged, audited action. | python/veritas/pii/redact.py:6 |
+| T5.4 | Automated findings are created as proposed; nothing is asserted until a human confirms. | python/veritas/analytics/findings.py:6 |
 
 ### T6 Key compromise
 
 | # | Mitigation | Location |
 |---|---|---|
-| T6.1 | Signing keys are generated per acquirer, stored encrypted at rest, and never logged. | crates/veritas-ledger/src/keys.rs |
-| T6.2 | Key fingerprints are enrolled in a registry with validity windows; the verifier rejects entries signed outside a window. | crates/veritas-ledger/src/verify.rs |
-| T6.3 | A signed KeyRevoked entry invalidates later use of a key without invalidating earlier entries. | crates/veritas-ledger/src/verify.rs |
-| T6.4 | The test suite scans captured logs for secret patterns. | python/tests/test_no_secrets_in_logs.py |
+| T6.1 | Signing keys are generated per acquirer, stored encrypted at rest, and never logged. | crates/veritas-ledger/src/keys.rs:41 |
+| T6.2 | Key fingerprints are enrolled in a registry with validity windows; the verifier rejects entries signed outside a window. | crates/veritas-ledger/src/verify.rs:130 |
+| T6.3 | A signed KeyRevoked entry invalidates later use of a key without invalidating earlier entries. | crates/veritas-ledger/src/verify.rs:130 |
+| T6.4 | The test suite scans captured logs for secret patterns. | python/tests/test_no_secrets_in_logs.py:1 |
 
 ### T7 Supply chain
 
 | # | Mitigation | Location |
 |---|---|---|
-| T7.1 | cargo-audit, pip-audit, npm audit and Semgrep run in CI; HIGH or CRITICAL fails the build. | .github/workflows/ci.yml |
-| T7.2 | A CycloneDX SBOM is produced for every release. | .github/workflows/release.yml |
-| T7.3 | Release binaries are signed with cosign (keyless OIDC); the agent pins the intake server certificate. | .github/workflows/release.yml |
-| T7.4 | Lockfiles are committed and CI installs with locked flags. | .github/workflows/ci.yml |
+| T7.1 | cargo-audit, pip-audit, npm audit and Semgrep run in CI; HIGH or CRITICAL fails the build. | .github/workflows/ci.yml:51 |
+| T7.2 | A CycloneDX SBOM is produced for every release. | .github/workflows/release.yml:166 |
+| T7.3 | Release binaries are signed with cosign (keyless OIDC); the agent pins the intake server certificate. | .github/workflows/release.yml:178 |
+| T7.4 | Lockfiles are committed and CI installs with locked flags. | .github/workflows/ci.yml:35 |
 
 ### T8 Network attacker between agent and intake
 
 | # | Mitigation | Location |
 |---|---|---|
-| T8.1 | mTLS with client certificates issued per engagement. | crates/veritas-agent/src/transfer.rs |
-| T8.2 | Resumable upload keyed by segment hash; a segment whose hash differs from the manifest is rejected. | crates/veritas-agent/src/transfer.rs |
+| T8.1 | mTLS with client certificates issued per engagement. | crates/veritas-agent/src/transfer.rs:155 |
+| T8.2 | Resumable upload keyed by segment hash; a segment whose hash differs from the manifest is rejected. | crates/veritas-agent/src/transfer.rs:216 |
 
 ### T9 Anti-forensics by the subject
 
 | # | Mitigation | Location |
 |---|---|---|
-| T9.1 | Timestomping detection compares $STANDARD_INFORMATION with $FILE_NAME and USN records. | crates/veritas-fs/src/ntfs/timestomp.rs |
-| T9.2 | Log clearing surfaces as Event 1102/104 and as gaps in record numbers. | python/veritas/analytics/antiforensics.py |
+| T9.1 | Timestomping detection compares $STANDARD_INFORMATION with $FILE_NAME and USN records. | crates/veritas-fs/src/ntfs/timestomp.rs:2 |
+| T9.2 | Log clearing surfaces as Event 1102/104 and as gaps in record numbers. | python/veritas/analytics/antiforensics.py:1 |
 
 ## 5. Residual risks (accepted and documented)
 
