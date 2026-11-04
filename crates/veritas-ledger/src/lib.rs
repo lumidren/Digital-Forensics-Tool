@@ -23,7 +23,8 @@ use thiserror::Error;
 use veritas_hash::Hashes;
 
 pub const LEDGER_VERSION: u32 = 1;
-pub const GENESIS_PREV_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+pub const GENESIS_PREV_HASH: &str =
+    "0000000000000000000000000000000000000000000000000000000000000000";
 
 #[derive(Debug, Error)]
 pub enum LedgerError {
@@ -134,7 +135,11 @@ impl Entry {
         let sig: Signature = key.signing_key().sign(&bytes);
         let signature = hex::encode(sig.to_bytes());
         let entry_hash = compute_entry_hash(&bytes, &sig.to_bytes());
-        Ok(Self { body, signature, entry_hash })
+        Ok(Self {
+            body,
+            signature,
+            entry_hash,
+        })
     }
 }
 
@@ -187,9 +192,18 @@ pub struct Ledger {
 
 impl Ledger {
     /// Create a new ledger with a signed genesis entry.
-    pub fn create(ledger_id: &str, case_id: &str, key: &ExaminerKey, actor: &str, tool: ToolInfo) -> Result<Self, LedgerError> {
+    pub fn create(
+        ledger_id: &str,
+        case_id: &str,
+        key: &ExaminerKey,
+        actor: &str,
+        tool: ToolInfo,
+    ) -> Result<Self, LedgerError> {
         let mut details = BTreeMap::new();
-        details.insert("case_id".to_string(), serde_json::Value::String(case_id.to_string()));
+        details.insert(
+            "case_id".to_string(),
+            serde_json::Value::String(case_id.to_string()),
+        );
         let body = EntryBody {
             ledger_version: LEDGER_VERSION,
             ledger_id: ledger_id.to_string(),
@@ -208,7 +222,10 @@ impl Ledger {
             details,
         };
         let genesis = Entry::sign(body, key)?;
-        Ok(Self { ledger_id: ledger_id.to_string(), entries: vec![genesis] })
+        Ok(Self {
+            ledger_id: ledger_id.to_string(),
+            entries: vec![genesis],
+        })
     }
 
     pub fn head(&self) -> Option<&Entry> {
@@ -216,7 +233,9 @@ impl Ledger {
     }
 
     pub fn head_hash(&self) -> String {
-        self.head().map(|e| e.entry_hash.clone()).unwrap_or_else(|| GENESIS_PREV_HASH.to_string())
+        self.head()
+            .map(|e| e.entry_hash.clone())
+            .unwrap_or_else(|| GENESIS_PREV_HASH.to_string())
     }
 
     /// Append a signed entry. THREAT:T1.4 callers record every evidence access through here.
@@ -246,7 +265,10 @@ impl Ledger {
 
     /// Append the last entry to a JSON Lines file (one line per entry, append only).
     pub fn append_to_file(&self, path: &Path) -> Result<(), LedgerError> {
-        let entry = self.head().ok_or_else(|| LedgerError::Corrupt { line: 0, reason: "empty ledger".into() })?;
+        let entry = self.head().ok_or_else(|| LedgerError::Corrupt {
+            line: 0,
+            reason: "empty ledger".into(),
+        })?;
         let mut f = OpenOptions::new().create(true).append(true).open(path)?;
         let line = serde_json::to_string(entry)?;
         f.write_all(line.as_bytes())?;
@@ -257,7 +279,11 @@ impl Ledger {
 
     /// Write every entry (used for exports and tests).
     pub fn write_all(&self, path: &Path) -> Result<(), LedgerError> {
-        let mut f = OpenOptions::new().create(true).write(true).truncate(true).open(path)?;
+        let mut f = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(path)?;
         for e in &self.entries {
             f.write_all(serde_json::to_string(e)?.as_bytes())?;
             f.write_all(b"\n")?;
@@ -276,13 +302,19 @@ impl Ledger {
             if line.trim().is_empty() {
                 continue;
             }
-            let entry: Entry = serde_json::from_str(&line).map_err(|e| LedgerError::Corrupt { line: i + 1, reason: e.to_string() })?;
+            let entry: Entry = serde_json::from_str(&line).map_err(|e| LedgerError::Corrupt {
+                line: i + 1,
+                reason: e.to_string(),
+            })?;
             entries.push(entry);
         }
         let ledger_id = entries
             .first()
             .map(|e| e.body.ledger_id.clone())
-            .ok_or_else(|| LedgerError::Corrupt { line: 0, reason: "ledger has no entries".into() })?;
+            .ok_or_else(|| LedgerError::Corrupt {
+                line: 0,
+                reason: "ledger has no entries".into(),
+            })?;
         Ok(Self { ledger_id, entries })
     }
 }
@@ -340,7 +372,13 @@ pub struct CustodyExport {
 }
 
 impl CustodyExport {
-    pub fn build(ledger: &Ledger, registry: KeyRegistry, anchors: Vec<anchor::AnchorRecord>, key: &ExaminerKey, exported_by: &str) -> Result<Self, LedgerError> {
+    pub fn build(
+        ledger: &Ledger,
+        registry: KeyRegistry,
+        anchors: Vec<anchor::AnchorRecord>,
+        key: &ExaminerKey,
+        exported_by: &str,
+    ) -> Result<Self, LedgerError> {
         let mut export = Self {
             format: "veritas-custody".into(),
             format_version: 1,
@@ -395,7 +433,12 @@ mod tests {
         e.evidence_id = Some("EV-1".into());
         e.hashes = Some(veritas_hash::hash_bytes(b"evidence"));
         ledger.append(e, &key).unwrap();
-        ledger.append(NewEntry::simple("alice", EntryKind::Access, "parse", tool()), &key).unwrap();
+        ledger
+            .append(
+                NewEntry::simple("alice", EntryKind::Access, "parse", tool()),
+                &key,
+            )
+            .unwrap();
         let report = verify_ledger(&ledger.entries, &reg, &[]);
         assert_eq!(report.verdict, Verdict::Pass, "{:?}", report.failures);
         assert_eq!(report.entries_checked, 3);
@@ -412,8 +455,18 @@ mod tests {
         let key = ExaminerKey::generate();
         let reg = KeyRegistry::default().with_key(&key, "alice", "admin");
         let mut ledger = Ledger::create("L1", "CASE-1", &key, "alice", tool()).unwrap();
-        ledger.append(NewEntry::simple("alice", EntryKind::Access, "parse", tool()), &key).unwrap();
-        ledger.append(NewEntry::simple("alice", EntryKind::Note, "ok", tool()), &key).unwrap();
+        ledger
+            .append(
+                NewEntry::simple("alice", EntryKind::Access, "parse", tool()),
+                &key,
+            )
+            .unwrap();
+        ledger
+            .append(
+                NewEntry::simple("alice", EntryKind::Note, "ok", tool()),
+                &key,
+            )
+            .unwrap();
 
         // Change the purpose of entry 1.
         let mut t = ledger.entries.clone();

@@ -65,11 +65,15 @@ fn parse_with_sector(src: &dyn ReadAt, ss: u64) -> Result<VolumeSystem> {
     if entry_size < 128 || entry_size > 4096 || entry_size % 8 != 0 {
         return Err(FsError::invalid(ss + 84, "GPT entry size out of range"));
     }
-    let total = num_entries.checked_mul(entry_size).ok_or_else(|| FsError::invalid(ss + 80, "entry array overflow"))?;
+    let total = num_entries
+        .checked_mul(entry_size)
+        .ok_or_else(|| FsError::invalid(ss + 80, "entry array overflow"))?;
     if total > MAX_ENTRY_ARRAY {
         return Err(FsError::Limit("GPT entry array too large".into()));
     }
-    let arr_off = entries_lba.checked_mul(ss).ok_or_else(|| FsError::invalid(ss + 72, "entry LBA overflow"))?;
+    let arr_off = entries_lba
+        .checked_mul(ss)
+        .ok_or_else(|| FsError::invalid(ss + 72, "entry LBA overflow"))?;
     let arr = read_vec(src, arr_off, total)?;
     let entries_ok = crc32(&arr) == entries_crc;
     let mut parts = Vec::new();
@@ -98,12 +102,23 @@ fn parse_with_sector(src: &dyn ReadAt, ss: u64) -> Result<VolumeSystem> {
             offset: first.saturating_mul(ss),
             length: n.saturating_mul(ss),
             type_name: type_name(&type_guid).to_string(),
-            description: if name.is_empty() { type_name(&type_guid).to_string() } else { name },
+            description: if name.is_empty() {
+                type_name(&type_guid).to_string()
+            } else {
+                name
+            },
             type_id: type_guid,
             guid: guid_le(&e[16..32])?,
             bootable: u64_at(e, 48)? & 0x4 != 0,
             logical: false,
         });
     }
-    Ok(VolumeSystem { scheme: "gpt".into(), sector_size: ss, partitions: parts, gpt_header_crc_ok: Some(header_ok), gpt_entries_crc_ok: Some(entries_ok), disk_guid })
+    Ok(VolumeSystem {
+        scheme: "gpt".into(),
+        sector_size: ss,
+        partitions: parts,
+        gpt_header_crc_ok: Some(header_ok),
+        gpt_entries_crc_ok: Some(entries_ok),
+        disk_guid,
+    })
 }

@@ -23,13 +23,19 @@ fn err(msg: impl Into<String>) -> io::Error {
 }
 
 fn u16_at(b: &[u8], o: usize) -> io::Result<u16> {
-    b.get(o..o + 2).map(|s| u16::from_le_bytes([s[0], s[1]])).ok_or_else(|| err("u16 out of range"))
+    b.get(o..o + 2)
+        .map(|s| u16::from_le_bytes([s[0], s[1]]))
+        .ok_or_else(|| err("u16 out of range"))
 }
 fn u32_at(b: &[u8], o: usize) -> io::Result<u32> {
-    b.get(o..o + 4).map(|s| u32::from_le_bytes([s[0], s[1], s[2], s[3]])).ok_or_else(|| err("u32 out of range"))
+    b.get(o..o + 4)
+        .map(|s| u32::from_le_bytes([s[0], s[1], s[2], s[3]]))
+        .ok_or_else(|| err("u32 out of range"))
 }
 fn u64_at(b: &[u8], o: usize) -> io::Result<u64> {
-    b.get(o..o + 8).map(|s| u64::from_le_bytes([s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]])).ok_or_else(|| err("u64 out of range"))
+    b.get(o..o + 8)
+        .map(|s| u64::from_le_bytes([s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]]))
+        .ok_or_else(|| err("u64 out of range"))
 }
 
 /// Reader that only issues 4096-byte-aligned reads, as Windows volume handles require.
@@ -42,7 +48,12 @@ pub struct AlignedReader<R: Read + Seek> {
 
 impl<R: Read + Seek> AlignedReader<R> {
     pub fn new(inner: R) -> Self {
-        Self { inner, block: vec![0u8; ALIGN as usize * 16], block_offset: None, block_len: 0 }
+        Self {
+            inner,
+            block: vec![0u8; ALIGN as usize * 16],
+            block_offset: None,
+            block_len: 0,
+        }
     }
 
     /// Read exactly `buf.len()` bytes at `offset`.
@@ -68,7 +79,10 @@ impl<R: Read + Seek> AlignedReader<R> {
             }
             let within = (pos - start) as usize;
             if within >= self.block_len {
-                return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "read beyond end of volume"));
+                return Err(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "read beyond end of volume",
+                ));
             }
             let n = (self.block_len - within).min(buf.len() - done);
             buf[done..done + n].copy_from_slice(&self.block[within..within + n]);
@@ -103,7 +117,9 @@ pub fn decode_runs(data: &[u8], start_vcn: u64) -> io::Result<Vec<Run>> {
             return Err(err("bad run header"));
         }
         pos += 1;
-        let len_bytes = data.get(pos..pos + len_size).ok_or_else(|| err("run length truncated"))?;
+        let len_bytes = data
+            .get(pos..pos + len_size)
+            .ok_or_else(|| err("run length truncated"))?;
         let mut length: u64 = 0;
         for (i, b) in len_bytes.iter().enumerate() {
             length |= (*b as u64) << (8 * i);
@@ -112,7 +128,9 @@ pub fn decode_runs(data: &[u8], start_vcn: u64) -> io::Result<Vec<Run>> {
         let run_lcn = if off_size == 0 {
             None
         } else {
-            let off_bytes = data.get(pos..pos + off_size).ok_or_else(|| err("run offset truncated"))?;
+            let off_bytes = data
+                .get(pos..pos + off_size)
+                .ok_or_else(|| err("run offset truncated"))?;
             let mut delta: i64 = 0;
             for (i, b) in off_bytes.iter().enumerate() {
                 delta |= (*b as i64) << (8 * i);
@@ -122,7 +140,9 @@ pub fn decode_runs(data: &[u8], start_vcn: u64) -> io::Result<Vec<Run>> {
                 delta = (delta << shift) >> shift;
             }
             pos += off_size;
-            lcn = lcn.checked_add(delta).ok_or_else(|| err("run offset overflow"))?;
+            lcn = lcn
+                .checked_add(delta)
+                .ok_or_else(|| err("run offset overflow"))?;
             if lcn < 0 {
                 return Err(err("negative LCN"));
             }
@@ -131,7 +151,11 @@ pub fn decode_runs(data: &[u8], start_vcn: u64) -> io::Result<Vec<Run>> {
         if length == 0 {
             return Err(err("zero-length run"));
         }
-        runs.push(Run { vcn, lcn: run_lcn, length });
+        runs.push(Run {
+            vcn,
+            lcn: run_lcn,
+            length,
+        });
         vcn = vcn.checked_add(length).ok_or_else(|| err("VCN overflow"))?;
         if runs.len() > MAX_RUNS {
             return Err(err("too many runs"));
@@ -160,7 +184,11 @@ impl BootSector {
             return Err(err("bad bytes per sector"));
         }
         let spc_raw = b[0x0d];
-        let spc: u64 = if spc_raw > 0x80 { 1u64 << (256 - spc_raw as u32).min(31) } else { spc_raw as u64 };
+        let spc: u64 = if spc_raw > 0x80 {
+            1u64 << (256 - spc_raw as u32).min(31)
+        } else {
+            spc_raw as u64
+        };
         if spc == 0 {
             return Err(err("bad sectors per cluster"));
         }
@@ -169,11 +197,21 @@ impl BootSector {
             return Err(err("cluster size too large"));
         }
         let cpr = b[0x40] as i8;
-        let record_size = if cpr < 0 { 1u64 << (-(cpr as i32)).min(31) } else { cpr as u64 * cluster_size };
+        let record_size = if cpr < 0 {
+            1u64 << (-(cpr as i32)).min(31)
+        } else {
+            cpr as u64 * cluster_size
+        };
         if !(256..=MAX_RECORD_SIZE).contains(&record_size) {
             return Err(err("bad MFT record size"));
         }
-        Ok(Self { bytes_per_sector: bps, cluster_size, mft_lcn: u64_at(b, 0x30)?, record_size, total_sectors: u64_at(b, 0x28)? })
+        Ok(Self {
+            bytes_per_sector: bps,
+            cluster_size,
+            mft_lcn: u64_at(b, 0x30)?,
+            record_size,
+            total_sectors: u64_at(b, 0x28)?,
+        })
     }
 }
 
@@ -195,7 +233,10 @@ pub fn apply_fixups(rec: &mut [u8], bytes_per_sector: usize) -> io::Result<()> {
     }
     let usa_off = u16_at(rec, 4)? as usize;
     let usa_count = u16_at(rec, 6)? as usize;
-    if usa_count == 0 || usa_off + usa_count * 2 > rec.len() || (usa_count - 1) * bytes_per_sector > rec.len() {
+    if usa_count == 0
+        || usa_off + usa_count * 2 > rec.len()
+        || (usa_count - 1) * bytes_per_sector > rec.len()
+    {
         return Err(err("bad update sequence array"));
     }
     let usn = [rec[usa_off], rec[usa_off + 1]];
@@ -232,8 +273,14 @@ pub fn parse_attributes(rec: &[u8]) -> io::Result<Vec<Attribute>> {
         let name_len = a[9] as usize;
         let name_off = u16_at(a, 10)? as usize;
         let name = if name_len > 0 {
-            let raw = a.get(name_off..name_off + name_len * 2).ok_or_else(|| err("attribute name out of range"))?;
-            String::from_utf16_lossy(&raw.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect::<Vec<_>>())
+            let raw = a
+                .get(name_off..name_off + name_len * 2)
+                .ok_or_else(|| err("attribute name out of range"))?;
+            String::from_utf16_lossy(
+                &raw.chunks_exact(2)
+                    .map(|c| u16::from_le_bytes([c[0], c[1]]))
+                    .collect::<Vec<_>>(),
+            )
         } else {
             String::new()
         };
@@ -241,14 +288,33 @@ pub fn parse_attributes(rec: &[u8]) -> io::Result<Vec<Attribute>> {
             let start_vcn = u64_at(a, 16)?;
             let runs_off = u16_at(a, 32)? as usize;
             let real_size = u64_at(a, 48)?;
-            let run_bytes = a.get(runs_off..).ok_or_else(|| err("runlist out of range"))?;
+            let run_bytes = a
+                .get(runs_off..)
+                .ok_or_else(|| err("runlist out of range"))?;
             let runs = decode_runs(run_bytes, start_vcn)?;
-            out.push(Attribute { type_code, name, resident_value: None, runs, start_vcn, real_size });
+            out.push(Attribute {
+                type_code,
+                name,
+                resident_value: None,
+                runs,
+                start_vcn,
+                real_size,
+            });
         } else {
             let vlen = u32_at(a, 16)? as usize;
             let voff = u16_at(a, 20)? as usize;
-            let value = a.get(voff..voff + vlen).ok_or_else(|| err("resident value out of range"))?.to_vec();
-            out.push(Attribute { type_code, name, real_size: vlen as u64, resident_value: Some(value), runs: Vec::new(), start_vcn: 0 });
+            let value = a
+                .get(voff..voff + vlen)
+                .ok_or_else(|| err("resident value out of range"))?
+                .to_vec();
+            out.push(Attribute {
+                type_code,
+                name,
+                real_size: vlen as u64,
+                resident_value: Some(value),
+                runs: Vec::new(),
+                start_vcn: 0,
+            });
         }
         off += len;
     }
@@ -276,7 +342,10 @@ impl<R: Read + Seek> NtfsVolume<R> {
         reader.read_exact_at(0, &mut bs)?;
         let boot = BootSector::parse(&bs)?;
         // Bootstrap: record 0 sits at mft_lcn; its $DATA (and attribute list) describe the rest.
-        let off = boot.mft_lcn.checked_mul(boot.cluster_size).ok_or_else(|| err("MFT offset overflow"))?;
+        let off = boot
+            .mft_lcn
+            .checked_mul(boot.cluster_size)
+            .ok_or_else(|| err("MFT offset overflow"))?;
         let mut rec = vec![0u8; boot.record_size as usize];
         reader.read_exact_at(off, &mut rec)?;
         apply_fixups(&mut rec, boot.bytes_per_sector as usize)?;
@@ -285,7 +354,14 @@ impl<R: Read + Seek> NtfsVolume<R> {
             .iter()
             .find(|a| a.type_code == 0x80 && a.name.is_empty() && a.resident_value.is_none())
             .ok_or_else(|| err("$MFT has no non-resident $DATA"))?;
-        let mut vol = Self { reader, boot, mft: Stream { runs: base.runs.clone(), real_size: base.real_size } };
+        let mut vol = Self {
+            reader,
+            boot,
+            mft: Stream {
+                runs: base.runs.clone(),
+                real_size: base.real_size,
+            },
+        };
         // With a bootstrap mapping in place, follow an attribute list if record 0 has one.
         vol.mft = vol.stream_from_attrs(0, &attrs, 0x80, "")?;
         Ok(vol)
@@ -304,7 +380,9 @@ impl<R: Read + Seek> NtfsVolume<R> {
         let vcn = offset / self.boot.cluster_size;
         for r in runs {
             if vcn >= r.vcn && vcn < r.vcn + r.length {
-                return Ok(r.lcn.map(|l| (l + (vcn - r.vcn)) * self.boot.cluster_size + offset % self.boot.cluster_size));
+                return Ok(r.lcn.map(|l| {
+                    (l + (vcn - r.vcn)) * self.boot.cluster_size + offset % self.boot.cluster_size
+                }));
             }
         }
         Err(err(format!("offset {} not mapped", offset)))
@@ -313,7 +391,9 @@ impl<R: Read + Seek> NtfsVolume<R> {
     /// Read MFT record `n` with fixups applied.
     pub fn read_record(&mut self, n: u64) -> io::Result<Vec<u8>> {
         let rs = self.boot.record_size;
-        let off = n.checked_mul(rs).ok_or_else(|| err("record offset overflow"))?;
+        let off = n
+            .checked_mul(rs)
+            .ok_or_else(|| err("record offset overflow"))?;
         if off + rs > self.mft.real_size {
             return Err(err("record beyond $MFT"));
         }
@@ -321,9 +401,13 @@ impl<R: Read + Seek> NtfsVolume<R> {
         // A record may straddle clusters only when record size > cluster size; read in pieces.
         let mut done = 0u64;
         while done < rs {
-            let piece = (self.boot.cluster_size - (off + done) % self.boot.cluster_size).min(rs - done);
-            let vol_off = self.map(&self.mft.runs.clone(), off + done)?.ok_or_else(|| err("MFT record in sparse run"))?;
-            self.reader.read_exact_at(vol_off, &mut rec[done as usize..(done + piece) as usize])?;
+            let piece =
+                (self.boot.cluster_size - (off + done) % self.boot.cluster_size).min(rs - done);
+            let vol_off = self
+                .map(&self.mft.runs.clone(), off + done)?
+                .ok_or_else(|| err("MFT record in sparse run"))?;
+            self.reader
+                .read_exact_at(vol_off, &mut rec[done as usize..(done + piece) as usize])?;
             done += piece;
         }
         apply_fixups(&mut rec, self.boot.bytes_per_sector as usize)?;
@@ -342,12 +426,28 @@ impl<R: Read + Seek> NtfsVolume<R> {
 
     /// Assemble the stream (`type_code`, `name`) of base record `record` from its attributes,
     /// following `$ATTRIBUTE_LIST` into extension records when present.
-    fn stream_from_attrs(&mut self, record: u64, attrs: &[Attribute], type_code: u32, name: &str) -> io::Result<Stream> {
-        let mut fragments: Vec<Attribute> = attrs.iter().filter(|a| a.type_code == type_code && a.name == name && a.resident_value.is_none()).cloned().collect();
+    fn stream_from_attrs(
+        &mut self,
+        record: u64,
+        attrs: &[Attribute],
+        type_code: u32,
+        name: &str,
+    ) -> io::Result<Stream> {
+        let mut fragments: Vec<Attribute> = attrs
+            .iter()
+            .filter(|a| a.type_code == type_code && a.name == name && a.resident_value.is_none())
+            .cloned()
+            .collect();
         if let Some(list) = attrs.iter().find(|a| a.type_code == 0x20) {
             let data = match &list.resident_value {
                 Some(v) => v.clone(),
-                None => self.read_small_stream(&Stream { runs: list.runs.clone(), real_size: list.real_size }, MAX_ATTRIBUTE_LIST)?,
+                None => self.read_small_stream(
+                    &Stream {
+                        runs: list.runs.clone(),
+                        real_size: list.real_size,
+                    },
+                    MAX_ATTRIBUTE_LIST,
+                )?,
             };
             let mut pos = 0usize;
             let mut ext_records = Vec::new();
@@ -360,13 +460,23 @@ impl<R: Read + Seek> NtfsVolume<R> {
                 let nlen = data[pos + 6] as usize;
                 let noff = data[pos + 7] as usize;
                 let aname = if nlen > 0 {
-                    let raw = data.get(pos + noff..pos + noff + nlen * 2).ok_or_else(|| err("list name out of range"))?;
-                    String::from_utf16_lossy(&raw.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect::<Vec<_>>())
+                    let raw = data
+                        .get(pos + noff..pos + noff + nlen * 2)
+                        .ok_or_else(|| err("list name out of range"))?;
+                    String::from_utf16_lossy(
+                        &raw.chunks_exact(2)
+                            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+                            .collect::<Vec<_>>(),
+                    )
                 } else {
                     String::new()
                 };
                 let rec_no = u64_at(&data, pos + 16)? & 0x0000_ffff_ffff_ffff;
-                if t == type_code && aname == name && rec_no != record && !ext_records.contains(&rec_no) {
+                if t == type_code
+                    && aname == name
+                    && rec_no != record
+                    && !ext_records.contains(&rec_no)
+                {
                     ext_records.push(rec_no);
                 }
                 pos += len;
@@ -381,10 +491,17 @@ impl<R: Read + Seek> NtfsVolume<R> {
             }
         }
         if fragments.is_empty() {
-            return Err(err(format!("record {} has no non-resident stream {:#x}:{}", record, type_code, name)));
+            return Err(err(format!(
+                "record {} has no non-resident stream {:#x}:{}",
+                record, type_code, name
+            )));
         }
         fragments.sort_by_key(|a| a.start_vcn);
-        let real_size = fragments.iter().find(|a| a.start_vcn == 0).map(|a| a.real_size).unwrap_or(fragments[0].real_size);
+        let real_size = fragments
+            .iter()
+            .find(|a| a.start_vcn == 0)
+            .map(|a| a.real_size)
+            .unwrap_or(fragments[0].real_size);
         let runs: Vec<Run> = fragments.into_iter().flat_map(|a| a.runs).collect();
         Ok(Stream { runs, real_size })
     }
@@ -399,16 +516,29 @@ impl<R: Read + Seek> NtfsVolume<R> {
     /// Copy a stream to `out`. With `skip_sparse`, sparse runs are omitted and `extent` is
     /// called with (logical offset, length) for each allocated extent written; otherwise sparse
     /// runs are written as zeros. Returns the number of bytes written.
-    pub fn copy_stream(&mut self, s: &Stream, out: &mut dyn Write, skip_sparse: bool, extent: &mut dyn FnMut((u64, u64))) -> io::Result<u64> {
+    pub fn copy_stream(
+        &mut self,
+        s: &Stream,
+        out: &mut dyn Write,
+        skip_sparse: bool,
+        extent: &mut dyn FnMut((u64, u64)),
+    ) -> io::Result<u64> {
         let cs = self.boot.cluster_size;
         let mut written = 0u64;
         let mut buf = vec![0u8; 1 << 20];
         for r in &s.runs {
-            let run_start = r.vcn.checked_mul(cs).ok_or_else(|| err("run offset overflow"))?;
+            let run_start = r
+                .vcn
+                .checked_mul(cs)
+                .ok_or_else(|| err("run offset overflow"))?;
             if run_start >= s.real_size {
                 break;
             }
-            let run_len = (r.length.checked_mul(cs).ok_or_else(|| err("run length overflow"))?).min(s.real_size - run_start);
+            let run_len = (r
+                .length
+                .checked_mul(cs)
+                .ok_or_else(|| err("run length overflow"))?)
+            .min(s.real_size - run_start);
             match r.lcn {
                 None if skip_sparse => continue,
                 None => {
@@ -466,7 +596,11 @@ impl<R: Read + Seek> NtfsVolume<R> {
                         Some(r) => r,
                         None => continue,
                     };
-                    let name = String::from_utf16_lossy(&raw.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect::<Vec<_>>());
+                    let name = String::from_utf16_lossy(
+                        &raw.chunks_exact(2)
+                            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+                            .collect::<Vec<_>>(),
+                    );
                     if parent == 11 && name == "$UsnJrnl" {
                         return Ok(Some(rec_no));
                     }
@@ -492,11 +626,26 @@ mod tests {
         // 0x21: 1-byte length, 2-byte offset; 0x01: sparse; 0x11 with negative delta.
         let data = [0x21, 0x10, 0x00, 0x01, 0x01, 0x05, 0x11, 0x02, 0xff, 0x00];
         let runs = decode_runs(&data, 0).unwrap();
-        assert_eq!(runs, vec![
-            Run { vcn: 0, lcn: Some(0x100), length: 0x10 },
-            Run { vcn: 0x10, lcn: None, length: 5 },
-            Run { vcn: 0x15, lcn: Some(0xff), length: 2 },
-        ]);
+        assert_eq!(
+            runs,
+            vec![
+                Run {
+                    vcn: 0,
+                    lcn: Some(0x100),
+                    length: 0x10
+                },
+                Run {
+                    vcn: 0x10,
+                    lcn: None,
+                    length: 5
+                },
+                Run {
+                    vcn: 0x15,
+                    lcn: Some(0xff),
+                    length: 2
+                },
+            ]
+        );
         assert!(decode_runs(&[0x21, 0x10], 0).is_err());
     }
 
@@ -514,12 +663,22 @@ mod tests {
         assert_eq!(&out[rs..rs + 4], b"FILE");
         let log = vol.stream(2, 0x80, "").unwrap();
         let mut logbytes = Vec::new();
-        assert_eq!(vol.copy_stream(&log, &mut logbytes, false, &mut |_| {}).unwrap(), log.real_size);
+        assert_eq!(
+            vol.copy_stream(&log, &mut logbytes, false, &mut |_| {})
+                .unwrap(),
+            log.real_size
+        );
         // Reference values from The Sleuth Kit (pytsk3) reading the same image.
         assert_eq!(out.len(), 70656);
-        assert_eq!(veritas_hash::sha256_hex(&out), "ef643dc219fbea7eeca9790faa56b400b6427491e1250db9191ce836f42b9930");
+        assert_eq!(
+            veritas_hash::sha256_hex(&out),
+            "ef643dc219fbea7eeca9790faa56b400b6427491e1250db9191ce836f42b9930"
+        );
         assert_eq!(logbytes.len(), 1_048_576);
-        assert_eq!(veritas_hash::sha256_hex(&logbytes), "f5fb04aa5b882706b9309e885f19477261336ef76a150c3b4d3489dfac3953ec");
+        assert_eq!(
+            veritas_hash::sha256_hex(&logbytes),
+            "f5fb04aa5b882706b9309e885f19477261336ef76a150c3b4d3489dfac3953ec"
+        );
         // This image has no $Extend\$UsnJrnl (TSK agrees); the scan must say so, not fail.
         assert_eq!(vol.find_usnjrnl(10_000).unwrap(), None);
     }

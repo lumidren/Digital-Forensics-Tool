@@ -23,11 +23,19 @@ pub struct IndexEntry {
     pub in_root: bool,
 }
 
-fn parse_entries(buf: &[u8], node_hdr: usize, base_offset: u64, in_root: bool, out: &mut Vec<IndexEntry>) -> Result<()> {
+fn parse_entries(
+    buf: &[u8],
+    node_hdr: usize,
+    base_offset: u64,
+    in_root: bool,
+    out: &mut Vec<IndexEntry>,
+) -> Result<()> {
     let first = u32_at(buf, node_hdr)? as usize;
     let used = u32_at(buf, node_hdr + 4)? as usize;
     let alloc = u32_at(buf, node_hdr + 8)? as usize;
-    let start = node_hdr.checked_add(first).ok_or_else(|| FsError::invalid(node_hdr as u64, "entries offset"))?;
+    let start = node_hdr
+        .checked_add(first)
+        .ok_or_else(|| FsError::invalid(node_hdr as u64, "entries offset"))?;
     let end_used = node_hdr.saturating_add(used).min(buf.len());
     let end_alloc = node_hdr.saturating_add(alloc).min(buf.len());
     let mut pos = start;
@@ -41,7 +49,14 @@ fn parse_entries(buf: &[u8], node_hdr: usize, base_offset: u64, in_root: bool, o
         if flags & 2 == 0 && klen >= 0x42 {
             if let Ok(fname) = FileName::parse(need(buf, pos + 16, klen)?) {
                 let (e, s) = split_ref(u64_at(buf, pos)?);
-                out.push(IndexEntry { entry: e, sequence: s, file_name: fname, slack: false, offset: base_offset + pos as u64, in_root });
+                out.push(IndexEntry {
+                    entry: e,
+                    sequence: s,
+                    file_name: fname,
+                    slack: false,
+                    offset: base_offset + pos as u64,
+                    in_root,
+                });
             }
         }
         if flags & 2 != 0 {
@@ -54,7 +69,11 @@ fn parse_entries(buf: &[u8], node_hdr: usize, base_offset: u64, in_root: bool, o
     let mut p = (pos + 7) & !7;
     while p + 0x52 <= end_alloc && out.len() < MAX_INDEX_ENTRIES {
         if let Some((ie, len)) = carve_entry(buf, p, end_alloc) {
-            out.push(IndexEntry { offset: base_offset + p as u64, in_root, ..ie });
+            out.push(IndexEntry {
+                offset: base_offset + p as u64,
+                in_root,
+                ..ie
+            });
             p += (len + 7) & !7;
         } else {
             p += 8;
@@ -63,7 +82,9 @@ fn parse_entries(buf: &[u8], node_hdr: usize, base_offset: u64, in_root: bool, o
     Ok(())
 }
 
-fn plausible_time(t: u64) -> bool { (FT_MIN..FT_MAX).contains(&t) }
+fn plausible_time(t: u64) -> bool {
+    (FT_MIN..FT_MAX).contains(&t)
+}
 
 fn carve_entry(buf: &[u8], p: usize, end: usize) -> Option<(IndexEntry, usize)> {
     let fref = u64_at(buf, p).ok()?;
@@ -78,17 +99,38 @@ fn carve_entry(buf: &[u8], p: usize, end: usize) -> Option<(IndexEntry, usize)> 
         return None;
     }
     let fname = FileName::parse(need(buf, p + 16, 0x42 + nlen * 2).ok()?).ok()?;
-    if !(plausible_time(fname.crtime) && plausible_time(fname.mtime) && plausible_time(fname.ctime) && plausible_time(fname.atime)) {
+    if !(plausible_time(fname.crtime)
+        && plausible_time(fname.mtime)
+        && plausible_time(fname.ctime)
+        && plausible_time(fname.atime))
+    {
         return None;
     }
-    if fname.parent_entry == 0 || fname.parent_entry > (1 << 40) || fname.real_size > fname.alloc_size.max(1 << 40) {
+    if fname.parent_entry == 0
+        || fname.parent_entry > (1 << 40)
+        || fname.real_size > fname.alloc_size.max(1 << 40)
+    {
         return None;
     }
-    if fname.name.chars().any(|c| c == '\u{fffd}' || (c as u32) < 0x20) {
+    if fname
+        .name
+        .chars()
+        .any(|c| c == '\u{fffd}' || (c as u32) < 0x20)
+    {
         return None;
     }
     let (e, s) = split_ref(fref);
-    Some((IndexEntry { entry: e, sequence: s, file_name: fname, slack: true, offset: 0, in_root: false }, 16 + 0x42 + nlen * 2))
+    Some((
+        IndexEntry {
+            entry: e,
+            sequence: s,
+            file_name: fname,
+            slack: true,
+            offset: 0,
+            in_root: false,
+        },
+        16 + 0x42 + nlen * 2,
+    ))
 }
 
 /// Parse the value of an `$INDEX_ROOT` attribute. Returns entries and the index record size.
@@ -100,7 +142,11 @@ pub fn parse_index_root(value: &[u8]) -> Result<(Vec<IndexEntry>, u32)> {
 }
 
 /// Parse the data of an `$INDEX_ALLOCATION` attribute as a sequence of INDX buffers.
-pub fn parse_index_allocation(data: &[u8], rec_size: usize, sector: usize) -> Result<Vec<IndexEntry>> {
+pub fn parse_index_allocation(
+    data: &[u8],
+    rec_size: usize,
+    sector: usize,
+) -> Result<Vec<IndexEntry>> {
     if rec_size < 512 || rec_size > 65536 {
         return Err(FsError::invalid(0, "index record size"));
     }

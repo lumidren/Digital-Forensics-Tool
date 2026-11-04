@@ -48,20 +48,50 @@ impl DataStream {
         parts.sort_by_key(|a| (a.start_vcn, a.record, a.id));
         let first = *parts.first()?;
         if first.resident {
-            return Some(DataStream { name: first.name.clone(), size: first.data_size, alloc_size: first.data_size, init_size: first.data_size, resident: true, resident_data: first.data.clone(), runs: vec![], flags: first.flags, compression_unit: 0 });
+            return Some(DataStream {
+                name: first.name.clone(),
+                size: first.data_size,
+                alloc_size: first.data_size,
+                init_size: first.data_size,
+                resident: true,
+                resident_data: first.data.clone(),
+                runs: vec![],
+                flags: first.flags,
+                compression_unit: 0,
+            });
         }
-        let head = parts.iter().find(|a| a.start_vcn == 0).copied().unwrap_or(first);
+        let head = parts
+            .iter()
+            .find(|a| a.start_vcn == 0)
+            .copied()
+            .unwrap_or(first);
         let mut runs = Vec::new();
         for p in &parts {
             if !p.resident {
                 runs.extend(p.runs.iter().cloned());
             }
         }
-        Some(DataStream { name: head.name.clone(), size: head.data_size, alloc_size: head.alloc_size, init_size: head.init_size, resident: false, resident_data: vec![], runs, flags: head.flags, compression_unit: head.compression_unit })
+        Some(DataStream {
+            name: head.name.clone(),
+            size: head.data_size,
+            alloc_size: head.alloc_size,
+            init_size: head.init_size,
+            resident: false,
+            resident_data: vec![],
+            runs,
+            flags: head.flags,
+            compression_unit: head.compression_unit,
+        })
     }
-    pub fn is_compressed(&self) -> bool { self.flags & 0x0001 != 0 && self.compression_unit != 0 }
-    pub fn is_encrypted(&self) -> bool { self.flags & 0x4000 != 0 }
-    pub fn is_sparse(&self) -> bool { self.flags & 0x8000 != 0 }
+    pub fn is_compressed(&self) -> bool {
+        self.flags & 0x0001 != 0 && self.compression_unit != 0
+    }
+    pub fn is_encrypted(&self) -> bool {
+        self.flags & 0x4000 != 0
+    }
+    pub fn is_sparse(&self) -> bool {
+        self.flags & 0x8000 != 0
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -110,17 +140,34 @@ impl FileEntry {
         };
         self.file_names.iter().min_by_key(|f| rank(f.namespace))
     }
-    pub fn name(&self) -> Option<&str> { self.best_name().map(|f| f.name.as_str()) }
-    pub fn data(&self) -> Option<&DataStream> { self.streams.iter().find(|s| s.name.is_empty()) }
-    pub fn stream(&self, name: &str) -> Option<&DataStream> { self.streams.iter().find(|s| s.name == name) }
-    pub fn size(&self) -> u64 { self.data().map(|d| d.size).unwrap_or(0) }
+    pub fn name(&self) -> Option<&str> {
+        self.best_name().map(|f| f.name.as_str())
+    }
+    pub fn data(&self) -> Option<&DataStream> {
+        self.streams.iter().find(|s| s.name.is_empty())
+    }
+    pub fn stream(&self, name: &str) -> Option<&DataStream> {
+        self.streams.iter().find(|s| s.name == name)
+    }
+    pub fn size(&self) -> u64 {
+        self.data().map(|d| d.size).unwrap_or(0)
+    }
     pub fn ads_names(&self) -> Vec<String> {
-        let mut v: Vec<String> = self.streams.iter().filter(|s| !s.name.is_empty()).map(|s| s.name.clone()).collect();
+        let mut v: Vec<String> = self
+            .streams
+            .iter()
+            .filter(|s| !s.name.is_empty())
+            .map(|s| s.name.clone())
+            .collect();
         v.sort();
         v
     }
-    pub fn is_base(&self) -> bool { self.base_entry == 0 }
-    pub fn file_reference(&self) -> String { format!("{}-{}", self.entry, self.sequence) }
+    pub fn is_base(&self) -> bool {
+        self.base_entry == 0
+    }
+    pub fn file_reference(&self) -> String {
+        format!("{}-{}", self.entry, self.sequence)
+    }
 }
 
 /// Anything that can hand out raw MFT records: a mounted volume or a bare `$MFT` extract.
@@ -130,7 +177,9 @@ pub trait RecordProvider {
     fn record_bytes(&self, n: u64) -> Result<Vec<u8>>;
     /// Read a non-resident stream. Bare `$MFT` extracts have no cluster data and return `Unsupported`.
     fn read_nonresident(&self, _s: &DataStream) -> Result<Vec<u8>> {
-        Err(FsError::Unsupported("non-resident data without a volume".into()))
+        Err(FsError::Unsupported(
+            "non-resident data without a volume".into(),
+        ))
     }
 }
 
@@ -139,7 +188,11 @@ pub fn build_entry(p: &dyn RecordProvider, n: u64) -> Result<FileEntry> {
     let rec = MftRecord::parse(&p.record_bytes(n)?, n)?;
     let mut attrs: Vec<Attribute> = rec.attributes.clone();
     let mut attribute_list = Vec::new();
-    if let Some(al) = rec.attributes.iter().find(|a| a.type_code == AT_ATTRIBUTE_LIST) {
+    if let Some(al) = rec
+        .attributes
+        .iter()
+        .find(|a| a.type_code == AT_ATTRIBUTE_LIST)
+    {
         let data = if al.resident {
             Some(al.data.clone())
         } else {
@@ -147,12 +200,21 @@ pub fn build_entry(p: &dyn RecordProvider, n: u64) -> Result<FileEntry> {
         };
         if let Some(d) = data {
             attribute_list = parse_attribute_list(&d).unwrap_or_default();
-            let ext: BTreeSet<u64> = attribute_list.iter().map(|e| e.record).filter(|&r| r != n).take(MAX_EXTENSION_RECORDS).collect();
+            let ext: BTreeSet<u64> = attribute_list
+                .iter()
+                .map(|e| e.record)
+                .filter(|&r| r != n)
+                .take(MAX_EXTENSION_RECORDS)
+                .collect();
             for r in ext {
                 if let Ok(b) = p.record_bytes(r) {
                     if let Ok(x) = MftRecord::parse(&b, r) {
                         if x.base_entry() == n {
-                            attrs.extend(x.attributes.into_iter().filter(|a| a.type_code != AT_ATTRIBUTE_LIST));
+                            attrs.extend(
+                                x.attributes
+                                    .into_iter()
+                                    .filter(|a| a.type_code != AT_ATTRIBUTE_LIST),
+                            );
                         }
                     }
                 }
@@ -174,9 +236,19 @@ pub fn build_entry(p: &dyn RecordProvider, n: u64) -> Result<FileEntry> {
     let mut data_groups: BTreeMap<String, Vec<&Attribute>> = BTreeMap::new();
     let mut ia_parts: Vec<&Attribute> = Vec::new();
     for a in &attrs {
-        e.attributes.push(AttrSummary { type_code: a.type_code, type_name: attribute_type_name(a.type_code).into(), name: a.name.clone(), id: a.id, resident: a.resident, data_size: a.data_size, record: a.record });
+        e.attributes.push(AttrSummary {
+            type_code: a.type_code,
+            type_name: attribute_type_name(a.type_code).into(),
+            name: a.name.clone(),
+            id: a.id,
+            resident: a.resident,
+            data_size: a.data_size,
+            record: a.record,
+        });
         match a.type_code {
-            AT_STANDARD_INFORMATION if e.si.is_none() && a.resident => e.si = StdInfo::parse(&a.data).ok(),
+            AT_STANDARD_INFORMATION if e.si.is_none() && a.resident => {
+                e.si = StdInfo::parse(&a.data).ok()
+            }
             AT_FILE_NAME if a.resident => {
                 if let Ok(f) = FileName::parse(&a.data) {
                     e.file_names.push(f);
@@ -218,7 +290,11 @@ pub fn compute_paths(entries: &mut [FileEntry]) {
     }
 }
 
-fn path_for(n: u64, names: &BTreeMap<u64, (u64, String)>, memo: &mut BTreeMap<u64, String>) -> String {
+fn path_for(
+    n: u64,
+    names: &BTreeMap<u64, (u64, String)>,
+    memo: &mut BTreeMap<u64, String>,
+) -> String {
     if n == ROOT_ENTRY {
         return "/".into();
     }
@@ -259,7 +335,13 @@ fn path_for(n: u64, names: &BTreeMap<u64, (u64, String)>, memo: &mut BTreeMap<u6
 }
 
 /// Read a non-resident (possibly sparse) stream range. Bytes past `init_size` read as zero.
-fn read_runs_range(src: &dyn ReadAt, cs: u64, s: &DataStream, off: u64, len: u64) -> Result<Vec<u8>> {
+fn read_runs_range(
+    src: &dyn ReadAt,
+    cs: u64,
+    s: &DataStream,
+    off: u64,
+    len: u64,
+) -> Result<Vec<u8>> {
     if len > MAX_FILE_READ {
         return Err(FsError::Limit("stream read too large".into()));
     }
@@ -342,7 +424,9 @@ pub struct Ntfs {
 }
 
 impl RecordProvider for Ntfs {
-    fn record_size(&self) -> u32 { self.boot.mft_record_size }
+    fn record_size(&self) -> u32 {
+        self.boot.mft_record_size
+    }
     fn record_count(&self) -> u64 {
         // The $MFT cannot be larger than the volume holding it.
         let rs = self.boot.mft_record_size as u64;
@@ -350,13 +434,23 @@ impl RecordProvider for Ntfs {
     }
     fn record_bytes(&self, n: u64) -> Result<Vec<u8>> {
         let rs = self.boot.mft_record_size as u64;
-        let off = n.checked_mul(rs).ok_or_else(|| FsError::invalid(n, "record number overflow"))?;
+        let off = n
+            .checked_mul(rs)
+            .ok_or_else(|| FsError::invalid(n, "record number overflow"))?;
         if off + rs > self.mft.size {
             return Err(FsError::NotFound(format!("MFT entry {n}")));
         }
-        read_runs_range(self.src.as_ref(), self.boot.cluster_size, &self.mft, off, rs)
+        read_runs_range(
+            self.src.as_ref(),
+            self.boot.cluster_size,
+            &self.mft,
+            off,
+            rs,
+        )
     }
-    fn read_nonresident(&self, s: &DataStream) -> Result<Vec<u8>> { self.read_stream(s) }
+    fn read_nonresident(&self, s: &DataStream) -> Result<Vec<u8>> {
+        self.read_stream(s)
+    }
 }
 
 impl Ntfs {
@@ -364,17 +458,29 @@ impl Ntfs {
         let b = read_vec(src.as_ref(), 0, 512)?;
         let boot = BootSector::parse(&b)?;
         let rs = boot.mft_record_size as u64;
-        let mft_off = boot.mft_lcn.checked_mul(boot.cluster_size).ok_or_else(|| FsError::invalid(0x30, "MFT LCN overflow"))?;
+        let mft_off = boot
+            .mft_lcn
+            .checked_mul(boot.cluster_size)
+            .ok_or_else(|| FsError::invalid(0x30, "MFT LCN overflow"))?;
         let r0 = read_vec(src.as_ref(), mft_off, rs)?;
         let rec0 = MftRecord::parse(&r0, 0)?;
-        let parts: Vec<&Attribute> = rec0.attributes.iter().filter(|a| a.type_code == AT_DATA && a.name.is_empty()).collect();
-        let mft = DataStream::from_parts(parts).ok_or_else(|| FsError::NotFound("$MFT $DATA".into()))?;
+        let parts: Vec<&Attribute> = rec0
+            .attributes
+            .iter()
+            .filter(|a| a.type_code == AT_DATA && a.name.is_empty())
+            .collect();
+        let mft =
+            DataStream::from_parts(parts).ok_or_else(|| FsError::NotFound("$MFT $DATA".into()))?;
         if mft.resident {
             return Err(FsError::invalid(mft_off, "resident $MFT data"));
         }
         let mut fs = Ntfs { src, boot, mft };
         // A fragmented $MFT keeps further extents in extension records listed in $ATTRIBUTE_LIST.
-        if rec0.attributes.iter().any(|a| a.type_code == AT_ATTRIBUTE_LIST) {
+        if rec0
+            .attributes
+            .iter()
+            .any(|a| a.type_code == AT_ATTRIBUTE_LIST)
+        {
             if let Ok(e0) = build_entry(&fs, 0) {
                 if let Some(d) = e0.data() {
                     if d.size >= fs.mft.size && !d.resident {
@@ -386,8 +492,12 @@ impl Ntfs {
         Ok(fs)
     }
 
-    pub fn source(&self) -> &Source { &self.src }
-    pub fn cluster_size(&self) -> u64 { self.boot.cluster_size }
+    pub fn source(&self) -> &Source {
+        &self.src
+    }
+    pub fn cluster_size(&self) -> u64 {
+        self.boot.cluster_size
+    }
 
     pub fn read_stream(&self, s: &DataStream) -> Result<Vec<u8>> {
         if s.resident {
@@ -410,7 +520,11 @@ impl Ntfs {
             return Ok(Vec::new());
         }
         if s.resident {
-            return Ok(s.resident_data.get(off as usize..end as usize).unwrap_or(&[]).to_vec());
+            return Ok(s
+                .resident_data
+                .get(off as usize..end as usize)
+                .unwrap_or(&[])
+                .to_vec());
         }
         if s.is_encrypted() {
             return Err(FsError::Unsupported("EFS-encrypted stream".into()));
@@ -423,7 +537,11 @@ impl Ntfs {
     }
 
     /// Read only the allocated (non-sparse) runs of a stream as `(stream_offset, bytes)` chunks.
-    pub fn read_allocated_chunks(&self, s: &DataStream, max_total: u64) -> Result<Vec<(u64, Vec<u8>)>> {
+    pub fn read_allocated_chunks(
+        &self,
+        s: &DataStream,
+        max_total: u64,
+    ) -> Result<Vec<(u64, Vec<u8>)>> {
         if s.resident {
             return Ok(vec![(0, s.resident_data.clone())]);
         }
@@ -441,7 +559,10 @@ impl Ntfs {
             if total > max_total {
                 return Err(FsError::Limit("allocated stream data too large".into()));
             }
-            out.push((start, read_vec_padded(self.src.as_ref(), lcn.saturating_mul(cs), len)?));
+            out.push((
+                start,
+                read_vec_padded(self.src.as_ref(), lcn.saturating_mul(cs), len)?,
+            ));
         }
         Ok(out)
     }
@@ -497,10 +618,25 @@ impl Ntfs {
         let (mut out, rec_size) = index::parse_index_root(root)?;
         if let Some(ia) = &e.index_allocation {
             let data = self.read_stream(ia)?;
-            let rs = if rec_size >= 512 { rec_size as usize } else { self.boot.index_record_size as usize };
-            out.extend(index::parse_index_allocation(&data, rs, self.boot.bytes_per_sector as usize)?);
+            let rs = if rec_size >= 512 {
+                rec_size as usize
+            } else {
+                self.boot.index_record_size as usize
+            };
+            out.extend(index::parse_index_allocation(
+                &data,
+                rs,
+                self.boot.bytes_per_sector as usize,
+            )?);
         }
-        out.sort_by(|a, b| (a.slack, &a.file_name.name, a.entry, a.offset).cmp(&(b.slack, &b.file_name.name, b.entry, b.offset)));
+        out.sort_by(|a, b| {
+            (a.slack, &a.file_name.name, a.entry, a.offset).cmp(&(
+                b.slack,
+                &b.file_name.name,
+                b.entry,
+                b.offset,
+            ))
+        });
         // Live entries are present in exactly one node; remove DOS-only duplicates of Win32 names.
         let mut seen = BTreeSet::new();
         out.retain(|ie| ie.slack || ie.file_name.namespace != 2 || seen.insert(ie.entry));
@@ -513,7 +649,10 @@ impl Ntfs {
         for comp in path.split(['/', '\\']).filter(|c| !c.is_empty()) {
             let list = self.list_dir(cur)?;
             let live: Vec<&IndexEntry> = list.iter().filter(|e| !e.slack).collect();
-            let hit = live.iter().find(|e| e.file_name.name == comp).or_else(|| live.iter().find(|e| e.file_name.name.eq_ignore_ascii_case(comp)));
+            let hit = live.iter().find(|e| e.file_name.name == comp).or_else(|| {
+                live.iter()
+                    .find(|e| e.file_name.name.eq_ignore_ascii_case(comp))
+            });
             match hit {
                 Some(e) => cur = e.entry,
                 None => return Err(FsError::NotFound(path.to_string())),
@@ -525,7 +664,9 @@ impl Ntfs {
     /// Read the unnamed (or a named) data stream of an entry.
     pub fn read_entry_data(&self, n: u64, stream: &str) -> Result<Vec<u8>> {
         let e = build_entry(self, n)?;
-        let s = e.stream(stream).ok_or_else(|| FsError::NotFound(format!("stream '{stream}' of entry {n}")))?;
+        let s = e
+            .stream(stream)
+            .ok_or_else(|| FsError::NotFound(format!("stream '{stream}' of entry {n}")))?;
         self.read_stream(s)
     }
 
@@ -543,7 +684,9 @@ impl Ntfs {
     pub fn usn_records(&self) -> Result<Vec<usn::UsnRecord>> {
         let n = self.lookup("/$Extend/$UsnJrnl")?;
         let e = build_entry(self, n)?;
-        let j = e.stream("$J").ok_or_else(|| FsError::NotFound("$UsnJrnl:$J".into()))?;
+        let j = e
+            .stream("$J")
+            .ok_or_else(|| FsError::NotFound("$UsnJrnl:$J".into()))?;
         let mut out = Vec::new();
         for (base, chunk) in self.read_allocated_chunks(j, MAX_FILE_READ)? {
             out.extend(usn::parse_usn_records(&chunk, base));
@@ -555,7 +698,11 @@ impl Ntfs {
     /// Parse `$LogFile` (entry 2).
     pub fn logfile(&self) -> Result<logfile::LogFile> {
         let data = self.read_entry_data(2, "")?;
-        logfile::parse_logfile(&data, self.boot.cluster_size, self.boot.mft_record_size as u64)
+        logfile::parse_logfile(
+            &data,
+            self.boot.cluster_size,
+            self.boot.mft_record_size as u64,
+        )
     }
 }
 
@@ -579,15 +726,24 @@ impl MftFile {
                 None
             })
             .ok_or_else(|| FsError::sig(0, "FILE", bytes.get(0..4).unwrap_or(&[])))?;
-        Ok(Self { data: MemSource::source(bytes), record_size: rs })
+        Ok(Self {
+            data: MemSource::source(bytes),
+            record_size: rs,
+        })
     }
 }
 
 impl RecordProvider for MftFile {
-    fn record_size(&self) -> u32 { self.record_size }
-    fn record_count(&self) -> u64 { (self.data.size() / self.record_size as u64).min(MAX_MFT_ENTRIES) }
+    fn record_size(&self) -> u32 {
+        self.record_size
+    }
+    fn record_count(&self) -> u64 {
+        (self.data.size() / self.record_size as u64).min(MAX_MFT_ENTRIES)
+    }
     fn record_bytes(&self, n: u64) -> Result<Vec<u8>> {
-        let off = n.checked_mul(self.record_size as u64).ok_or_else(|| FsError::invalid(n, "record number overflow"))?;
+        let off = n
+            .checked_mul(self.record_size as u64)
+            .ok_or_else(|| FsError::invalid(n, "record number overflow"))?;
         read_vec(self.data.as_ref(), off, self.record_size as u64)
     }
 }

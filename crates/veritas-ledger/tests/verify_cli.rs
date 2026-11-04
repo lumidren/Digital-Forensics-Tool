@@ -15,12 +15,34 @@ fn export_pass_then_tamper_fail() {
     let dir = tempfile::tempdir().unwrap();
     let key = ExaminerKey::generate();
     let registry = KeyRegistry::default().with_key(&key, "alice", "admin");
-    let mut ledger = Ledger::create("L-TEST", "CASE-7", &key, "alice", tool_info("test", "cargo test")).unwrap();
-    let mut acquire = NewEntry::simple("alice", EntryKind::Acquire, "image laptop disk", tool_info("veritas-agent", "image /dev/sda"));
+    let mut ledger = Ledger::create(
+        "L-TEST",
+        "CASE-7",
+        &key,
+        "alice",
+        tool_info("test", "cargo test"),
+    )
+    .unwrap();
+    let mut acquire = NewEntry::simple(
+        "alice",
+        EntryKind::Acquire,
+        "image laptop disk",
+        tool_info("veritas-agent", "image /dev/sda"),
+    );
     acquire.evidence_id = Some("EV-1".into());
     acquire.hashes = Some(veritas_hash::hash_bytes(b"disk bytes"));
     ledger.append(acquire, &key).unwrap();
-    ledger.append(NewEntry::simple("alice", EntryKind::Ingest, "stored", tool_info("veritas-api", "ingest")), &key).unwrap();
+    ledger
+        .append(
+            NewEntry::simple(
+                "alice",
+                EntryKind::Ingest,
+                "stored",
+                tool_info("veritas-api", "ingest"),
+            ),
+            &key,
+        )
+        .unwrap();
 
     let anchors_path = dir.path().join("anchors.jsonl");
     let head = ledger.head().unwrap();
@@ -53,14 +75,29 @@ fn export_pass_then_tamper_fail() {
     ledger.write_all(&ledger_path).unwrap();
     let reg_path = dir.path().join("registry.json");
     std::fs::write(&reg_path, serde_json::to_string(&registry).unwrap()).unwrap();
-    let out = bin().arg("ledger").arg(&ledger_path).arg("--registry").arg(&reg_path).arg("--anchors").arg(&anchors_path).arg("--json").output().unwrap();
+    let out = bin()
+        .arg("ledger")
+        .arg(&ledger_path)
+        .arg("--registry")
+        .arg(&reg_path)
+        .arg("--anchors")
+        .arg(&anchors_path)
+        .arg("--json")
+        .output()
+        .unwrap();
     assert!(out.status.success());
     let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(report["verdict"], "Pass");
 
     // Tamper: flip one character of the evidence hash inside the export.
     let text = std::fs::read_to_string(&export_path).unwrap();
-    let sha = export.entries[1].body.hashes.as_ref().unwrap().sha256.clone();
+    let sha = export.entries[1]
+        .body
+        .hashes
+        .as_ref()
+        .unwrap()
+        .sha256
+        .clone();
     let mut flipped = sha.clone();
     let first = flipped.remove(0);
     flipped.insert(0, if first == 'a' { 'b' } else { 'a' });

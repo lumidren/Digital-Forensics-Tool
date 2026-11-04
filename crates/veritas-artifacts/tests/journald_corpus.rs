@@ -7,11 +7,16 @@ use std::path::PathBuf;
 use veritas_artifacts::journald;
 
 fn corpus(rel: &str) -> Option<Vec<u8>> {
-    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/corpus/plaso").join(rel);
+    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../testdata/corpus/plaso")
+        .join(rel);
     match std::fs::read(&p) {
         Ok(d) => Some(d),
         Err(_) if std::env::var("VERITAS_REQUIRE_CORPUS").is_err() => {
-            eprintln!("skipping: corpus file {} missing (run testdata/fetch.py)", p.display());
+            eprintln!(
+                "skipping: corpus file {} missing (run testdata/fetch.py)",
+                p.display()
+            );
             None
         }
         Err(e) => panic!("corpus file {} missing: {e}", p.display()),
@@ -20,7 +25,9 @@ fn corpus(rel: &str) -> Option<Vec<u8>> {
 
 #[test]
 fn system_journal_xz() {
-    let Some(d) = corpus("systemd/journal/system.journal") else { return };
+    let Some(d) = corpus("systemd/journal/system.journal") else {
+        return;
+    };
     let j = journald::parse(&d).unwrap();
     assert_eq!(j.header.incompatible_flags, 1); // COMPRESSED_XZ
     assert_eq!(j.header.n_entries, 2101);
@@ -31,7 +38,11 @@ fn system_journal_xz() {
     assert_eq!(e.realtime_us, 1485510055913258);
     assert_eq!(e.get("MESSAGE"), Some("Started User Manager for UID 1000."));
     // XZ payloads are reported per field, not fatal.
-    let xz = j.entries.iter().filter(|e| e.unsupported.iter().any(|u| u.contains("xz"))).count();
+    let xz = j
+        .entries
+        .iter()
+        .filter(|e| e.unsupported.iter().any(|u| u.contains("xz")))
+        .count();
     assert_eq!(xz, 165);
     let ev = journald::events(&j, "sha", "system.journal");
     assert_eq!(ev.len(), 2101);
@@ -42,7 +53,9 @@ fn system_journal_xz() {
 
 #[test]
 fn system_journal_lz4() {
-    let Some(d) = corpus("systemd/journal/system.journal.lz4") else { return };
+    let Some(d) = corpus("systemd/journal/system.journal.lz4") else {
+        return;
+    };
     let j = journald::parse(&d).unwrap();
     assert_eq!(j.header.incompatible_flags, 2); // COMPRESSED_LZ4
     assert_eq!(j.entries.len(), 85);
@@ -53,17 +66,25 @@ fn system_journal_lz4() {
 
 #[test]
 fn dirty_journal_tolerated() {
-    let Some(d) = corpus("systemd/journal/system@00053f9c9a4c1e0e-2e18a70e8b327fed.journal~") else { return };
+    let Some(d) = corpus("systemd/journal/system@00053f9c9a4c1e0e-2e18a70e8b327fed.journal~")
+    else {
+        return;
+    };
     let j = journald::parse(&d).unwrap();
     assert_eq!(j.header.n_entries, 2257);
     assert_eq!(j.entries.len(), 2212);
     assert_eq!(j.errors.len(), 45);
-    assert_eq!(j.entries[0].get("MESSAGE"), Some("Runtime journal (/run/log/journal/) is 1.2M, max 9.9M, 8.6M free."));
+    assert_eq!(
+        j.entries[0].get("MESSAGE"),
+        Some("Runtime journal (/run/log/journal/) is 1.2M, max 9.9M, 8.6M free.")
+    );
 }
 
 #[test]
 fn compact_zstd_journal() {
-    let Some(d) = corpus("systemd/journal/user-1000.journal") else { return };
+    let Some(d) = corpus("systemd/journal/user-1000.journal") else {
+        return;
+    };
     let j = journald::parse(&d).unwrap();
     assert!(j.header.compact);
     assert_eq!(j.entries.len(), 1);
@@ -80,9 +101,13 @@ fn compact_zstd_journal() {
 
 #[test]
 fn determinism() {
-    let Some(d) = corpus("systemd/journal/system.journal.lz4") else { return };
-    let a = serde_json::to_string(&journald::events(&journald::parse(&d).unwrap(), "s", "p")).unwrap();
-    let b = serde_json::to_string(&journald::events(&journald::parse(&d).unwrap(), "s", "p")).unwrap();
+    let Some(d) = corpus("systemd/journal/system.journal.lz4") else {
+        return;
+    };
+    let a =
+        serde_json::to_string(&journald::events(&journald::parse(&d).unwrap(), "s", "p")).unwrap();
+    let b =
+        serde_json::to_string(&journald::events(&journald::parse(&d).unwrap(), "s", "p")).unwrap();
     assert_eq!(a, b);
 }
 

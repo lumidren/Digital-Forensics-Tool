@@ -4,9 +4,17 @@ use thiserror::Error;
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum ParseError {
     #[error("truncated input: needed {needed} bytes at offset {offset}, have {available}")]
-    Truncated { offset: usize, needed: usize, available: usize },
+    Truncated {
+        offset: usize,
+        needed: usize,
+        available: usize,
+    },
     #[error("bad signature at offset {offset}: expected {expected}, found {found}")]
-    BadSignature { offset: usize, expected: String, found: String },
+    BadSignature {
+        offset: usize,
+        expected: String,
+        found: String,
+    },
     #[error("invalid value at offset {offset}: {reason}")]
     Invalid { offset: usize, reason: String },
     #[error("unsupported: {0}")]

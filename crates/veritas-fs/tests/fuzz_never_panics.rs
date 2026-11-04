@@ -16,25 +16,46 @@ fn hot(name: &str) -> Vec<(usize, usize)> {
         "dfvfs/fat12.raw" => vec![(0, 32768)],
         "dfvfs/ext4.raw" | "dfvfs/ext2.raw" => vec![(0, 300 * 1024)],
         "plaso/syslog_image.dd" => vec![(0, 102400)],
-        "dfvfs/apfs.raw" => vec![(0, 4096), (1 * 4096, 120 * 4096), (1026 * 4096, 4096), (1028 * 4096, 4096)],
+        "dfvfs/apfs.raw" => vec![
+            (0, 4096),
+            (1 * 4096, 120 * 4096),
+            (1026 * 4096, 4096),
+            (1028 * 4096, 4096),
+        ],
         "dfvfs/mbr.raw" | "dfvfs/gpt.raw" | "plaso/tsk_volume_system.raw" => vec![(0, 65536)],
-        "dfvfs/vss.raw" => vec![(0, 512), (0x1E00, 128), (25051136, 65536), (8208384, 3 * 16384), (8290304, 16384), (37945344, 3 * 16384), (38043648, 2 * 16384)],
+        "dfvfs/vss.raw" => vec![
+            (0, 512),
+            (0x1E00, 128),
+            (25051136, 65536),
+            (8208384, 3 * 16384),
+            (8290304, 16384),
+            (37945344, 3 * 16384),
+            (38043648, 2 * 16384),
+        ],
         _ => vec![],
     }
 }
 
 fn base(name: &'static str) -> Arc<Vec<u8>> {
-    static CACHE: OnceLock<std::sync::Mutex<std::collections::BTreeMap<&'static str, Arc<Vec<u8>>>>> = OnceLock::new();
+    static CACHE: OnceLock<
+        std::sync::Mutex<std::collections::BTreeMap<&'static str, Arc<Vec<u8>>>>,
+    > = OnceLock::new();
     let m = CACHE.get_or_init(Default::default);
     let mut g = m.lock().unwrap();
-    g.entry(name).or_insert_with(|| Arc::new(bytes(name))).clone()
+    g.entry(name)
+        .or_insert_with(|| Arc::new(bytes(name)))
+        .clone()
 }
 
 fn mutate(name: &'static str, flips: &[(usize, u8)], trunc: Option<usize>) -> Vec<u8> {
     let b = base(name);
     let mut d = b.as_ref().clone();
     let regions = hot(name);
-    let total: usize = if regions.is_empty() { d.len() } else { regions.iter().map(|r| r.1).sum() };
+    let total: usize = if regions.is_empty() {
+        d.len()
+    } else {
+        regions.iter().map(|r| r.1).sum()
+    };
     for &(p, x) in flips {
         let mut p = p % total.max(1);
         let pos = if regions.is_empty() {
@@ -63,7 +84,9 @@ fn mutate(name: &'static str, flips: &[(usize, u8)], trunc: Option<usize>) -> Ve
 /// Run every parser entry point that applies; any `Err` is acceptable, a panic fails the test.
 fn exercise(src: Source) {
     let _ = veritas_fs::volume::detect(src.as_ref());
-    let Ok(vols) = image::volumes(src) else { return };
+    let Ok(vols) = image::volumes(src) else {
+        return;
+    };
     for v in vols {
         let Ok(fs) = AnyFs::open(&v) else { continue };
         let _ = fs.entries(true);
@@ -108,7 +131,10 @@ fn exercise(src: Source) {
 
 /// `VERITAS_FUZZ_MULT=20 cargo test --test fuzz_never_panics` scales every case count.
 fn mult() -> u32 {
-    std::env::var("VERITAS_FUZZ_MULT").ok().and_then(|v| v.parse().ok()).unwrap_or(1)
+    std::env::var("VERITAS_FUZZ_MULT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1)
 }
 
 fn flips() -> impl Strategy<Value = Vec<(usize, u8)>> {
@@ -135,7 +161,11 @@ image_fuzz!(syslog_ext_image_never_panics, "plaso/syslog_image.dd", 48);
 image_fuzz!(apfs_image_never_panics, "dfvfs/apfs.raw", 96);
 image_fuzz!(mbr_image_never_panics, "dfvfs/mbr.raw", 48);
 image_fuzz!(gpt_image_never_panics, "dfvfs/gpt.raw", 48);
-image_fuzz!(tsk_volume_image_never_panics, "plaso/tsk_volume_system.raw", 32);
+image_fuzz!(
+    tsk_volume_image_never_panics,
+    "plaso/tsk_volume_system.raw",
+    32
+);
 image_fuzz!(vss_image_never_panics, "dfvfs/vss.raw", 12);
 
 proptest! {

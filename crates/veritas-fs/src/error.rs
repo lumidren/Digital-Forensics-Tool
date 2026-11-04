@@ -4,9 +4,17 @@ use thiserror::Error;
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum FsError {
     #[error("truncated input: needed {needed} bytes at offset {offset}, have {available}")]
-    Truncated { offset: u64, needed: u64, available: u64 },
+    Truncated {
+        offset: u64,
+        needed: u64,
+        available: u64,
+    },
     #[error("bad signature at offset {offset}: expected {expected}, found {found}")]
-    BadSignature { offset: u64, expected: String, found: String },
+    BadSignature {
+        offset: u64,
+        expected: String,
+        found: String,
+    },
     #[error("invalid value at offset {offset}: {reason}")]
     Invalid { offset: u64, reason: String },
     #[error("unsupported: {0}")]
@@ -21,10 +29,17 @@ pub enum FsError {
 
 impl FsError {
     pub fn invalid(offset: u64, reason: impl Into<String>) -> Self {
-        FsError::Invalid { offset, reason: reason.into() }
+        FsError::Invalid {
+            offset,
+            reason: reason.into(),
+        }
     }
     pub fn sig(offset: u64, expected: &str, found: &[u8]) -> Self {
-        FsError::BadSignature { offset, expected: expected.to_string(), found: hex::encode(found) }
+        FsError::BadSignature {
+            offset,
+            expected: expected.to_string(),
+            found: hex::encode(found),
+        }
     }
 }
 

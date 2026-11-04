@@ -1,13 +1,17 @@
 //! Windows Shell Link (.lnk) parser, MS-SHLLINK.
 use crate::error::{ParseError, Result};
-use crate::shellitems::{decode_ansi, guid_string, parse_shell_item_list, shell_item_path, ShellItem};
+use crate::shellitems::{
+    decode_ansi, guid_string, parse_shell_item_list, shell_item_path, ShellItem,
+};
 use crate::util::{need, u16_at, u32_at, u64_at, utf16le};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use veritas_timeline::{desc, filetime_to_ns, Event};
 
-pub const LNK_CLSID: [u8; 16] = [0x01, 0x14, 0x02, 0x00, 0, 0, 0, 0, 0xc0, 0, 0, 0, 0, 0, 0, 0x46];
+pub const LNK_CLSID: [u8; 16] = [
+    0x01, 0x14, 0x02, 0x00, 0, 0, 0, 0, 0xc0, 0, 0, 0, 0, 0, 0, 0x46,
+];
 const MAX_EXTRA_BLOCKS: usize = 256;
 const MAX_PROPS: usize = 4096;
 
@@ -117,13 +121,15 @@ impl LnkFile {
     }
 
     pub fn target_path(&self) -> Option<String> {
-        self.local_path().or_else(|| self.network_path()).or_else(|| {
-            if self.target_id_list.is_empty() {
-                None
-            } else {
-                Some(shell_item_path(&self.target_id_list))
-            }
-        })
+        self.local_path()
+            .or_else(|| self.network_path())
+            .or_else(|| {
+                if self.target_id_list.is_empty() {
+                    None
+                } else {
+                    Some(shell_item_path(&self.target_id_list))
+                }
+            })
     }
 }
 
@@ -163,7 +169,11 @@ pub fn parse(data: &[u8]) -> Result<LnkFile> {
     let hs = u32_at(data, 0)?;
     let clsid = need(data, 4, 16)?;
     if hs != 0x4c || clsid != LNK_CLSID {
-        return Err(ParseError::BadSignature { offset: 0, expected: "4c000000 + shell link CLSID".into(), found: hex::encode(&data[..20.min(data.len())]) });
+        return Err(ParseError::BadSignature {
+            offset: 0,
+            expected: "4c000000 + shell link CLSID".into(),
+            found: hex::encode(&data[..20.min(data.len())]),
+        });
     }
     need(data, 0, 76)?;
     let mut l = LnkFile {
@@ -243,8 +253,18 @@ fn parse_link_info(li: &[u8]) -> Result<LinkInfo> {
     let lbp_off = u32_at(li, 16)? as usize;
     let cnrl_off = u32_at(li, 20)? as usize;
     let cps_off = u32_at(li, 24)? as usize;
-    let mut out = LinkInfo { flags: lflags, ..Default::default() };
-    let (lbp_u, cps_u) = if header_size >= 0x24 { (u32_at(li, 28).ok().map(|v| v as usize), u32_at(li, 32).ok().map(|v| v as usize)) } else { (None, None) };
+    let mut out = LinkInfo {
+        flags: lflags,
+        ..Default::default()
+    };
+    let (lbp_u, cps_u) = if header_size >= 0x24 {
+        (
+            u32_at(li, 28).ok().map(|v| v as usize),
+            u32_at(li, 32).ok().map(|v| v as usize),
+        )
+    } else {
+        (None, None)
+    };
     if lflags & 0x1 != 0 {
         if vol_off > 0 && vol_off < li.len() {
             let v = &li[vol_off..];
@@ -261,7 +281,13 @@ fn parse_link_info(li: &[u8]) -> Result<LinkInfo> {
         }
         out.local_base_path = match lbp_u {
             Some(o) if o > 0 => cstr_utf16(li, o),
-            _ => if lbp_off > 0 { cstr_ansi(li, lbp_off) } else { None },
+            _ => {
+                if lbp_off > 0 {
+                    cstr_ansi(li, lbp_off)
+                } else {
+                    None
+                }
+            }
         };
     }
     if lflags & 0x2 != 0 && cnrl_off > 0 && cnrl_off < li.len() {
@@ -271,7 +297,11 @@ fn parse_link_info(li: &[u8]) -> Result<LinkInfo> {
         let cflags = u32_at(c, 4).unwrap_or(0);
         let net_off = u32_at(c, 8).unwrap_or(0) as usize;
         let dev_off = u32_at(c, 12).unwrap_or(0) as usize;
-        out.network_provider_type = if cflags & 0x2 != 0 { u32_at(c, 16).ok() } else { None };
+        out.network_provider_type = if cflags & 0x2 != 0 {
+            u32_at(c, 16).ok()
+        } else {
+            None
+        };
         if net_off > 0x14 {
             out.network_share_name = u32_at(c, 20).ok().and_then(|o| cstr_utf16(c, o as usize));
             if cflags & 0x1 != 0 {
@@ -286,7 +316,13 @@ fn parse_link_info(li: &[u8]) -> Result<LinkInfo> {
     }
     out.common_path_suffix = match cps_u {
         Some(o) if o > 0 => cstr_utf16(li, o),
-        _ => if cps_off > 0 { cstr_ansi(li, cps_off) } else { None },
+        _ => {
+            if cps_off > 0 {
+                cstr_ansi(li, cps_off)
+            } else {
+                None
+            }
+        }
     };
     Ok(out)
 }
@@ -311,7 +347,13 @@ fn uuid_mac(g: &[u8]) -> Option<String> {
     if g.len() < 16 || g[7] >> 4 != 1 {
         return None;
     }
-    Some(g[10..16].iter().map(|b| format!("{b:02x}")).collect::<Vec<_>>().join(":"))
+    Some(
+        g[10..16]
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<Vec<_>>()
+            .join(":"),
+    )
 }
 
 fn parse_extra(data: &[u8], mut off: usize, l: &mut LnkFile) -> usize {
@@ -339,7 +381,10 @@ fn parse_extra(data: &[u8], mut off: usize, l: &mut LnkFile) -> usize {
         match sig {
             0xa0000001 | 0xa0000007 | 0xa0000006 => {
                 let ansi = cstr_ansi(b, 8).filter(|s| !s.is_empty());
-                let uni = need(b, 268, 520).ok().map(|u| utf16le(u, true)).filter(|s| !s.is_empty());
+                let uni = need(b, 268, 520)
+                    .ok()
+                    .map(|u| utf16le(u, true))
+                    .filter(|s| !s.is_empty());
                 let v = uni.or(ansi);
                 match sig {
                     0xa0000001 => l.environment_variables_location = v,
@@ -354,7 +399,12 @@ fn parse_extra(data: &[u8], mut off: usize, l: &mut LnkFile) -> usize {
                         m.insert(k.to_string(), json!(v));
                     }
                 }
-                for (k, o) in [("screen_buffer_size_x", 12usize), ("screen_buffer_size_y", 14), ("window_size_x", 16), ("window_size_y", 18)] {
+                for (k, o) in [
+                    ("screen_buffer_size_x", 12usize),
+                    ("screen_buffer_size_y", 14),
+                    ("window_size_x", 16),
+                    ("window_size_y", 18),
+                ] {
                     if let Ok(v) = u16_at(b, o) {
                         m.insert(k.to_string(), json!(v));
                     }
@@ -368,7 +418,9 @@ fn parse_extra(data: &[u8], mut off: usize, l: &mut LnkFile) -> usize {
             0xa0000003 => {
                 let g = |o| need(b, o, 16).ok();
                 l.tracker = Some(Tracker {
-                    machine_identifier: need(b, 16, 16).map(|m| decode_ansi(&m[..m.iter().position(|&c| c == 0).unwrap_or(16)])).unwrap_or_default(),
+                    machine_identifier: need(b, 16, 16)
+                        .map(|m| decode_ansi(&m[..m.iter().position(|&c| c == 0).unwrap_or(16)]))
+                        .unwrap_or_default(),
                     droid_volume_identifier: g(32).and_then(guid_string).unwrap_or_default(),
                     droid_file_identifier: g(48).and_then(guid_string).unwrap_or_default(),
                     birth_droid_volume_identifier: g(64).and_then(guid_string).unwrap_or_default(),
@@ -380,7 +432,9 @@ fn parse_extra(data: &[u8], mut off: usize, l: &mut LnkFile) -> usize {
                 });
             }
             0xa0000005 => l.special_folder_id = u32_at(b, 8).ok(),
-            0xa0000008 => l.shim_layer_name = need(b, 8, b.len() - 8).ok().map(|s| utf16le(s, true)),
+            0xa0000008 => {
+                l.shim_layer_name = need(b, 8, b.len() - 8).ok().map(|s| utf16le(s, true))
+            }
             0xa000000b => l.known_folder_id = need(b, 8, 16).ok().and_then(guid_string),
             0xa0000009 => {
                 if let Ok(ps) = need(b, 8, b.len() - 8) {
@@ -426,14 +480,21 @@ pub fn parse_property_store(d: &[u8]) -> Vec<PropertyValue> {
             let v = &st[p..p + vsize];
             let (id, typed_off) = if named {
                 let nsize = u32_at(v, 4).unwrap_or(0) as usize;
-                let name = need(v, 9, nsize).map(|n| utf16le(n, true)).unwrap_or_default();
+                let name = need(v, 9, nsize)
+                    .map(|n| utf16le(n, true))
+                    .unwrap_or_default();
                 (json!(name), 9 + nsize)
             } else {
                 (json!(u32_at(v, 4).unwrap_or(0)), 9)
             };
             let vtype = u16_at(v, typed_off).unwrap_or(0);
             let value = typed_value(v, typed_off + 4, vtype);
-            out.push(PropertyValue { format_id: fmt.clone(), id, vtype, value });
+            out.push(PropertyValue {
+                format_id: fmt.clone(),
+                id,
+                vtype,
+                value,
+            });
             p += vsize;
         }
         off += ssize;
@@ -450,7 +511,9 @@ fn typed_value(v: &[u8], o: usize, vtype: u16) -> Value {
         }
         0x1e => {
             let n = u32_at(v, o).unwrap_or(0) as usize;
-            json!(need(v, o + 4, n).map(|b| decode_ansi(&b[..b.iter().position(|&c| c == 0).unwrap_or(b.len())])).unwrap_or_default())
+            json!(need(v, o + 4, n)
+                .map(|b| decode_ansi(&b[..b.iter().position(|&c| c == 0).unwrap_or(b.len())]))
+                .unwrap_or_default())
         }
         0x13 | 0x17 => json!(u32_at(v, o).unwrap_or(0)),
         0x03 | 0x16 => json!(u32_at(v, o).unwrap_or(0) as i32),
@@ -481,9 +544,15 @@ pub fn link_attrs(l: &LnkFile) -> BTreeMap<String, Value> {
     a.insert("description".into(), opt(&l.description));
     a.insert("relative_path".into(), opt(&l.relative_path));
     a.insert("working_directory".into(), opt(&l.working_directory));
-    a.insert("command_line_arguments".into(), opt(&l.command_line_arguments));
+    a.insert(
+        "command_line_arguments".into(),
+        opt(&l.command_line_arguments),
+    );
     a.insert("icon_location".into(), opt(&l.icon_location));
-    a.insert("env_var_location".into(), opt(&l.environment_variables_location));
+    a.insert(
+        "env_var_location".into(),
+        opt(&l.environment_variables_location),
+    );
     a.insert("local_path".into(), opt(&l.local_path()));
     a.insert("network_path".into(), opt(&l.network_path()));
     a.insert("file_size".into(), json!(l.file_size));
@@ -495,14 +564,29 @@ pub fn link_attrs(l: &LnkFile) -> BTreeMap<String, Value> {
         a.insert("volume_label".into(), opt(&li.volume_label));
     }
     if !l.target_id_list.is_empty() {
-        a.insert("link_target".into(), json!(shell_item_path(&l.target_id_list)));
+        a.insert(
+            "link_target".into(),
+            json!(shell_item_path(&l.target_id_list)),
+        );
     }
     if let Some(t) = &l.tracker {
         a.insert("machine_identifier".into(), json!(t.machine_identifier));
-        a.insert("droid_volume_identifier".into(), json!(t.droid_volume_identifier));
-        a.insert("droid_file_identifier".into(), json!(t.droid_file_identifier));
-        a.insert("birth_droid_volume_identifier".into(), json!(t.birth_droid_volume_identifier));
-        a.insert("birth_droid_file_identifier".into(), json!(t.birth_droid_file_identifier));
+        a.insert(
+            "droid_volume_identifier".into(),
+            json!(t.droid_volume_identifier),
+        );
+        a.insert(
+            "droid_file_identifier".into(),
+            json!(t.droid_file_identifier),
+        );
+        a.insert(
+            "birth_droid_volume_identifier".into(),
+            json!(t.birth_droid_volume_identifier),
+        );
+        a.insert(
+            "birth_droid_file_identifier".into(),
+            json!(t.birth_droid_file_identifier),
+        );
         a.insert("droid_mac_address".into(), opt(&t.droid_mac_address));
     }
     if let Some(k) = &l.known_folder_id {
@@ -539,7 +623,10 @@ fn link_message(l: &LnkFile) -> String {
         parts.push(format!("Icon location: {p}"));
     }
     if !l.target_id_list.is_empty() {
-        parts.push(format!("Link target: {}", shell_item_path(&l.target_id_list)));
+        parts.push(format!(
+            "Link target: {}",
+            shell_item_path(&l.target_id_list)
+        ));
     }
     parts.join(" ")
 }
@@ -549,34 +636,76 @@ pub fn events(l: &LnkFile, evidence_sha256: &str, evidence_path: &str, offset: i
     let attrs = link_attrs(l);
     let msg = link_message(l);
     let mut out = Vec::new();
-    let times = [(l.creation_ns, desc::CREATION), (l.modification_ns, desc::MODIFICATION), (l.access_ns, desc::ACCESS)];
+    let times = [
+        (l.creation_ns, desc::CREATION),
+        (l.modification_ns, desc::MODIFICATION),
+        (l.access_ns, desc::ACCESS),
+    ];
     let mut any = false;
     for (t, d) in times {
         if t.is_some() {
             any = true;
-            out.push(mk(Event::new("windows:lnk:link", d, msg.clone()).with_time(t), &attrs, evidence_sha256, evidence_path, offset));
+            out.push(mk(
+                Event::new("windows:lnk:link", d, msg.clone()).with_time(t),
+                &attrs,
+                evidence_sha256,
+                evidence_path,
+                offset,
+            ));
         }
     }
     if !any {
-        out.push(mk(Event::new("windows:lnk:link", desc::NOT_A_TIME, msg.clone()), &attrs, evidence_sha256, evidence_path, offset));
+        out.push(mk(
+            Event::new("windows:lnk:link", desc::NOT_A_TIME, msg.clone()),
+            &attrs,
+            evidence_sha256,
+            evidence_path,
+            offset,
+        ));
     }
     if let Some(t) = &l.tracker {
         for (ts, file_id, vol_id, mac) in [
-            (t.droid_file_time_ns, &t.droid_file_identifier, &t.droid_volume_identifier, &t.droid_mac_address),
-            (t.birth_droid_file_time_ns, &t.birth_droid_file_identifier, &t.birth_droid_volume_identifier, &t.birth_droid_mac_address),
+            (
+                t.droid_file_time_ns,
+                &t.droid_file_identifier,
+                &t.droid_volume_identifier,
+                &t.droid_mac_address,
+            ),
+            (
+                t.birth_droid_file_time_ns,
+                &t.birth_droid_file_identifier,
+                &t.birth_droid_volume_identifier,
+                &t.birth_droid_mac_address,
+            ),
         ] {
             if ts.is_none() {
                 continue;
             }
-            let m = format!("{} MAC address: {} Origin: {}", file_id, mac.clone().unwrap_or_default(), l.target_path().unwrap_or_default());
-            let e = Event::new("windows:distributed_link_tracking:creation", desc::CREATION, m)
-                .with_time(ts)
-                .attr("uuid", file_id.clone())
-                .attr("mac_address", mac.clone().map(Value::from).unwrap_or(Value::Null))
-                .attr("droid_volume_identifier", vol_id.clone())
-                .attr("machine_identifier", t.machine_identifier.clone());
+            let m = format!(
+                "{} MAC address: {} Origin: {}",
+                file_id,
+                mac.clone().unwrap_or_default(),
+                l.target_path().unwrap_or_default()
+            );
+            let e = Event::new(
+                "windows:distributed_link_tracking:creation",
+                desc::CREATION,
+                m,
+            )
+            .with_time(ts)
+            .attr("uuid", file_id.clone())
+            .attr(
+                "mac_address",
+                mac.clone().map(Value::from).unwrap_or(Value::Null),
+            )
+            .attr("droid_volume_identifier", vol_id.clone())
+            .attr("machine_identifier", t.machine_identifier.clone());
             let e = finish(e, evidence_sha256, evidence_path, offset);
-            if !out.iter().any(|x: &Event| x.data_type == e.data_type && x.timestamp == e.timestamp && x.attrs.get("uuid") == e.attrs.get("uuid")) {
+            if !out.iter().any(|x: &Event| {
+                x.data_type == e.data_type
+                    && x.timestamp == e.timestamp
+                    && x.attrs.get("uuid") == e.attrs.get("uuid")
+            }) {
                 out.push(e);
             }
         }

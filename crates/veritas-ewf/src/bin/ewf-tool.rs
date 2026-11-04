@@ -9,7 +9,11 @@ use std::process::ExitCode;
 use veritas_ewf::{Compression, EwfOptions, EwfReader, EwfWriter};
 
 #[derive(Parser)]
-#[command(name = "ewf-tool", version, about = "EWF-E01 writer, reader and verifier")]
+#[command(
+    name = "ewf-tool",
+    version,
+    about = "EWF-E01 writer, reader and verifier"
+)]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
@@ -46,12 +50,23 @@ enum Cmd {
 
 fn run(cli: Cli) -> Result<bool, Box<dyn std::error::Error>> {
     match cli.cmd {
-        Cmd::Write { input, out_base, segment_size, compression, case, evidence, examiner, description, notes } => {
+        Cmd::Write {
+            input,
+            out_base,
+            segment_size,
+            compression,
+            case,
+            evidence,
+            examiner,
+            description,
+            notes,
+        } => {
             let mut opts = EwfOptions::default();
             if let Some(s) = segment_size {
                 opts.segment_size = s;
             }
-            opts.compression = Compression::parse(&compression).ok_or("compression must be none, fast or best")?;
+            opts.compression =
+                Compression::parse(&compression).ok_or("compression must be none, fast or best")?;
             opts.header.case_number = case;
             opts.header.evidence_number = evidence;
             opts.header.examiner_name = examiner;
@@ -84,7 +99,10 @@ fn run(cli: Cli) -> Result<bool, Box<dyn std::error::Error>> {
         }
         Cmd::Dump { e01, out_raw } => {
             let mut r = EwfReader::open(&e01)?;
-            let out = OpenOptions::new().write(true).create_new(true).open(&out_raw)?;
+            let out = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&out_raw)?;
             let mut out = BufWriter::new(out);
             let mut buf = vec![0u8; 1 << 20];
             let mut total = 0u64;

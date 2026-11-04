@@ -15,7 +15,10 @@ fn vss_stores_metadata() {
     let s0 = &v.stores[0];
     assert_eq!(s0.identifier, "de81cc22-aa8b-11eb-9339-8cdcd4557abc");
     assert_eq!(s0.copy_identifier, "2c6c6cc8-2b97-41da-a030-4add838ae8f6");
-    assert_eq!(s0.copy_set_identifier, "6c5c9cd2-ea46-4c70-a4a8-568fdabd27c1");
+    assert_eq!(
+        s0.copy_set_identifier,
+        "6c5c9cd2-ea46-4c70-a4a8-568fdabd27c1"
+    );
     assert_eq!(s0.creation_time_raw, 132643644032230304);
     let s1 = &v.stores[1];
     assert_eq!(s1.identifier, "de81cc2b-aa8b-11eb-9339-8cdcd4557abc");
@@ -28,11 +31,23 @@ fn vss_stores_metadata() {
 fn vss_store_data_matches_pyvshadow() {
     let v = Vss::open(src("dfvfs/vss.raw")).unwrap();
     let first = |i| veritas_hash::sha256_hex(&v.read_store(i, 0, 1 << 20).unwrap());
-    assert_eq!(first(0), "711785ebb1bfe4aa5a1f202e9765cf9d6ff3325af31b924dbd934cc68f0322d0");
-    assert_eq!(first(1), "b25ea25ad27c11c061f947f86586245f98f5f7432953e9e24da8d992d4595699");
+    assert_eq!(
+        first(0),
+        "711785ebb1bfe4aa5a1f202e9765cf9d6ff3325af31b924dbd934cc68f0322d0"
+    );
+    assert_eq!(
+        first(1),
+        "b25ea25ad27c11c061f947f86586245f98f5f7432953e9e24da8d992d4595699"
+    );
     let full = |i| veritas_hash::sha256_hex(&v.read_store(i, 0, v.volume_size).unwrap());
-    assert_eq!(full(0), "d830fe9e2f75e66edfe0f9b0730c0ec8148233ed9c2ab5601195c293d593d9a9");
-    assert_eq!(full(1), "d47ca0497f4aa3098a7d0b5407a6406a4f8d747e6207fdbc197e2224fb4838ae");
+    assert_eq!(
+        full(0),
+        "d830fe9e2f75e66edfe0f9b0730c0ec8148233ed9c2ab5601195c293d593d9a9"
+    );
+    assert_eq!(
+        full(1),
+        "d47ca0497f4aa3098a7d0b5407a6406a4f8d747e6207fdbc197e2224fb4838ae"
+    );
 }
 
 #[test]

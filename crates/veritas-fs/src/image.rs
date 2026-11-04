@@ -32,7 +32,9 @@ impl FsKind {
 
 /// Detect the file system at the start of `src`.
 pub fn detect_fs(src: &dyn ReadAt) -> FsKind {
-    let Ok(b) = read_vec_padded(src, 0, 4096) else { return FsKind::Unknown };
+    let Ok(b) = read_vec_padded(src, 0, 4096) else {
+        return FsKind::Unknown;
+    };
     if &b[3..11] == b"NTFS    " {
         return FsKind::Ntfs;
     }
@@ -65,11 +67,25 @@ pub fn volumes(src: Source) -> Result<Vec<ImageVolume>> {
     if let Some(vs) = volume::detect(src.as_ref())? {
         for p in &vs.partitions {
             let s = SubSource::source(src.clone(), p.offset, p.length)?;
-            out.push(ImageVolume { index: p.index, offset: p.offset, length: p.length, description: p.description.clone(), fs: detect_fs(s.as_ref()), src: s });
+            out.push(ImageVolume {
+                index: p.index,
+                offset: p.offset,
+                length: p.length,
+                description: p.description.clone(),
+                fs: detect_fs(s.as_ref()),
+                src: s,
+            });
         }
     }
     if out.is_empty() {
-        out.push(ImageVolume { index: 0, offset: 0, length: src.size(), description: "whole image".into(), fs: detect_fs(src.as_ref()), src });
+        out.push(ImageVolume {
+            index: 0,
+            offset: 0,
+            length: src.size(),
+            description: "whole image".into(),
+            fs: detect_fs(src.as_ref()),
+            src,
+        });
     }
     Ok(out)
 }
@@ -77,8 +93,16 @@ pub fn volumes(src: Source) -> Result<Vec<ImageVolume>> {
 pub fn select_volume(src: Source, partition: Option<usize>) -> Result<ImageVolume> {
     let vols = volumes(src)?;
     match partition {
-        Some(n) => vols.into_iter().find(|v| v.index == n).ok_or_else(|| FsError::NotFound(format!("partition {n}"))),
-        None => vols.iter().find(|v| v.fs != FsKind::Unknown).cloned().or_else(|| vols.into_iter().next()).ok_or_else(|| FsError::NotFound("volume".into())),
+        Some(n) => vols
+            .into_iter()
+            .find(|v| v.index == n)
+            .ok_or_else(|| FsError::NotFound(format!("partition {n}"))),
+        None => vols
+            .iter()
+            .find(|v| v.fs != FsKind::Unknown)
+            .cloned()
+            .or_else(|| vols.into_iter().next())
+            .ok_or_else(|| FsError::NotFound("volume".into())),
     }
 }
 
@@ -112,7 +136,10 @@ impl AnyFs {
             FsKind::Fat => Ok(AnyFs::Fat(FatFs::open(v.src.clone())?)),
             FsKind::Ext => Ok(AnyFs::Ext(Ext4::open(v.src.clone())?)),
             FsKind::Apfs => Ok(AnyFs::Apfs(Apfs::open(v.src.clone())?)),
-            FsKind::Unknown => Err(FsError::Unsupported(format!("no supported file system in volume {}", v.index))),
+            FsKind::Unknown => Err(FsError::Unsupported(format!(
+                "no supported file system in volume {}",
+                v.index
+            ))),
         }
     }
 
@@ -120,7 +147,15 @@ impl AnyFs {
         match self {
             AnyFs::Ntfs(_) => "NTFS".into(),
             AnyFs::Fat(f) => f.kind.name().into(),
-            AnyFs::Ext(e) => if e.sb.feature_incompat & 0x40 != 0 { "EXT4".into() } else if e.sb.feature_compat & 0x4 != 0 { "EXT3".into() } else { "EXT2".into() },
+            AnyFs::Ext(e) => {
+                if e.sb.feature_incompat & 0x40 != 0 {
+                    "EXT4".into()
+                } else if e.sb.feature_compat & 0x4 != 0 {
+                    "EXT3".into()
+                } else {
+                    "EXT2".into()
+                }
+            }
             AnyFs::Apfs(_) => "APFS".into(),
         }
     }
@@ -140,7 +175,12 @@ impl AnyFs {
             AnyFs::Ntfs(n) => n
                 .entries()?
                 .into_iter()
-                .filter(|e| e.is_base() && e.path.is_some() && e.entry != crate::ntfs::ROOT_ENTRY && (include_deleted || e.in_use))
+                .filter(|e| {
+                    e.is_base()
+                        && e.path.is_some()
+                        && e.entry != crate::ntfs::ROOT_ENTRY
+                        && (include_deleted || e.in_use)
+                })
                 .map(|e| {
                     let si = e.si.clone().unwrap_or_default();
                     GenericEntry {
@@ -160,19 +200,56 @@ impl AnyFs {
             AnyFs::Fat(f) => f
                 .walk(include_deleted)?
                 .into_iter()
-                .map(|e| GenericEntry { path: e.path, name: e.name, is_dir: e.is_dir, size: e.size, id: e.dir_entry_offset, allocated: !e.deleted, crtime: e.crtime, mtime: e.mtime, atime: e.atime, ctime: None })
+                .map(|e| GenericEntry {
+                    path: e.path,
+                    name: e.name,
+                    is_dir: e.is_dir,
+                    size: e.size,
+                    id: e.dir_entry_offset,
+                    allocated: !e.deleted,
+                    crtime: e.crtime,
+                    mtime: e.mtime,
+                    atime: e.atime,
+                    ctime: None,
+                })
                 .collect(),
             AnyFs::Ext(x) => x
                 .walk(include_deleted)?
                 .into_iter()
-                .map(|e| GenericEntry { path: e.path, name: e.name, is_dir: e.kind == "dir", size: e.size, id: e.inode, allocated: e.allocated && !e.deleted_name, crtime: e.crtime, mtime: e.mtime, atime: e.atime, ctime: e.ctime })
+                .map(|e| GenericEntry {
+                    path: e.path,
+                    name: e.name,
+                    is_dir: e.kind == "dir",
+                    size: e.size,
+                    id: e.inode,
+                    allocated: e.allocated && !e.deleted_name,
+                    crtime: e.crtime,
+                    mtime: e.mtime,
+                    atime: e.atime,
+                    ctime: e.ctime,
+                })
                 .collect(),
             AnyFs::Apfs(a) => {
                 let mut all = Vec::new();
                 for vi in 0..a.volumes.len() {
-                    let prefix = if a.volumes.len() > 1 { format!("/{}", a.volumes[vi].name) } else { String::new() };
+                    let prefix = if a.volumes.len() > 1 {
+                        format!("/{}", a.volumes[vi].name)
+                    } else {
+                        String::new()
+                    };
                     for e in a.walk(vi)? {
-                        all.push(GenericEntry { path: format!("{prefix}{}", e.path), name: e.name, is_dir: e.kind == "dir", size: e.size, id: e.id, allocated: true, crtime: e.crtime, mtime: e.mtime, atime: e.atime, ctime: e.ctime });
+                        all.push(GenericEntry {
+                            path: format!("{prefix}{}", e.path),
+                            name: e.name,
+                            is_dir: e.kind == "dir",
+                            size: e.size,
+                            id: e.id,
+                            allocated: true,
+                            crtime: e.crtime,
+                            mtime: e.mtime,
+                            atime: e.atime,
+                            ctime: e.ctime,
+                        });
                     }
                 }
                 all
@@ -192,7 +269,11 @@ impl AnyFs {
                 if a.volumes.len() > 1 {
                     let p = path.trim_start_matches('/');
                     let (vname, rest) = p.split_once('/').unwrap_or((p, ""));
-                    let vi = a.volumes.iter().position(|v| v.name == vname).ok_or_else(|| FsError::NotFound(path.into()))?;
+                    let vi = a
+                        .volumes
+                        .iter()
+                        .position(|v| v.name == vname)
+                        .ok_or_else(|| FsError::NotFound(path.into()))?;
                     a.read_file(vi, rest)
                 } else {
                     a.read_file(0, path)

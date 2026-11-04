@@ -38,7 +38,11 @@ pub enum HiveKind {
 impl HiveKind {
     /// Guess the kind from a file name (`SYSTEM`, `NTUSER.DAT`, `UsrClass.dat`, `Amcache.hve`).
     pub fn from_file_name(name: &str) -> Option<HiveKind> {
-        let base = name.rsplit(['/', '\\']).next().unwrap_or(name).to_ascii_lowercase();
+        let base = name
+            .rsplit(['/', '\\'])
+            .next()
+            .unwrap_or(name)
+            .to_ascii_lowercase();
         let k = match base.as_str() {
             "system" => HiveKind::System,
             "software" => HiveKind::Software,
@@ -60,15 +64,22 @@ impl HiveKind {
             HiveKind::System
         } else if has("Microsoft\\Windows NT\\CurrentVersion") {
             HiveKind::Software
-        } else if has("Root\\InventoryApplicationFile") || has("Root\\File") || has("Root\\Programs") {
+        } else if has("Root\\InventoryApplicationFile")
+            || has("Root\\File")
+            || has("Root\\Programs")
+        {
             HiveKind::Amcache
         } else if has("SAM\\Domains") {
             HiveKind::Sam
         } else if has("Policy\\Secrets") || has("Policy\\PolAdtEv") {
             HiveKind::Security
-        } else if has("Local Settings\\Software\\Microsoft\\Windows\\Shell") || (has("CLSID") && !has("Software")) {
+        } else if has("Local Settings\\Software\\Microsoft\\Windows\\Shell")
+            || (has("CLSID") && !has("Software"))
+        {
             HiveKind::UsrClass
-        } else if has("Software\\Microsoft") && (has("Control Panel") || has("Environment") || has("Console")) {
+        } else if has("Software\\Microsoft")
+            && (has("Control Panel") || has("Environment") || has("Console"))
+        {
             HiveKind::NtUser
         } else {
             HiveKind::Other
@@ -117,10 +128,25 @@ impl Ctx<'_> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn event(&self, parser: &str, data_type: &str, ts_desc: &str, ts: Option<i64>, message: String, rel_key_path: &str, offset: u32) -> Event {
+    pub fn event(
+        &self,
+        parser: &str,
+        data_type: &str,
+        ts_desc: &str,
+        ts: Option<i64>,
+        message: String,
+        rel_key_path: &str,
+        offset: u32,
+    ) -> Event {
         let mut e = Event::new(data_type, ts_desc, message)
             .with_time(ts)
-            .provenance(&self.prov.evidence_sha256, &self.prov.evidence_path, offset as i64, &format!("winreg/{parser}"), crate::PARSER_VERSION)
+            .provenance(
+                &self.prov.evidence_sha256,
+                &self.prov.evidence_path,
+                offset as i64,
+                &format!("winreg/{parser}"),
+                crate::PARSER_VERSION,
+            )
             .attr("key_path", self.full_path(rel_key_path));
         e.source_short = "REG".into();
         e.source_long = "Registry Key".into();
@@ -132,12 +158,19 @@ impl Ctx<'_> {
 
 /// `MRUListEx`: little-endian u32 indexes terminated by 0xFFFFFFFF.
 pub fn parse_mrulistex(raw: &[u8]) -> Vec<u32> {
-    raw.chunks_exact(4).map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]])).take_while(|&v| v != 0xFFFF_FFFF).take(65536).collect()
+    raw.chunks_exact(4)
+        .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+        .take_while(|&v| v != 0xFFFF_FFFF)
+        .take(65536)
+        .collect()
 }
 
 /// `MRUList`: UTF-16 string of value-name letters.
 pub fn parse_mrulist(s: &str) -> Vec<String> {
-    s.chars().filter(|c| !c.is_control()).map(|c| c.to_string()).collect()
+    s.chars()
+        .filter(|c| !c.is_control())
+        .map(|c| c.to_string())
+        .collect()
 }
 
 /// Split UTF-16LE bytes at the first NUL code unit: (string, bytes after the terminator).
@@ -160,7 +193,9 @@ pub fn current_control_set(hive: &Hive) -> Option<String> {
             return Some(name);
         }
     }
-    (1..=9).map(|i| format!("ControlSet{i:03}")).find(|n| hive.key(n).is_some())
+    (1..=9)
+        .map(|i| format!("ControlSet{i:03}"))
+        .find(|n| hive.key(n).is_some())
 }
 
 /// Join a path with a child name.
@@ -190,7 +225,11 @@ pub fn join_shell_path<S: AsRef<str>>(parts: &[S]) -> String {
 
 /// Plaso-style one-line rendering of a value: `name: [TYPE] data`.
 pub fn render_value(v: &Value) -> String {
-    let name = if v.name.is_empty() { "(default)" } else { v.name.as_str() };
+    let name = if v.name.is_empty() {
+        "(default)"
+    } else {
+        v.name.as_str()
+    };
     let mut s = v.display_string();
     if s.chars().count() > 512 {
         s = s.chars().take(512).collect::<String>() + "...";
@@ -217,10 +256,23 @@ pub fn key_value_event(ctx: &Ctx<'_>, rel: &str, k: &Key<'_>, deleted: bool) -> 
         format!("[{}] (no values)", ctx.full_path(rel))
     } else {
         let joined: Vec<&str> = kept.iter().filter_map(|j| j.as_str()).take(8).collect();
-        format!("[{}] {}{}", ctx.full_path(rel), joined.join(" "), if kept.len() > 8 { " ..." } else { "" })
+        format!(
+            "[{}] {}{}",
+            ctx.full_path(rel),
+            joined.join(" "),
+            if kept.len() > 8 { " ..." } else { "" }
+        )
     };
     let mut e = ctx
-        .event("winreg_default", "windows:registry:key_value", desc::WRITTEN, k.last_written_ns, msg, rel, k.offset)
+        .event(
+            "winreg_default",
+            "windows:registry:key_value",
+            desc::WRITTEN,
+            k.last_written_ns,
+            msg,
+            rel,
+            k.offset,
+        )
         .attr("values", Json::Array(kept))
         .attr("number_of_values", k.value_count)
         .attr("number_of_subkeys", k.subkey_count);
@@ -249,7 +301,15 @@ pub fn generic_events(hive: &Hive, ctx: &Ctx<'_>) -> Vec<Event> {
         vals.sort();
         vals.truncate(64);
         let e = ctx
-            .event("winreg_default", "windows:registry:key_value", desc::WRITTEN, d.last_written_ns, format!("[{}] (deleted key)", ctx.full_path(&rel)), &rel, d.offset)
+            .event(
+                "winreg_default",
+                "windows:registry:key_value",
+                desc::WRITTEN,
+                d.last_written_ns,
+                format!("[{}] (deleted key)", ctx.full_path(&rel)),
+                &rel,
+                d.offset,
+            )
             .attr("values", json!(vals))
             .attr("deleted", true)
             .attr("cell_allocated", d.allocated);
@@ -260,7 +320,10 @@ pub fn generic_events(hive: &Hive, ctx: &Ctx<'_>) -> Vec<Event> {
 
 /// All events for a hive: specific plugins for its kind plus generic key events.
 pub fn events_from_hive(hive: &Hive, hive_kind: HiveKind, provenance: &Provenance) -> Vec<Event> {
-    let ctx = Ctx { prov: provenance, kind: hive_kind };
+    let ctx = Ctx {
+        prov: provenance,
+        kind: hive_kind,
+    };
     let mut out = Vec::new();
     match hive_kind {
         HiveKind::System => {
@@ -300,13 +363,25 @@ mod tests {
 
     #[test]
     fn registry_mrulistex_and_split() {
-        assert_eq!(parse_mrulistex(&hex::decode("0100000000000000ffffffff02000000").unwrap()), vec![1, 0]);
+        assert_eq!(
+            parse_mrulistex(&hex::decode("0100000000000000ffffffff02000000").unwrap()),
+            vec![1, 0]
+        );
         let raw = hex::decode("680069000000aabb").unwrap();
         let (s, rest) = split_utf16z(&raw);
         assert_eq!(s, "hi");
         assert_eq!(rest, &[0xaa, 0xbb]);
-        assert_eq!(HiveKind::from_file_name("C:\\x\\NTUSER.DAT"), Some(HiveKind::NtUser));
-        assert_eq!(HiveKind::from_file_name("UsrClass.dat"), Some(HiveKind::UsrClass));
-        assert_eq!(join_shell_path(&["My Computer", "C:\\", "Users"]), "My Computer\\C:\\Users");
+        assert_eq!(
+            HiveKind::from_file_name("C:\\x\\NTUSER.DAT"),
+            Some(HiveKind::NtUser)
+        );
+        assert_eq!(
+            HiveKind::from_file_name("UsrClass.dat"),
+            Some(HiveKind::UsrClass)
+        );
+        assert_eq!(
+            join_shell_path(&["My Computer", "C:\\", "Users"]),
+            "My Computer\\C:\\Users"
+        );
     }
 }

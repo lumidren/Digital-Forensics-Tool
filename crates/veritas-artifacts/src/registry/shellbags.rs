@@ -49,10 +49,29 @@ pub struct ShellBagEntry {
     pub decode_error: Option<String>,
 }
 
-fn decode(raw: &[u8]) -> (String, Vec<String>, Option<i64>, Option<i64>, Option<i64>, Option<u64>, Option<String>) {
+fn decode(
+    raw: &[u8],
+) -> (
+    String,
+    Vec<String>,
+    Option<i64>,
+    Option<i64>,
+    Option<i64>,
+    Option<u64>,
+    Option<String>,
+) {
     match crate::shellitems::parse_shell_item_list(raw) {
         Ok(items) => {
-            let names: Vec<String> = items.iter().map(|i| i.long_name.clone().filter(|s| !s.is_empty()).unwrap_or_else(|| i.name.clone())).filter(|n| !n.is_empty()).collect();
+            let names: Vec<String> = items
+                .iter()
+                .map(|i| {
+                    i.long_name
+                        .clone()
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or_else(|| i.name.clone())
+                })
+                .filter(|n| !n.is_empty())
+                .collect();
             let types: Vec<String> = items.iter().map(|i| i.item_type.clone()).collect();
             let last = items.last();
             (
@@ -65,7 +84,15 @@ fn decode(raw: &[u8]) -> (String, Vec<String>, Option<i64>, Option<i64>, Option<
                 None,
             )
         }
-        Err(e) => (String::new(), vec![], None, None, None, None, Some(e.to_string())),
+        Err(e) => (
+            String::new(),
+            vec![],
+            None,
+            None,
+            None,
+            None,
+            Some(e.to_string()),
+        ),
     }
 }
 
@@ -74,8 +101,15 @@ fn walk(key: &Key<'_>, rel: &str, prefix: &str, depth: usize, out: &mut Vec<Shel
         return;
     }
     let values = key.values();
-    let mru: Vec<u32> = values.iter().find(|v| v.name.eq_ignore_ascii_case("MRUListEx")).map(|v| parse_mrulistex(&v.raw)).unwrap_or_default();
-    let mut numbered: Vec<(u32, &crate::regf::Value)> = values.iter().filter_map(|v| v.name.parse::<u32>().ok().map(|n| (n, v))).collect();
+    let mru: Vec<u32> = values
+        .iter()
+        .find(|v| v.name.eq_ignore_ascii_case("MRUListEx"))
+        .map(|v| parse_mrulistex(&v.raw))
+        .unwrap_or_default();
+    let mut numbered: Vec<(u32, &crate::regf::Value)> = values
+        .iter()
+        .filter_map(|v| v.name.parse::<u32>().ok().map(|n| (n, v)))
+        .collect();
     numbered.sort_by_key(|(n, _)| *n);
     // Order: MRUListEx order first, then any numbered value missing from the list.
     let mut order: Vec<u32> = Vec::new();
@@ -94,9 +128,15 @@ fn walk(key: &Key<'_>, rel: &str, prefix: &str, depth: usize, out: &mut Vec<Shel
         if out.len() >= MAX_ENTRIES {
             return;
         }
-        let Some((_, v)) = numbered.iter().find(|(m, _)| *m == n) else { continue };
+        let Some((_, v)) = numbered.iter().find(|(m, _)| *m == n) else {
+            continue;
+        };
         let (name, types, c, m, a, mft, err) = decode(&v.raw);
-        let item_name = if name.is_empty() { format!("<unknown shell item {}>", n) } else { name };
+        let item_name = if name.is_empty() {
+            format!("<unknown shell item {}>", n)
+        } else {
+            name
+        };
         let path = super::join_shell_path(&[prefix, item_name.as_str()]);
         let child = subkeys.iter().find(|s| s.name == n.to_string());
         let node_slot = child.and_then(|c| c.value_u32("NodeSlot"));
@@ -109,7 +149,9 @@ fn walk(key: &Key<'_>, rel: &str, prefix: &str, depth: usize, out: &mut Vec<Shel
             item_name,
             item_types: types,
             node_slot,
-            last_written_ns: child.and_then(|c| c.last_written_ns).or(key.last_written_ns),
+            last_written_ns: child
+                .and_then(|c| c.last_written_ns)
+                .or(key.last_written_ns),
             creation_ns: c,
             modification_ns: m,
             access_ns: a,
@@ -138,7 +180,20 @@ pub fn events(hive: &Hive, ctx: &Ctx<'_>) -> Vec<Event> {
     for e in entries(hive) {
         let base = |d: &str, ts: Option<i64>| {
             let mut ev = ctx
-                .event("shellbags", "windows:shellbags", d, ts, format!("Shell bag: {} [{}\\{}]", e.path, ctx.full_path(&e.key_rel_path), e.value_name), &e.key_rel_path, e.key_offset)
+                .event(
+                    "shellbags",
+                    "windows:shellbags",
+                    d,
+                    ts,
+                    format!(
+                        "Shell bag: {} [{}\\{}]",
+                        e.path,
+                        ctx.full_path(&e.key_rel_path),
+                        e.value_name
+                    ),
+                    &e.key_rel_path,
+                    e.key_offset,
+                )
                 .attr("path", e.path.clone())
                 .attr("value_name", e.value_name.clone())
                 .attr("item_types", json!(e.item_types))

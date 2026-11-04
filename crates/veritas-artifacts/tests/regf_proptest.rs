@@ -8,7 +8,13 @@ use veritas_artifacts::registry::{events_from_hive, HiveKind, Provenance};
 
 fn sample() -> &'static Option<Vec<u8>> {
     static S: OnceLock<Option<Vec<u8>>> = OnceLock::new();
-    S.get_or_init(|| std::fs::read(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/corpus/plaso/NTUSER.DAT")).ok())
+    S.get_or_init(|| {
+        std::fs::read(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../testdata/corpus/plaso/NTUSER.DAT"),
+        )
+        .ok()
+    })
 }
 
 fn exercise(data: &[u8]) {

@@ -7,11 +7,16 @@ use veritas_artifacts::{lnk, shellitems};
 use veritas_timeline::format_ns;
 
 fn corpus(rel: &str) -> Option<Vec<u8>> {
-    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/corpus/plaso").join(rel);
+    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../testdata/corpus/plaso")
+        .join(rel);
     match std::fs::read(&p) {
         Ok(d) => Some(d),
         Err(_) if std::env::var("VERITAS_REQUIRE_CORPUS").is_err() => {
-            eprintln!("skipping: corpus file {} missing (run testdata/fetch.py)", p.display());
+            eprintln!(
+                "skipping: corpus file {} missing (run testdata/fetch.py)",
+                p.display()
+            );
             None
         }
         Err(e) => panic!("corpus file {} missing: {e}", p.display()),
@@ -24,16 +29,32 @@ fn fmt(t: Option<i64>) -> String {
 
 #[test]
 fn nero_id_list_matches_pyfwsi() {
-    let Some(d) = corpus("NeroInfoTool.lnk") else { return };
+    let Some(d) = corpus("NeroInfoTool.lnk") else {
+        return;
+    };
     let l = lnk::parse(&d).unwrap();
     let raw = hex::decode(&l.target_id_list_raw_hex).unwrap();
     let items = shellitems::parse_shell_item_list(&raw).unwrap();
     // pyfwsi class types: 0x1f, 0x2f, 0x31 x4, 0x32
     let types: Vec<&str> = items.iter().map(|i| i.item_type.as_str()).collect();
-    assert_eq!(types, ["root_folder", "volume", "directory", "directory", "directory", "directory", "file"]);
+    assert_eq!(
+        types,
+        [
+            "root_folder",
+            "volume",
+            "directory",
+            "directory",
+            "directory",
+            "directory",
+            "file"
+        ]
+    );
     let sizes: Vec<usize> = items.iter().map(|i| i.raw_size).collect();
     assert_eq!(sizes, [20, 25, 148, 74, 80, 96, 98]);
-    assert_eq!(items[0].class_id.as_deref(), Some("20d04fe0-3aea-1069-a2d8-08002b30309d"));
+    assert_eq!(
+        items[0].class_id.as_deref(),
+        Some("20d04fe0-3aea-1069-a2d8-08002b30309d")
+    );
     assert_eq!(items[0].name, "My Computer");
     assert_eq!(items[1].name, "C:\\");
     let p = &items[2];
@@ -52,24 +73,47 @@ fn nero_id_list_matches_pyfwsi() {
     let refs: Vec<Option<u64>> = items[2..].iter().map(|i| i.mft_entry).collect();
     // pyfwsi file references 281474976710930, 281474976790987, 281474976790988,
     // 562949953502657 and 281474976792005 (low 48 bits = MFT entry).
-    assert_eq!(refs, [Some(274), Some(80331), Some(80332), Some(81345), Some(81349)]);
+    assert_eq!(
+        refs,
+        [
+            Some(274),
+            Some(80331),
+            Some(80332),
+            Some(81345),
+            Some(81349)
+        ]
+    );
     assert_eq!(items[5].mft_sequence, Some(2));
     assert_eq!(items[6].name, "InfoTool.exe");
     assert_eq!(fmt(items[6].modification_ns), "2009-06-05T20:13:20.000000Z");
-    assert_eq!(shellitems::shell_item_path(&items), r"My Computer\C:\Program Files (x86)\Nero\Nero 9\Nero InfoTool\InfoTool.exe");
+    assert_eq!(
+        shellitems::shell_item_path(&items),
+        r"My Computer\C:\Program Files (x86)\Nero\Nero 9\Nero InfoTool\InfoTool.exe"
+    );
 }
 
 #[test]
 fn unpaired_surrogate_id_list() {
-    let Some(d) = corpus("unpaired_surrogate.lnk") else { return };
+    let Some(d) = corpus("unpaired_surrogate.lnk") else {
+        return;
+    };
     let l = lnk::parse(&d).unwrap();
     let items = &l.target_id_list;
     assert_eq!(items.len(), 4);
     assert_eq!(items[3].name, "UNICOD~1.EXE");
-    assert_eq!(items[3].long_name.as_deref(), Some("unicode_U+0000d800_\u{fffd}.exe"));
+    assert_eq!(
+        items[3].long_name.as_deref(),
+        Some("unicode_U+0000d800_\u{fffd}.exe")
+    );
     // pyfwsi file_reference 17732923533157946
-    assert_eq!(items[3].mft_entry, Some(17732923533157946u64 & 0xffff_ffff_ffff));
-    assert_eq!(items[3].mft_sequence, Some((17732923533157946u64 >> 48) as u16));
+    assert_eq!(
+        items[3].mft_entry,
+        Some(17732923533157946u64 & 0xffff_ffff_ffff)
+    );
+    assert_eq!(
+        items[3].mft_sequence,
+        Some((17732923533157946u64 >> 48) as u16)
+    );
 }
 
 #[test]
@@ -88,7 +132,9 @@ fn hex_input_and_terminator() {
 
 #[test]
 fn determinism() {
-    let Some(d) = corpus("NeroInfoTool.lnk") else { return };
+    let Some(d) = corpus("NeroInfoTool.lnk") else {
+        return;
+    };
     let l = lnk::parse(&d).unwrap();
     let raw = hex::decode(&l.target_id_list_raw_hex).unwrap();
     let a = serde_json::to_string(&shellitems::parse_shell_item_list(&raw).unwrap()).unwrap();

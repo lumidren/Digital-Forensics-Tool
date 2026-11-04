@@ -87,7 +87,11 @@ impl BaseBlock {
     pub fn parse(d: &[u8]) -> Result<Self> {
         let sig = need(d, 0, 4)?;
         if sig != b"regf" {
-            return Err(ParseError::BadSignature { offset: 0, expected: "regf".into(), found: hex::encode(sig) });
+            return Err(ParseError::BadSignature {
+                offset: 0,
+                expected: "regf".into(),
+                found: hex::encode(sig),
+            });
         }
         need(d, 0, 512)?;
         let raw_ts = u64_at(d, 12)?;
@@ -227,8 +231,14 @@ pub struct Value {
 }
 
 fn decode_multi_sz(raw: &[u8]) -> Vec<String> {
-    let units: Vec<u16> = raw.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
-    let mut out: Vec<String> = units.split(|&u| u == 0).map(String::from_utf16_lossy).collect();
+    let units: Vec<u16> = raw
+        .chunks_exact(2)
+        .map(|c| u16::from_le_bytes([c[0], c[1]]))
+        .collect();
+    let mut out: Vec<String> = units
+        .split(|&u| u == 0)
+        .map(String::from_utf16_lossy)
+        .collect();
     while out.last().is_some_and(|s| s.is_empty()) {
         out.pop();
     }
@@ -242,10 +252,18 @@ pub fn decode_value_data(kind: ValueType, raw: &[u8]) -> ValueData {
         ValueType::ExpandSz => ValueData::ExpandString(utf16le(raw, true)),
         ValueType::Link => ValueData::Link(utf16le(raw, false)),
         ValueType::MultiSz => ValueData::MultiString(decode_multi_sz(raw)),
-        ValueType::Dword => u32_at(raw, 0).map(ValueData::Dword).unwrap_or(ValueData::Unparsed),
-        ValueType::DwordBigEndian => crate::util::u32_be_at(raw, 0).map(ValueData::DwordBigEndian).unwrap_or(ValueData::Unparsed),
-        ValueType::Qword => u64_at(raw, 0).map(ValueData::Qword).unwrap_or(ValueData::Unparsed),
-        ValueType::ResourceList | ValueType::FullResourceDescriptor | ValueType::ResourceRequirementsList => ValueData::Resource,
+        ValueType::Dword => u32_at(raw, 0)
+            .map(ValueData::Dword)
+            .unwrap_or(ValueData::Unparsed),
+        ValueType::DwordBigEndian => crate::util::u32_be_at(raw, 0)
+            .map(ValueData::DwordBigEndian)
+            .unwrap_or(ValueData::Unparsed),
+        ValueType::Qword => u64_at(raw, 0)
+            .map(ValueData::Qword)
+            .unwrap_or(ValueData::Unparsed),
+        ValueType::ResourceList
+        | ValueType::FullResourceDescriptor
+        | ValueType::ResourceRequirementsList => ValueData::Resource,
         ValueType::Binary | ValueType::Other(_) => ValueData::Binary,
     }
 }
@@ -255,22 +273,36 @@ impl Value {
     /// binary as `"(N bytes)"`).
     pub fn display_string(&self) -> String {
         match &self.data {
-            ValueData::None => if self.raw.is_empty() { String::new() } else { format!("({} bytes)", self.raw.len()) },
+            ValueData::None => {
+                if self.raw.is_empty() {
+                    String::new()
+                } else {
+                    format!("({} bytes)", self.raw.len())
+                }
+            }
             ValueData::String(s) | ValueData::ExpandString(s) | ValueData::Link(s) => s.clone(),
             ValueData::Dword(v) | ValueData::DwordBigEndian(v) => v.to_string(),
             ValueData::Qword(v) => v.to_string(),
             ValueData::MultiString(v) => v.join(" "),
-            ValueData::Binary | ValueData::Resource | ValueData::Unparsed => format!("({} bytes)", self.raw.len()),
+            ValueData::Binary | ValueData::Resource | ValueData::Unparsed => {
+                format!("({} bytes)", self.raw.len())
+            }
         }
     }
     /// String data for REG_SZ / REG_EXPAND_SZ / REG_LINK, and UTF-16 decoded binary otherwise.
     pub fn as_string(&self) -> Option<String> {
         match &self.data {
-            ValueData::String(s) | ValueData::ExpandString(s) | ValueData::Link(s) => Some(s.clone()),
+            ValueData::String(s) | ValueData::ExpandString(s) | ValueData::Link(s) => {
+                Some(s.clone())
+            }
             ValueData::MultiString(v) => Some(v.join(" ")),
             ValueData::Dword(v) | ValueData::DwordBigEndian(v) => Some(v.to_string()),
             ValueData::Qword(v) => Some(v.to_string()),
-            ValueData::Binary | ValueData::None if self.raw.len() >= 2 && self.raw.len() % 2 == 0 => Some(utf16le(&self.raw, true)),
+            ValueData::Binary | ValueData::None
+                if self.raw.len() >= 2 && self.raw.len() % 2 == 0 =>
+            {
+                Some(utf16le(&self.raw, true))
+            }
             _ => None,
         }
     }
@@ -347,7 +379,8 @@ impl<'a> Key<'a> {
         if self.subkey_count == 0 || self.subkey_list_offset == NONE_OFFSET {
             return Ok(out);
         }
-        self.hive.collect_subkey_offsets(self.subkey_list_offset, 0, &mut out)?;
+        self.hive
+            .collect_subkey_offsets(self.subkey_list_offset, 0, &mut out)?;
         Ok(out)
     }
 
@@ -366,9 +399,14 @@ impl<'a> Key<'a> {
     pub fn subkeys(&self) -> Vec<Key<'a>> {
         let mut offs = Vec::new();
         if self.subkey_count != 0 && self.subkey_list_offset != NONE_OFFSET {
-            let _ = self.hive.collect_subkey_offsets(self.subkey_list_offset, 0, &mut offs);
+            let _ = self
+                .hive
+                .collect_subkey_offsets(self.subkey_list_offset, 0, &mut offs);
         }
-        offs.into_iter().filter(|&o| o != self.offset).filter_map(|o| self.hive.key_at(o).ok()).collect()
+        offs.into_iter()
+            .filter(|&o| o != self.offset)
+            .filter_map(|o| self.hive.key_at(o).ok())
+            .collect()
     }
 
     /// Number of subkeys that could not be read (declared count vs readable).
@@ -380,8 +418,14 @@ impl<'a> Key<'a> {
         if self.value_count == 0 || self.values_list_offset == NONE_OFFSET {
             return Ok(Vec::new());
         }
-        let cell = if self.deleted { self.hive.cell_any(self.values_list_offset)? } else { self.hive.cell(self.values_list_offset)? };
-        let n = (self.value_count as usize).min(cell.len() / 4).min(MAX_VALUES_PER_KEY);
+        let cell = if self.deleted {
+            self.hive.cell_any(self.values_list_offset)?
+        } else {
+            self.hive.cell(self.values_list_offset)?
+        };
+        let n = (self.value_count as usize)
+            .min(cell.len() / 4)
+            .min(MAX_VALUES_PER_KEY);
         let mut out = Vec::with_capacity(n);
         for i in 0..n {
             out.push(u32_at(cell, i * 4)?);
@@ -392,15 +436,23 @@ impl<'a> Key<'a> {
     pub fn try_values(&self) -> Result<Vec<Value>> {
         let offs = self.value_offsets()?;
         if offs.len() < self.value_count as usize {
-            return Err(ParseError::Invalid { offset: self.values_list_offset as usize, reason: "value list shorter than value count".into() });
+            return Err(ParseError::Invalid {
+                offset: self.values_list_offset as usize,
+                reason: "value list shorter than value count".into(),
+            });
         }
-        offs.into_iter().map(|o| self.hive.value_at(o, self.deleted)).collect()
+        offs.into_iter()
+            .map(|o| self.hive.value_at(o, self.deleted))
+            .collect()
     }
 
     /// Lenient value enumeration (unreadable values are skipped).
     pub fn values(&self) -> Vec<Value> {
         match self.value_offsets() {
-            Ok(offs) => offs.into_iter().filter_map(|o| self.hive.value_at(o, self.deleted).ok()).collect(),
+            Ok(offs) => offs
+                .into_iter()
+                .filter_map(|o| self.hive.value_at(o, self.deleted).ok())
+                .collect(),
             Err(_) => Vec::new(),
         }
     }
@@ -408,7 +460,9 @@ impl<'a> Key<'a> {
     /// Case-insensitive direct child lookup.
     pub fn subkey(&self, name: &str) -> Option<Key<'a>> {
         let want = name.to_lowercase();
-        self.subkeys().into_iter().find(|k| k.name.to_lowercase() == want)
+        self.subkeys()
+            .into_iter()
+            .find(|k| k.name.to_lowercase() == want)
     }
 
     /// Case-insensitive descendant lookup by backslash-separated path.
@@ -423,7 +477,9 @@ impl<'a> Key<'a> {
     /// Case-insensitive value lookup; `""` selects the default value.
     pub fn value(&self, name: &str) -> Option<Value> {
         let want = name.to_lowercase();
-        self.values().into_iter().find(|v| v.name.to_lowercase() == want)
+        self.values()
+            .into_iter()
+            .find(|v| v.name.to_lowercase() == want)
     }
     pub fn value_string(&self, name: &str) -> Option<String> {
         self.value(name).and_then(|v| v.as_string())
@@ -513,7 +569,11 @@ pub struct Hive {
 
 impl fmt::Debug for Hive {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Hive").field("len", &self.data.len()).field("base", &self.base).field("warnings", &self.warnings).finish()
+        f.debug_struct("Hive")
+            .field("len", &self.data.len())
+            .field("base", &self.base)
+            .field("warnings", &self.warnings)
+            .finish()
     }
 }
 
@@ -527,10 +587,16 @@ impl Hive {
         let base = BaseBlock::parse(&data)?;
         let mut warnings = Vec::new();
         if base.major_version != 1 {
-            return Err(ParseError::Unsupported(format!("regf major version {}", base.major_version)));
+            return Err(ParseError::Unsupported(format!(
+                "regf major version {}",
+                base.major_version
+            )));
         }
         if !base.checksum_ok() {
-            warnings.push(format!("base block checksum mismatch: stored {:#010x} computed {:#010x}", base.checksum, base.computed_checksum));
+            warnings.push(format!(
+                "base block checksum mismatch: stored {:#010x} computed {:#010x}",
+                base.checksum, base.computed_checksum
+            ));
         }
         if base.primary_sequence != base.secondary_sequence {
             warnings.push(format!(
@@ -539,18 +605,31 @@ impl Hive {
             ));
         }
         if data.len() < BASE_BLOCK_SIZE + HBIN_HEADER_SIZE {
-            return Err(ParseError::Truncated { offset: BASE_BLOCK_SIZE, needed: HBIN_HEADER_SIZE, available: data.len().saturating_sub(BASE_BLOCK_SIZE) });
+            return Err(ParseError::Truncated {
+                offset: BASE_BLOCK_SIZE,
+                needed: HBIN_HEADER_SIZE,
+                available: data.len().saturating_sub(BASE_BLOCK_SIZE),
+            });
         }
         let declared = BASE_BLOCK_SIZE.saturating_add(base.hive_bins_data_size as usize);
         let bins_end = if base.hive_bins_data_size == 0 || declared > data.len() {
             if base.hive_bins_data_size != 0 {
-                warnings.push(format!("hive bins data size {} exceeds file; truncated hive", base.hive_bins_data_size));
+                warnings.push(format!(
+                    "hive bins data size {} exceeds file; truncated hive",
+                    base.hive_bins_data_size
+                ));
             }
             data.len()
         } else {
             declared
         };
-        let hive = Hive { data, base, bins_end, recovery: None, warnings };
+        let hive = Hive {
+            data,
+            base,
+            bins_end,
+            recovery: None,
+            warnings,
+        };
         let root = hive.key_at(hive.base.root_cell_offset)?;
         let _ = root;
         Ok(hive)
@@ -568,7 +647,9 @@ impl Hive {
         for (i, l) in logs.iter().enumerate() {
             match BaseBlock::parse(l) {
                 Ok(b) if b.checksum_ok() => log_bases.push(b),
-                Ok(_) => rec.notes.push(format!("log {i}: base block checksum mismatch")),
+                Ok(_) => rec
+                    .notes
+                    .push(format!("log {i}: base block checksum mismatch")),
                 Err(e) => rec.notes.push(format!("log {i}: {e}")),
             }
         }
@@ -577,24 +658,40 @@ impl Hive {
             Some(b) => b,
             None => {
                 let best_idx = (0..logs.len())
-                    .filter(|&i| BaseBlock::parse(logs[i]).map(|b| b.checksum_ok()).unwrap_or(false))
-                    .max_by_key(|&i| BaseBlock::parse(logs[i]).map(|b| b.secondary_sequence).unwrap_or(0));
+                    .filter(|&i| {
+                        BaseBlock::parse(logs[i])
+                            .map(|b| b.checksum_ok())
+                            .unwrap_or(false)
+                    })
+                    .max_by_key(|&i| {
+                        BaseBlock::parse(logs[i])
+                            .map(|b| b.secondary_sequence)
+                            .unwrap_or(0)
+                    });
                 match best_idx {
                     Some(i) => {
                         if data.len() < 512 {
                             data.resize(BASE_BLOCK_SIZE, 0);
                         }
                         data[..512].copy_from_slice(&logs[i][..512]);
-                        rec.notes.push(format!("primary base block invalid; using base block from log {i}"));
+                        rec.notes.push(format!(
+                            "primary base block invalid; using base block from log {i}"
+                        ));
                         BaseBlock::parse(&data)?
                     }
-                    None => return Err(ParseError::Invalid { offset: 0, reason: "no valid base block in primary or logs".into() }),
+                    None => {
+                        return Err(ParseError::Invalid {
+                            offset: 0,
+                            reason: "no valid base block in primary or logs".into(),
+                        })
+                    }
                 }
             }
         };
         rec.was_dirty = base.is_dirty() || !primary_ok;
         if !rec.was_dirty {
-            rec.notes.push("primary hive is clean; logs not applied".into());
+            rec.notes
+                .push("primary hive is clean; logs not applied".into());
             let mut h = Self::from_vec(data)?;
             h.recovery = Some(rec);
             return Ok(h);
@@ -605,14 +702,18 @@ impl Hive {
         for (i, l) in logs.iter().enumerate() {
             match BaseBlock::parse(l) {
                 Ok(b) if b.file_type == 1 || b.file_type == 2 => {
-                    rec.notes.push(format!("log {i}: old-format (DIRT) transaction log is not supported; skipped"));
+                    rec.notes.push(format!(
+                        "log {i}: old-format (DIRT) transaction log is not supported; skipped"
+                    ));
                     continue;
                 }
                 Ok(_) => {}
                 Err(_) => continue,
             }
             if l.get(512..516) == Some(b"DIRT".as_slice()) {
-                rec.notes.push(format!("log {i}: old-format (DIRT) transaction log is not supported; skipped"));
+                rec.notes.push(format!(
+                    "log {i}: old-format (DIRT) transaction log is not supported; skipped"
+                ));
                 continue;
             }
             let (es, note) = parse_log_entries(l);
@@ -627,7 +728,8 @@ impl Hive {
         let mut seq = match entries.range(start..).next() {
             Some((s, _)) => *s,
             None => {
-                rec.notes.push(format!("no log entries with sequence >= {start}"));
+                rec.notes
+                    .push(format!("no log entries with sequence >= {start}"));
                 let mut h = Self::from_vec(data)?;
                 h.recovery = Some(rec);
                 return Ok(h);
@@ -637,7 +739,9 @@ impl Hive {
         while let Some(e) = entries.get(&seq) {
             let new_len = BASE_BLOCK_SIZE.saturating_add(e.hive_bins_size as usize);
             if new_len > MAX_HIVE_SIZE {
-                return Err(ParseError::Limit(format!("log entry {seq} grows hive to {new_len} bytes")));
+                return Err(ParseError::Limit(format!(
+                    "log entry {seq} grows hive to {new_len} bytes"
+                )));
             }
             if data.len() < new_len {
                 data.resize(new_len, 0);
@@ -646,7 +750,9 @@ impl Hive {
                 let dst = BASE_BLOCK_SIZE.saturating_add(*off as usize);
                 let end = dst.saturating_add(bytes.len());
                 if end > MAX_HIVE_SIZE {
-                    return Err(ParseError::Limit(format!("dirty page at {off:#x} beyond limit")));
+                    return Err(ParseError::Limit(format!(
+                        "dirty page at {off:#x} beyond limit"
+                    )));
                 }
                 if data.len() < end {
                     data.resize(end, 0);
@@ -687,7 +793,10 @@ impl Hive {
     pub fn cell(&self, off: u32) -> Result<&[u8]> {
         let (d, alloc) = self.cell_raw(off)?;
         if !alloc {
-            return Err(ParseError::Invalid { offset: off as usize, reason: "cell is not allocated".into() });
+            return Err(ParseError::Invalid {
+                offset: off as usize,
+                reason: "cell is not allocated".into(),
+            });
         }
         Ok(d)
     }
@@ -699,14 +808,25 @@ impl Hive {
 
     fn cell_raw(&self, off: u32) -> Result<(&[u8], bool)> {
         if off == NONE_OFFSET {
-            return Err(ParseError::Invalid { offset: off as usize, reason: "null cell offset".into() });
+            return Err(ParseError::Invalid {
+                offset: off as usize,
+                reason: "null cell offset".into(),
+            });
         }
-        let abs = BASE_BLOCK_SIZE.checked_add(off as usize).ok_or(ParseError::Invalid { offset: off as usize, reason: "cell offset overflow".into() })?;
+        let abs = BASE_BLOCK_SIZE
+            .checked_add(off as usize)
+            .ok_or(ParseError::Invalid {
+                offset: off as usize,
+                reason: "cell offset overflow".into(),
+            })?;
         let bins = self.data.get(..self.bins_end).unwrap_or(&self.data);
         let size = i32_at(bins, abs)?;
         let len = size.unsigned_abs() as usize;
         if len < 8 {
-            return Err(ParseError::Invalid { offset: abs, reason: format!("cell size {size} too small") });
+            return Err(ParseError::Invalid {
+                offset: abs,
+                reason: format!("cell size {size} too small"),
+            });
         }
         let d = need(bins, abs + 4, len - 4)?;
         Ok((d, size < 0))
@@ -734,12 +854,21 @@ impl Hive {
                 for i in 0..count {
                     let sub = u32_at(c, 4 + i * 4)?;
                     if sub == list {
-                        return Err(ParseError::Invalid { offset: list as usize, reason: "self-referencing ri list".into() });
+                        return Err(ParseError::Invalid {
+                            offset: list as usize,
+                            reason: "self-referencing ri list".into(),
+                        });
                     }
                     self.collect_subkey_offsets(sub, depth + 1, out)?;
                 }
             }
-            _ => return Err(ParseError::BadSignature { offset: list as usize, expected: "lf|lh|li|ri".into(), found: hex::encode(sig) }),
+            _ => {
+                return Err(ParseError::BadSignature {
+                    offset: list as usize,
+                    expected: "lf|lh|li|ri".into(),
+                    found: hex::encode(sig),
+                })
+            }
         }
         if out.len() > MAX_KEYS {
             return Err(ParseError::Limit("too many subkeys".into()));
@@ -756,18 +885,32 @@ impl Hive {
     fn parse_nk(&self, off: u32, c: &[u8], deleted: bool) -> Result<Key<'_>> {
         let sig = need(c, 0, 2)?;
         if sig != b"nk" {
-            return Err(ParseError::BadSignature { offset: off as usize, expected: "nk".into(), found: hex::encode(sig) });
+            return Err(ParseError::BadSignature {
+                offset: off as usize,
+                expected: "nk".into(),
+                found: hex::encode(sig),
+            });
         }
         let flags = u16_at(c, 2)?;
         let lw = u64_at(c, 4)?;
         let name_len = u16_at(c, 72)? as usize;
         let class_len = u16_at(c, 74)? as usize;
         let name_bytes = need(c, 76, name_len)?;
-        let name = if flags & key_flags::COMP_NAME != 0 { ascii(name_bytes, false) } else { utf16le(name_bytes, false) };
+        let name = if flags & key_flags::COMP_NAME != 0 {
+            ascii(name_bytes, false)
+        } else {
+            utf16le(name_bytes, false)
+        };
         let class_off = u32_at(c, 48)?;
         let class_name = if class_off != NONE_OFFSET && class_len > 0 {
-            let cell = if deleted { self.cell_any(class_off) } else { self.cell(class_off) };
-            cell.ok().and_then(|cd| need(cd, 0, class_len).ok()).map(|b| utf16le(b, false))
+            let cell = if deleted {
+                self.cell_any(class_off)
+            } else {
+                self.cell(class_off)
+            };
+            cell.ok()
+                .and_then(|cd| need(cd, 0, class_len).ok())
+                .map(|b| utf16le(b, false))
         } else {
             None
         };
@@ -792,14 +935,22 @@ impl Hive {
 
     /// Parse the value at a cell offset. `lenient` accepts unallocated cells.
     pub fn value_at(&self, off: u32, lenient: bool) -> Result<Value> {
-        let c = if lenient { self.cell_any(off)? } else { self.cell(off)? };
+        let c = if lenient {
+            self.cell_any(off)?
+        } else {
+            self.cell(off)?
+        };
         self.parse_vk(off, c, lenient)
     }
 
     fn parse_vk(&self, off: u32, c: &[u8], lenient: bool) -> Result<Value> {
         let sig = need(c, 0, 2)?;
         if sig != b"vk" {
-            return Err(ParseError::BadSignature { offset: off as usize, expected: "vk".into(), found: hex::encode(sig) });
+            return Err(ParseError::BadSignature {
+                offset: off as usize,
+                expected: "vk".into(),
+                found: hex::encode(sig),
+            });
         }
         let name_len = u16_at(c, 2)? as usize;
         let size_field = u32_at(c, 4)?;
@@ -807,7 +958,11 @@ impl Hive {
         let raw_type = u32_at(c, 12)?;
         let flags = u16_at(c, 16)?;
         let name_bytes = need(c, 20, name_len)?;
-        let name = if flags & 0x0001 != 0 { ascii(name_bytes, false) } else { utf16le(name_bytes, false) };
+        let name = if flags & 0x0001 != 0 {
+            ascii(name_bytes, false)
+        } else {
+            utf16le(name_bytes, false)
+        };
         let resident = size_field & 0x8000_0000 != 0;
         let size = (size_field & 0x7FFF_FFFF) as usize;
         let mut data_error = None;
@@ -833,30 +988,62 @@ impl Hive {
         };
         let kind = ValueType::from_u32(raw_type);
         let data = decode_value_data(kind, &raw);
-        Ok(Value { offset: off, name, kind, flags, data_size: size as u32, resident, raw, data, data_error })
+        Ok(Value {
+            offset: off,
+            name,
+            kind,
+            flags,
+            data_size: size as u32,
+            resident,
+            raw,
+            data,
+            data_error,
+        })
     }
 
     fn read_data(&self, off: u32, size: usize, lenient: bool) -> Result<(Vec<u8>, Option<String>)> {
-        let c = if lenient { self.cell_any(off)? } else { self.cell(off)? };
-        if size > BIG_DATA_SEGMENT_SIZE && self.base.minor_version >= 4 && c.get(0..2) == Some(b"db".as_slice()) {
+        let c = if lenient {
+            self.cell_any(off)?
+        } else {
+            self.cell(off)?
+        };
+        if size > BIG_DATA_SEGMENT_SIZE
+            && self.base.minor_version >= 4
+            && c.get(0..2) == Some(b"db".as_slice())
+        {
             let count = u16_at(c, 2)? as usize;
             let list_off = u32_at(c, 4)?;
-            let list = if lenient { self.cell_any(list_off)? } else { self.cell(list_off)? };
+            let list = if lenient {
+                self.cell_any(list_off)?
+            } else {
+                self.cell(list_off)?
+            };
             let mut out = Vec::with_capacity(size.min(self.data.len()));
             for i in 0..count {
                 if out.len() >= size {
                     break;
                 }
                 let seg_off = u32_at(list, i * 4)?;
-                let seg = if lenient { self.cell_any(seg_off)? } else { self.cell(seg_off)? };
+                let seg = if lenient {
+                    self.cell_any(seg_off)?
+                } else {
+                    self.cell(seg_off)?
+                };
                 let take = (size - out.len()).min(BIG_DATA_SEGMENT_SIZE).min(seg.len());
                 out.extend_from_slice(&seg[..take]);
             }
-            let err = if out.len() < size { Some(format!("big data truncated: {} of {size} bytes", out.len())) } else { None };
+            let err = if out.len() < size {
+                Some(format!("big data truncated: {} of {size} bytes", out.len()))
+            } else {
+                None
+            };
             return Ok((out, err));
         }
         if c.len() < size {
-            return Ok((c.to_vec(), Some(format!("data cell holds {} of {size} bytes", c.len()))));
+            return Ok((
+                c.to_vec(),
+                Some(format!("data cell holds {} of {size} bytes", c.len())),
+            ));
         }
         Ok((c[..size].to_vec(), None))
     }
@@ -905,7 +1092,11 @@ impl Hive {
                 if visited.contains(&s.offset) {
                     continue;
                 }
-                let p = if path.is_empty() { s.name.clone() } else { format!("{}\\{}", path, s.name) };
+                let p = if path.is_empty() {
+                    s.name.clone()
+                } else {
+                    format!("{}\\{}", path, s.name)
+                };
                 stack.push((p, depth + 1, s));
             }
         }
@@ -916,7 +1107,9 @@ impl Hive {
     pub fn keys(&self) -> Vec<(String, Key<'_>)> {
         let mut out: Vec<(String, u32)> = Vec::new();
         let _ = self.walk(|p, _, k| out.push((p.to_string(), k.offset)));
-        out.into_iter().filter_map(|(p, o)| self.key_at(o).ok().map(|k| (p, k))).collect()
+        out.into_iter()
+            .filter_map(|(p, o)| self.key_at(o).ok().map(|k| (p, k)))
+            .collect()
     }
 
     /// Hive bins in file order. Walking stops at the first bin with a bad header.
@@ -932,7 +1125,11 @@ impl Hive {
                 break;
             }
             let ts = u64_at(&self.data, pos + 0x14).ok().and_then(filetime_to_ns);
-            out.push(HbinInfo { offset: (pos - BASE_BLOCK_SIZE) as u32, size: size as u32, timestamp_ns: ts });
+            out.push(HbinInfo {
+                offset: (pos - BASE_BLOCK_SIZE) as u32,
+                size: size as u32,
+                timestamp_ns: ts,
+            });
             pos += size;
         }
         out
@@ -955,7 +1152,12 @@ impl Hive {
                     break;
                 }
                 let sig = [self.data[pos + 4], self.data[pos + 5]];
-                out.push(CellInfo { offset: (pos - BASE_BLOCK_SIZE) as u32, size: len as u32, allocated: size < 0, signature: sig });
+                out.push(CellInfo {
+                    offset: (pos - BASE_BLOCK_SIZE) as u32,
+                    size: len as u32,
+                    allocated: size < 0,
+                    signature: sig,
+                });
                 pos += len;
             }
         }
@@ -989,7 +1191,9 @@ impl Hive {
             let end = abs + c.size as usize;
             let mut p = abs;
             while p + 8 <= end {
-                let inner = i32_at(&self.data, p).map(|s| s.unsigned_abs() as usize).unwrap_or(0);
+                let inner = i32_at(&self.data, p)
+                    .map(|s| s.unsigned_abs() as usize)
+                    .unwrap_or(0);
                 if inner >= 8 && p + inner <= end {
                     let sig = &self.data[p + 4..p + 6];
                     let rel = (p - BASE_BLOCK_SIZE) as u32;
@@ -1006,7 +1210,9 @@ impl Hive {
         let mut owner: BTreeMap<u32, u32> = BTreeMap::new();
         for (off, allocated) in cand_keys {
             let Ok(c) = self.cell_any(off) else { continue };
-            let Ok(k) = self.parse_nk(off, c, true) else { continue };
+            let Ok(k) = self.parse_nk(off, c, true) else {
+                continue;
+            };
             if k.name.is_empty() || k.last_written_ns.is_none() {
                 continue;
             }
@@ -1015,14 +1221,29 @@ impl Hive {
                 owner.entry(v.offset).or_insert(off);
             }
             let parent_path = live_keys.get(&k.parent_offset).cloned();
-            items.keys.push(DeletedKey { offset: off, name: k.name, last_written_ns: k.last_written_ns, parent_offset: k.parent_offset, parent_path, allocated, values });
+            items.keys.push(DeletedKey {
+                offset: off,
+                name: k.name,
+                last_written_ns: k.last_written_ns,
+                parent_offset: k.parent_offset,
+                parent_path,
+                allocated,
+                values,
+            });
         }
         for (off, allocated) in cand_vals {
-            let Ok(v) = self.value_at(off, true) else { continue };
+            let Ok(v) = self.value_at(off, true) else {
+                continue;
+            };
             if v.kind.as_u32() > 0x0B && v.kind.as_u32() & 0xFFFF_0000 == 0 {
                 continue;
             }
-            items.values.push(DeletedValue { offset: off, allocated, owner_key_offset: owner.get(&off).copied(), value: v });
+            items.values.push(DeletedValue {
+                offset: off,
+                allocated,
+                owner_key_offset: owner.get(&off).copied(),
+                value: v,
+            });
         }
         items
     }
@@ -1093,7 +1314,10 @@ fn parse_log_entries(l: &[u8]) -> (Vec<LogEntry>, Option<String>) {
         let parsed = (|| -> Result<(LogEntry, usize)> {
             let size = u32_at(l, off + 4)? as usize;
             if size < 40 || size % 512 != 0 {
-                return Err(ParseError::Invalid { offset: off, reason: format!("log entry size {size}") });
+                return Err(ParseError::Invalid {
+                    offset: off,
+                    reason: format!("log entry size {size}"),
+                });
             }
             let e = need(l, off, size)?;
             let seq = u32_at(e, 12)?;
@@ -1102,13 +1326,23 @@ fn parse_log_entries(l: &[u8]) -> (Vec<LogEntry>, Option<String>) {
             let h1 = u64_at(e, 24)?;
             let h2 = u64_at(e, 32)?;
             if marvin32(need(e, 0, 32)?, MARVIN32_REGISTRY_SEED) != h2 {
-                return Err(ParseError::Invalid { offset: off, reason: "log entry header hash mismatch".into() });
+                return Err(ParseError::Invalid {
+                    offset: off,
+                    reason: "log entry header hash mismatch".into(),
+                });
             }
             if marvin32(&e[40..], MARVIN32_REGISTRY_SEED) != h1 {
-                return Err(ParseError::Invalid { offset: off, reason: "log entry data hash mismatch".into() });
+                return Err(ParseError::Invalid {
+                    offset: off,
+                    reason: "log entry data hash mismatch".into(),
+                });
             }
-            let refs_len = npages.checked_mul(8).ok_or(ParseError::Limit("dirty pages".into()))?;
-            let mut data_pos = 40usize.checked_add(refs_len).ok_or(ParseError::Limit("dirty pages".into()))?;
+            let refs_len = npages
+                .checked_mul(8)
+                .ok_or(ParseError::Limit("dirty pages".into()))?;
+            let mut data_pos = 40usize
+                .checked_add(refs_len)
+                .ok_or(ParseError::Limit("dirty pages".into()))?;
             need(e, 40, refs_len)?;
             let mut pages = Vec::with_capacity(npages.min(4096));
             for i in 0..npages {
@@ -1118,13 +1352,23 @@ fn parse_log_entries(l: &[u8]) -> (Vec<LogEntry>, Option<String>) {
                 data_pos += ps;
                 pages.push((po, bytes));
             }
-            Ok((LogEntry { sequence: seq, hive_bins_size: hbs, pages }, size))
+            Ok((
+                LogEntry {
+                    sequence: seq,
+                    hive_bins_size: hbs,
+                    pages,
+                },
+                size,
+            ))
         })();
         match parsed {
             Ok((e, size)) => {
                 if let Some(prev) = out.last() {
                     if prev.sequence.wrapping_add(1) != e.sequence {
-                        note = Some(format!("non-consecutive sequence {} after {} at {off:#x}", e.sequence, prev.sequence));
+                        note = Some(format!(
+                            "non-consecutive sequence {} after {} at {off:#x}",
+                            e.sequence, prev.sequence
+                        ));
                         break;
                     }
                 }
@@ -1148,8 +1392,12 @@ mod tests {
     fn regf_marvin32_matches_windows_log_entry_hash() {
         // Header (first 32 bytes) of the first HvLE entry of a Windows 11 Default-profile
         // NTUSER.DAT.LOG1, and the hash-2 field Windows stored for it.
-        let hdr = hex::decode("48764c45002e0000000000002200000000c0020002000000d85151f9c1eb5540").unwrap();
-        assert_eq!(marvin32(&hdr, MARVIN32_REGISTRY_SEED), 0x48d3_9573_7b76_d700);
+        let hdr = hex::decode("48764c45002e0000000000002200000000c0020002000000d85151f9c1eb5540")
+            .unwrap();
+        assert_eq!(
+            marvin32(&hdr, MARVIN32_REGISTRY_SEED),
+            0x48d3_9573_7b76_d700
+        );
     }
 
     #[test]

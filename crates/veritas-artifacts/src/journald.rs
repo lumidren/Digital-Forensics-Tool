@@ -55,7 +55,10 @@ pub struct Entry {
 
 impl Entry {
     pub fn get(&self, k: &str) -> Option<&str> {
-        self.fields.get(k).and_then(|v| v.first()).map(|s| s.as_str())
+        self.fields
+            .get(k)
+            .and_then(|v| v.first())
+            .map(|s| s.as_str())
     }
 }
 
@@ -73,7 +76,9 @@ fn id_hex(b: &[u8]) -> String {
 /// LZ4 block-format decompression (no frame), output capped at `max_out`.
 pub fn lz4_block_decompress(src: &[u8], expected: usize, max_out: usize) -> Result<Vec<u8>> {
     if expected > max_out {
-        return Err(ParseError::Limit(format!("LZ4 output {expected} exceeds {max_out}")));
+        return Err(ParseError::Limit(format!(
+            "LZ4 output {expected} exceeds {max_out}"
+        )));
     }
     let mut out: Vec<u8> = Vec::with_capacity(expected);
     let mut i = 0usize;
@@ -81,9 +86,15 @@ pub fn lz4_block_decompress(src: &[u8], expected: usize, max_out: usize) -> Resu
         let mut l = base;
         if base == 15 {
             loop {
-                let b = *src.get(*i).ok_or(ParseError::Truncated { offset: *i, needed: 1, available: 0 })?;
+                let b = *src.get(*i).ok_or(ParseError::Truncated {
+                    offset: *i,
+                    needed: 1,
+                    available: 0,
+                })?;
                 *i += 1;
-                l = l.checked_add(b as usize).ok_or_else(|| ParseError::Limit("LZ4 length overflow".into()))?;
+                l = l
+                    .checked_add(b as usize)
+                    .ok_or_else(|| ParseError::Limit("LZ4 length overflow".into()))?;
                 if b != 255 {
                     break;
                 }
@@ -104,10 +115,20 @@ pub fn lz4_block_decompress(src: &[u8], expected: usize, max_out: usize) -> Resu
         if i >= src.len() {
             break; // last sequence has literals only
         }
-        let off = u16::from_le_bytes([src[i], *src.get(i + 1).ok_or(ParseError::Truncated { offset: i, needed: 2, available: 1 })?]) as usize;
+        let off = u16::from_le_bytes([
+            src[i],
+            *src.get(i + 1).ok_or(ParseError::Truncated {
+                offset: i,
+                needed: 2,
+                available: 1,
+            })?,
+        ]) as usize;
         i += 2;
         if off == 0 || off > out.len() {
-            return Err(ParseError::Invalid { offset: i, reason: format!("LZ4 match offset {off}") });
+            return Err(ParseError::Invalid {
+                offset: i,
+                reason: format!("LZ4 match offset {off}"),
+            });
         }
         let mlen = rd_len(&mut i, (token & 15) as usize)? + 4;
         if out.len() + mlen > max_out {
@@ -120,7 +141,10 @@ pub fn lz4_block_decompress(src: &[u8], expected: usize, max_out: usize) -> Resu
         }
     }
     if expected != 0 && out.len() != expected {
-        return Err(ParseError::Invalid { offset: 0, reason: format!("LZ4 produced {} bytes, expected {expected}", out.len()) });
+        return Err(ParseError::Invalid {
+            offset: 0,
+            reason: format!("LZ4 produced {} bytes, expected {expected}", out.len()),
+        });
     }
     Ok(out)
 }
@@ -128,7 +152,11 @@ pub fn lz4_block_decompress(src: &[u8], expected: usize, max_out: usize) -> Resu
 pub fn parse(d: &[u8]) -> Result<Journal> {
     let sig = need(d, 0, 8)?;
     if sig != SIGNATURE {
-        return Err(ParseError::BadSignature { offset: 0, expected: "LPKSHHRH".into(), found: hex::encode(sig) });
+        return Err(ParseError::BadSignature {
+            offset: 0,
+            expected: "LPKSHHRH".into(),
+            found: hex::encode(sig),
+        });
     }
     let incompat = u32_at(d, 12)?;
     let header = Header {
@@ -173,7 +201,10 @@ pub fn parse(d: &[u8]) -> Result<Journal> {
                 break;
             }
         };
-        if typ != OBJ_ENTRY_ARRAY || size < 24 || o.checked_add(size).map(|e| e > d.len()).unwrap_or(true) {
+        if typ != OBJ_ENTRY_ARRAY
+            || size < 24
+            || o.checked_add(size).map(|e| e > d.len()).unwrap_or(true)
+        {
             errors.push(format!("bad entry array object at {o}"));
             break;
         }
@@ -181,7 +212,11 @@ pub fn parse(d: &[u8]) -> Result<Journal> {
         let isz = if header.compact { 4 } else { 8 };
         let n = (size - 24) / isz;
         for k in 0..n {
-            let v = if header.compact { u32_at(d, o + 24 + k * 4)? as u64 } else { u64_at(d, o + 24 + k * 8)? };
+            let v = if header.compact {
+                u32_at(d, o + 24 + k * 4)? as u64
+            } else {
+                u64_at(d, o + 24 + k * 8)?
+            };
             if v == 0 {
                 break;
             }
@@ -194,22 +229,37 @@ pub fn parse(d: &[u8]) -> Result<Journal> {
     }
     let mut entries = Vec::with_capacity(offsets.len());
     for off in offsets {
-        match parse_entry(d, usize::try_from(off).unwrap_or(usize::MAX), header.compact) {
+        match parse_entry(
+            d,
+            usize::try_from(off).unwrap_or(usize::MAX),
+            header.compact,
+        ) {
             Ok(e) => entries.push(e),
             Err(e) => errors.push(format!("entry at {off}: {e}")),
         }
     }
-    Ok(Journal { header, entries, errors })
+    Ok(Journal {
+        header,
+        entries,
+        errors,
+    })
 }
 
 fn parse_entry(d: &[u8], o: usize, compact: bool) -> Result<Entry> {
     if o >= d.len() {
-        return Err(ParseError::Truncated { offset: o, needed: 64, available: 0 });
+        return Err(ParseError::Truncated {
+            offset: o,
+            needed: 64,
+            available: 0,
+        });
     }
     let typ = u8_at(d, o)?;
     let size = u64_at(d, o + 8)? as usize;
     if typ != OBJ_ENTRY || size < 64 {
-        return Err(ParseError::Invalid { offset: o, reason: format!("not an entry object (type {typ}, size {size})") });
+        return Err(ParseError::Invalid {
+            offset: o,
+            reason: format!("not an entry object (type {typ}, size {size})"),
+        });
     }
     let obj = need(d, o, size)?;
     let mut e = Entry {
@@ -224,7 +274,11 @@ fn parse_entry(d: &[u8], o: usize, compact: bool) -> Result<Entry> {
     let isz = if compact { 4 } else { 16 };
     let n = (size - 64) / isz;
     for k in 0..n {
-        let doff = if compact { u32_at(obj, 64 + k * 4)? as usize } else { u64_at(obj, 64 + k * 16)? as usize };
+        let doff = if compact {
+            u32_at(obj, 64 + k * 4)? as usize
+        } else {
+            u64_at(obj, 64 + k * 16)? as usize
+        };
         match read_data(d, doff, compact) {
             Ok(DataPayload::Bytes(p)) => {
                 if let Some(eq) = p.iter().position(|&b| b == b'=') {
@@ -247,14 +301,21 @@ enum DataPayload {
 
 fn read_data(d: &[u8], o: usize, compact: bool) -> Result<DataPayload> {
     if o >= d.len() {
-        return Err(ParseError::Truncated { offset: o, needed: 64, available: 0 });
+        return Err(ParseError::Truncated {
+            offset: o,
+            needed: 64,
+            available: 0,
+        });
     }
     let typ = u8_at(d, o)?;
     let flags = u8_at(d, o + 1)?;
     let size = u64_at(d, o + 8)? as usize;
     let hdr = if compact { 72 } else { 64 };
     if typ != OBJ_DATA || size < hdr {
-        return Err(ParseError::Invalid { offset: o, reason: format!("not a data object (type {typ})") });
+        return Err(ParseError::Invalid {
+            offset: o,
+            reason: format!("not a data object (type {typ})"),
+        });
     }
     let payload = need(d, o + hdr, size - hdr)?;
     if flags & 2 != 0 {
@@ -262,13 +323,21 @@ fn read_data(d: &[u8], o: usize, compact: bool) -> Result<DataPayload> {
         if usize_ > MAX_FIELD_SIZE {
             return Err(ParseError::Limit(format!("LZ4 field of {usize_} bytes")));
         }
-        return Ok(DataPayload::Bytes(lz4_block_decompress(&payload[8..], usize_, MAX_FIELD_SIZE)?));
+        return Ok(DataPayload::Bytes(lz4_block_decompress(
+            &payload[8..],
+            usize_,
+            MAX_FIELD_SIZE,
+        )?));
     }
     if flags & 1 != 0 {
-        return Ok(DataPayload::Unsupported(format!("xz-compressed data object at {o}")));
+        return Ok(DataPayload::Unsupported(format!(
+            "xz-compressed data object at {o}"
+        )));
     }
     if flags & 4 != 0 {
-        return Ok(DataPayload::Unsupported(format!("zstd-compressed data object at {o}")));
+        return Ok(DataPayload::Unsupported(format!(
+            "zstd-compressed data object at {o}"
+        )));
     }
     Ok(DataPayload::Bytes(payload.to_vec()))
 }
@@ -278,9 +347,21 @@ pub fn events(j: &Journal, sha: &str, path: &str) -> Vec<Event> {
     for e in &j.entries {
         let body = e.get("MESSAGE").unwrap_or("").to_string();
         let host = e.get("_HOSTNAME").unwrap_or("").to_string();
-        let reporter = e.get("SYSLOG_IDENTIFIER").or(e.get("_COMM")).unwrap_or("").to_string();
-        let pid = e.get("_PID").or(e.get("SYSLOG_PID")).unwrap_or("").to_string();
-        let msg = if pid.is_empty() { format!("{host} [{reporter}] {body}") } else { format!("{host} [{reporter}, pid: {pid}] {body}") };
+        let reporter = e
+            .get("SYSLOG_IDENTIFIER")
+            .or(e.get("_COMM"))
+            .unwrap_or("")
+            .to_string();
+        let pid = e
+            .get("_PID")
+            .or(e.get("SYSLOG_PID"))
+            .unwrap_or("")
+            .to_string();
+        let msg = if pid.is_empty() {
+            format!("{host} [{reporter}] {body}")
+        } else {
+            format!("{host} [{reporter}, pid: {pid}] {body}")
+        };
         let ts = (e.realtime_us as i64).checked_mul(1000);
         let mut ev = Event::new("systemd:journal", desc::WRITTEN, msg)
             .with_time(ts)
@@ -294,7 +375,10 @@ pub fn events(j: &Journal, sha: &str, path: &str) -> Vec<Event> {
             .attr("cmdline", json!(e.get("_CMDLINE")))
             .attr("unit", json!(e.get("_SYSTEMD_UNIT")))
             .attr("priority", json!(e.get("PRIORITY")))
-            .attr("source_realtime_timestamp", json!(e.get("_SOURCE_REALTIME_TIMESTAMP")))
+            .attr(
+                "source_realtime_timestamp",
+                json!(e.get("_SOURCE_REALTIME_TIMESTAMP")),
+            )
             .attr("seqnum", e.seqnum)
             .attr("boot_id", e.boot_id.clone());
         if !e.unsupported.is_empty() {
@@ -303,7 +387,13 @@ pub fn events(j: &Journal, sha: &str, path: &str) -> Vec<Event> {
         ev.host = if host.is_empty() { None } else { Some(host) };
         ev.source_short = "LOG".into();
         ev.source_long = "systemd journal".into();
-        out.push(ev.provenance(sha, path, e.offset as i64, "journald", crate::PARSER_VERSION));
+        out.push(ev.provenance(
+            sha,
+            path,
+            e.offset as i64,
+            "journald",
+            crate::PARSER_VERSION,
+        ));
     }
     out
 }

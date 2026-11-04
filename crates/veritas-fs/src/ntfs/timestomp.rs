@@ -25,7 +25,12 @@ pub struct Finding {
 }
 
 fn fields(si: &super::record::StdInfo) -> [(&'static str, u64); 4] {
-    [("crtime", si.crtime), ("mtime", si.mtime), ("ctime", si.ctime), ("atime", si.atime)]
+    [
+        ("crtime", si.crtime),
+        ("mtime", si.mtime),
+        ("ctime", si.ctime),
+        ("atime", si.atime),
+    ]
 }
 
 /// Evaluate all rules. `usn` may be empty when no journal is available.
@@ -46,22 +51,58 @@ pub fn detect(entries: &[FileEntry], usn: &[UsnRecord]) -> Vec<Finding> {
         let path = e.path.clone().unwrap_or_default();
         let fname = e.best_name();
         if let Some(f) = fname {
-            let fnf = [("crtime", f.crtime), ("mtime", f.mtime), ("ctime", f.ctime), ("atime", f.atime)];
+            let fnf = [
+                ("crtime", f.crtime),
+                ("mtime", f.mtime),
+                ("ctime", f.ctime),
+                ("atime", f.atime),
+            ];
             for ((name, s), (_, fv)) in fields(si).iter().zip(fnf.iter()) {
                 // Rule 1: $SI earlier than $FN for creation/modification. $FN is only set by the kernel.
                 if (*name == "crtime" || *name == "mtime") && *s != 0 && *fv != 0 && s < fv {
-                    out.push(Finding { entry: e.entry, sequence: e.sequence, path: path.clone(), rule: "si_before_fn".into(), field: name.to_string(), si_value: *s, other_value: *fv, detail: format!("$SI {name} precedes $FN {name} by {} ticks", fv - s) });
+                    out.push(Finding {
+                        entry: e.entry,
+                        sequence: e.sequence,
+                        path: path.clone(),
+                        rule: "si_before_fn".into(),
+                        field: name.to_string(),
+                        si_value: *s,
+                        other_value: *fv,
+                        detail: format!("$SI {name} precedes $FN {name} by {} ticks", fv - s),
+                    });
                 }
                 // Rule 2: $SI has whole-second precision while $FN does not (typical of SetFileTime tools).
-                if (*name == "crtime" || *name == "mtime") && *s != 0 && s % TICKS_PER_SEC == 0 && fv % TICKS_PER_SEC != 0 {
-                    out.push(Finding { entry: e.entry, sequence: e.sequence, path: path.clone(), rule: "si_zero_subsecond".into(), field: name.to_string(), si_value: *s, other_value: *fv, detail: format!("$SI {name} has zero sub-second precision, $FN does not") });
+                if (*name == "crtime" || *name == "mtime")
+                    && *s != 0
+                    && s % TICKS_PER_SEC == 0
+                    && fv % TICKS_PER_SEC != 0
+                {
+                    out.push(Finding {
+                        entry: e.entry,
+                        sequence: e.sequence,
+                        path: path.clone(),
+                        rule: "si_zero_subsecond".into(),
+                        field: name.to_string(),
+                        si_value: *s,
+                        other_value: *fv,
+                        detail: format!("$SI {name} has zero sub-second precision, $FN does not"),
+                    });
                 }
             }
         }
         // Rule 3: the journal records a content change after the $SI modification time.
         if let Some(&t) = by_ref.get(&(e.entry, e.sequence)) {
             if t > si.mtime.saturating_add(USN_TOLERANCE_TICKS) {
-                out.push(Finding { entry: e.entry, sequence: e.sequence, path: path.clone(), rule: "usn_after_si_mtime".into(), field: "mtime".into(), si_value: si.mtime, other_value: t, detail: "USN data change recorded after $SI modification time".into() });
+                out.push(Finding {
+                    entry: e.entry,
+                    sequence: e.sequence,
+                    path: path.clone(),
+                    rule: "usn_after_si_mtime".into(),
+                    field: "mtime".into(),
+                    si_value: si.mtime,
+                    other_value: t,
+                    detail: "USN data change recorded after $SI modification time".into(),
+                });
             }
         }
     }

@@ -54,7 +54,13 @@ pub struct TriageOptions {
 
 impl Default for TriageOptions {
     fn default() -> Self {
-        Self { profile: Profile::Quick, max_file_bytes: 512 * 1024 * 1024, hash_executables: true, only: None, command_timeout: Duration::from_secs(180) }
+        Self {
+            profile: Profile::Quick,
+            max_file_bytes: 512 * 1024 * 1024,
+            hash_executables: true,
+            only: None,
+            command_timeout: Duration::from_secs(180),
+        }
     }
 }
 
@@ -68,19 +74,35 @@ pub struct Ctx<'a> {
 
 impl Ctx<'_> {
     /// Run a command and store its stdout as `name`; failures are recorded, never fatal.
-    pub fn command(&mut self, collector: &str, name: &str, program: &str, args: &[&str]) -> Result<Option<cmd::CmdOutput>> {
+    pub fn command(
+        &mut self,
+        collector: &str,
+        name: &str,
+        program: &str,
+        args: &[&str],
+    ) -> Result<Option<cmd::CmdOutput>> {
         match cmd::run(program, args, self.opts.command_timeout) {
             Ok(out) => {
                 if !out.stdout.is_empty() {
-                    self.bundle.add_bytes(collector, name, &out.stdout, Some(&format!("{} {}", program, args.join(" "))))?;
+                    self.bundle.add_bytes(
+                        collector,
+                        name,
+                        &out.stdout,
+                        Some(&format!("{} {}", program, args.join(" "))),
+                    )?;
                 }
                 if !out.success() {
-                    self.bundle.error(collector, &format!("{} {}", program, args.join(" ")), out.failure_text());
+                    self.bundle.error(
+                        collector,
+                        &format!("{} {}", program, args.join(" ")),
+                        out.failure_text(),
+                    );
                 }
                 Ok(Some(out))
             }
             Err(e) => {
-                self.bundle.error(collector, &format!("{} {}", program, args.join(" ")), e);
+                self.bundle
+                    .error(collector, &format!("{} {}", program, args.join(" ")), e);
                 Ok(None)
             }
         }
@@ -99,7 +121,11 @@ type CollectorFn = fn(&mut Ctx) -> Result<()>;
 
 /// Collectors for the current OS, in run order.
 pub fn collectors_for_os(os: &str) -> Vec<(&'static str, CollectorFn)> {
-    let mut v: Vec<(&'static str, CollectorFn)> = vec![("system", collect_system), ("processes", collect_processes), ("network", collect_network)];
+    let mut v: Vec<(&'static str, CollectorFn)> = vec![
+        ("system", collect_system),
+        ("processes", collect_processes),
+        ("network", collect_network),
+    ];
     match os {
         "windows" => v.extend(windows::collectors()),
         "linux" => v.extend(unix::linux_collectors()),
@@ -111,18 +137,31 @@ pub fn collectors_for_os(os: &str) -> Vec<(&'static str, CollectorFn)> {
 }
 
 /// Run every collector and write the bundle to `out`.
-pub fn run_triage(out: &Path, opts: &TriageOptions, progress: &mut dyn FnMut(&str, usize, usize)) -> Result<Manifest> {
+pub fn run_triage(
+    out: &Path,
+    opts: &TriageOptions,
+    progress: &mut dyn FnMut(&str, usize, usize),
+) -> Result<Manifest> {
     let mut bundle = BundleWriter::create(out, opts.profile.as_str(), opts.max_file_bytes)?;
     bundle.set_elevated(is_elevated());
     let tmp = tempfile::tempdir()?;
     let list: Vec<_> = collectors_for_os(std::env::consts::OS)
         .into_iter()
-        .filter(|(n, _)| opts.only.as_ref().map(|o| o.iter().any(|x| x == n)).unwrap_or(true))
+        .filter(|(n, _)| {
+            opts.only
+                .as_ref()
+                .map(|o| o.iter().any(|x| x == n))
+                .unwrap_or(true)
+        })
         .collect();
     let total = list.len();
     for (i, (name, f)) in list.into_iter().enumerate() {
         progress(name, i, total);
-        let mut ctx = Ctx { bundle: &mut bundle, opts, tmp: tmp.path().to_path_buf() };
+        let mut ctx = Ctx {
+            bundle: &mut bundle,
+            opts,
+            tmp: tmp.path().to_path_buf(),
+        };
         f(&mut ctx)?;
     }
     progress("done", total, total);
@@ -146,9 +185,19 @@ pub fn is_elevated() -> Option<bool> {
 /// User profile directories on this host.
 pub fn user_profiles() -> Vec<PathBuf> {
     let mut v = Vec::new();
-    let skip = ["public", "default", "default user", "all users", "shared", "desktop.ini"];
+    let skip = [
+        "public",
+        "default",
+        "default user",
+        "all users",
+        "shared",
+        "desktop.ini",
+    ];
     let roots: Vec<PathBuf> = match std::env::consts::OS {
-        "windows" => vec![PathBuf::from(format!("{}\\Users", std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into())))],
+        "windows" => vec![PathBuf::from(format!(
+            "{}\\Users",
+            std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into())
+        ))],
         "macos" => vec![PathBuf::from("/Users")],
         _ => {
             v.push(PathBuf::from("/root"));
@@ -157,10 +206,17 @@ pub fn user_profiles() -> Vec<PathBuf> {
     };
     for r in roots {
         if let Ok(rd) = std::fs::read_dir(&r) {
-            let mut ps: Vec<PathBuf> = rd.flatten().map(|e| e.path()).filter(|p| p.is_dir()).collect();
+            let mut ps: Vec<PathBuf> = rd
+                .flatten()
+                .map(|e| e.path())
+                .filter(|p| p.is_dir())
+                .collect();
             ps.sort();
             for p in ps {
-                let n = p.file_name().map(|n| n.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
+                let n = p
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_ascii_lowercase())
+                    .unwrap_or_default();
                 if !skip.contains(&n.as_str()) {
                     v.push(p);
                 }
@@ -171,7 +227,9 @@ pub fn user_profiles() -> Vec<PathBuf> {
 }
 
 fn profile_label(p: &Path) -> String {
-    p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "unknown".into())
+    p.file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "unknown".into())
 }
 
 #[derive(Serialize)]
@@ -206,7 +264,10 @@ fn collect_system(ctx: &mut Ctx) -> Result<()> {
         os: std::env::consts::OS,
         os_version: sysinfo::System::long_os_version(),
         kernel_version: sysinfo::System::kernel_version(),
-        boot_time: Utc.timestamp_opt(sysinfo::System::boot_time() as i64, 0).single().map(|d| d.to_rfc3339()),
+        boot_time: Utc
+            .timestamp_opt(sysinfo::System::boot_time() as i64, 0)
+            .single()
+            .map(|d| d.to_rfc3339()),
         uptime_seconds: sysinfo::System::uptime(),
         collected_at: Utc::now().to_rfc3339(),
         elevated: ctx.bundle.manifest().elevated,
@@ -214,7 +275,8 @@ fn collect_system(ctx: &mut Ctx) -> Result<()> {
         users,
         timezone_offset_seconds: chrono::Local::now().offset().local_minus_utc(),
     };
-    ctx.bundle.add_json("system", "system/system_info.json", &info)?;
+    ctx.bundle
+        .add_json("system", "system/system_info.json", &info)?;
     Ok(())
 }
 
@@ -235,7 +297,11 @@ pub struct ProcessRecord {
 
 fn collect_processes(ctx: &mut Ctx) -> Result<()> {
     let mut sys = sysinfo::System::new();
-    sys.refresh_processes_specifics(sysinfo::ProcessesToUpdate::All, true, sysinfo::ProcessRefreshKind::everything());
+    sys.refresh_processes_specifics(
+        sysinfo::ProcessesToUpdate::All,
+        true,
+        sysinfo::ProcessRefreshKind::everything(),
+    );
     let users = sysinfo::Users::new_with_refreshed_list();
     let mut cache: BTreeMap<PathBuf, std::result::Result<String, String>> = BTreeMap::new();
     let mut records = Vec::new();
@@ -248,9 +314,14 @@ fn collect_processes(ctx: &mut Ctx) -> Result<()> {
         let exe_sha256 = match (&exe, ctx.opts.hash_executables) {
             (Some(path), true) if !path.as_os_str().is_empty() => {
                 let r = cache.entry(path.clone()).or_insert_with(|| {
-                    let len = std::fs::metadata(path).map(|m| m.len()).map_err(|e| e.to_string())?;
+                    let len = std::fs::metadata(path)
+                        .map(|m| m.len())
+                        .map_err(|e| e.to_string())?;
                     if len > ctx.opts.max_file_bytes {
-                        return Err(format!("executable larger than {} bytes, not hashed", ctx.opts.max_file_bytes));
+                        return Err(format!(
+                            "executable larger than {} bytes, not hashed",
+                            ctx.opts.max_file_bytes
+                        ));
                     }
                     crate::sha256_file(path).map_err(|e| e.to_string())
                 });
@@ -263,27 +334,44 @@ fn collect_processes(ctx: &mut Ctx) -> Result<()> {
                 }
             }
             (None, _) => {
-                error = Some("executable path not readable (insufficient privilege or kernel process)".into());
+                error = Some(
+                    "executable path not readable (insufficient privilege or kernel process)"
+                        .into(),
+                );
                 None
             }
             _ => None,
         };
         let user_id = p.user_id().map(|u| u.to_string());
-        let user = p.user_id().and_then(|u| users.get_user_by_id(u)).map(|u| u.name().to_string());
+        let user = p
+            .user_id()
+            .and_then(|u| users.get_user_by_id(u))
+            .map(|u| u.name().to_string());
         records.push(ProcessRecord {
             pid: pid.as_u32(),
             ppid: p.parent().map(|x| x.as_u32()),
             name: p.name().to_string_lossy().into_owned(),
             exe: exe.map(|e| e.display().to_string()),
-            cmdline: p.cmd().iter().map(|c| c.to_string_lossy().into_owned()).collect(),
+            cmdline: p
+                .cmd()
+                .iter()
+                .map(|c| c.to_string_lossy().into_owned())
+                .collect(),
             user,
             user_id,
-            start_time: if p.start_time() > 0 { Utc.timestamp_opt(p.start_time() as i64, 0).single().map(|d| d.to_rfc3339()) } else { None },
+            start_time: if p.start_time() > 0 {
+                Utc.timestamp_opt(p.start_time() as i64, 0)
+                    .single()
+                    .map(|d| d.to_rfc3339())
+            } else {
+                None
+            },
             exe_sha256,
             error,
         });
     }
-    ctx.bundle.add_json("processes", "processes/processes.json", &records)?;
+    ctx.bundle
+        .add_json("processes", "processes/processes.json", &records)?;
     Ok(())
 }
 
@@ -292,7 +380,9 @@ fn collect_network(ctx: &mut Ctx) -> Result<()> {
     let mut conns = Vec::new();
     match std::env::consts::OS {
         "windows" => {
-            if let Some(out) = ctx.command("network", "network/netstat_ano.txt", "netstat", &["-ano"])? {
+            if let Some(out) =
+                ctx.command("network", "network/netstat_ano.txt", "netstat", &["-ano"])?
+            {
                 conns = network::parse_netstat_windows(&out.stdout_lossy());
             }
         }
@@ -302,7 +392,12 @@ fn collect_network(ctx: &mut Ctx) -> Result<()> {
                 let p = PathBuf::from(format!("/proc/net/{}", proto));
                 match std::fs::read_to_string(&p) {
                     Ok(text) => {
-                        ctx.bundle.add_bytes("network", &format!("network/proc_net_{}.txt", proto), text.as_bytes(), Some(&p.display().to_string()))?;
+                        ctx.bundle.add_bytes(
+                            "network",
+                            &format!("network/proc_net_{}.txt", proto),
+                            text.as_bytes(),
+                            Some(&p.display().to_string()),
+                        )?;
                         for mut c in network::parse_proc_net(&text, proto) {
                             if let Some((pid, comm)) = c.inode.and_then(|i| owners.get(&i)) {
                                 c.pid = Some(*pid);
@@ -316,18 +411,34 @@ fn collect_network(ctx: &mut Ctx) -> Result<()> {
             }
         }
         _ => {
-            ctx.command("network", "network/netstat_anv_tcp.txt", "netstat", &["-anv", "-p", "tcp"])?;
-            ctx.command("network", "network/netstat_anv_udp.txt", "netstat", &["-anv", "-p", "udp"])?;
+            ctx.command(
+                "network",
+                "network/netstat_anv_tcp.txt",
+                "netstat",
+                &["-anv", "-p", "tcp"],
+            )?;
+            ctx.command(
+                "network",
+                "network/netstat_anv_udp.txt",
+                "netstat",
+                &["-anv", "-p", "udp"],
+            )?;
             match cmd::run("lsof", &["-i", "-n", "-P"], t) {
                 Ok(out) => {
-                    ctx.bundle.add_bytes("network", "network/lsof_i.txt", &out.stdout, Some("lsof -i -n -P"))?;
+                    ctx.bundle.add_bytes(
+                        "network",
+                        "network/lsof_i.txt",
+                        &out.stdout,
+                        Some("lsof -i -n -P"),
+                    )?;
                     conns = network::parse_lsof(&out.stdout_lossy());
                 }
                 Err(e) => ctx.bundle.error("network", "lsof -i -n -P", e),
             }
         }
     }
-    ctx.bundle.add_json("network", "network/connections.json", &conns)?;
+    ctx.bundle
+        .add_json("network", "network/connections.json", &conns)?;
     Ok(())
 }
 
@@ -335,15 +446,30 @@ fn collect_network(ctx: &mut Ctx) -> Result<()> {
 fn collect_browsers(ctx: &mut Ctx) -> Result<()> {
     let (chromium, firefox): (Vec<&str>, Vec<&str>) = match std::env::consts::OS {
         "windows" => (
-            vec![r"AppData\Local\Google\Chrome\User Data", r"AppData\Local\Microsoft\Edge\User Data", r"AppData\Local\BraveSoftware\Brave-Browser\User Data", r"AppData\Local\Chromium\User Data"],
+            vec![
+                r"AppData\Local\Google\Chrome\User Data",
+                r"AppData\Local\Microsoft\Edge\User Data",
+                r"AppData\Local\BraveSoftware\Brave-Browser\User Data",
+                r"AppData\Local\Chromium\User Data",
+            ],
             vec![r"AppData\Roaming\Mozilla\Firefox\Profiles"],
         ),
         "macos" => (
-            vec!["Library/Application Support/Google/Chrome", "Library/Application Support/Microsoft Edge", "Library/Application Support/BraveSoftware/Brave-Browser", "Library/Application Support/Chromium"],
+            vec![
+                "Library/Application Support/Google/Chrome",
+                "Library/Application Support/Microsoft Edge",
+                "Library/Application Support/BraveSoftware/Brave-Browser",
+                "Library/Application Support/Chromium",
+            ],
             vec!["Library/Application Support/Firefox/Profiles"],
         ),
         _ => (
-            vec![".config/google-chrome", ".config/microsoft-edge", ".config/BraveSoftware/Brave-Browser", ".config/chromium"],
+            vec![
+                ".config/google-chrome",
+                ".config/microsoft-edge",
+                ".config/BraveSoftware/Brave-Browser",
+                ".config/chromium",
+            ],
             vec![".mozilla/firefox", "snap/firefox/common/.mozilla/firefox"],
         ),
     };
@@ -352,7 +478,9 @@ fn collect_browsers(ctx: &mut Ctx) -> Result<()> {
         let user = profile_label(&profile);
         for base in &chromium {
             let dir = profile.join(base);
-            let Ok(rd) = std::fs::read_dir(&dir) else { continue };
+            let Ok(rd) = std::fs::read_dir(&dir) else {
+                continue;
+            };
             let browser = base.replace(['\\', '/'], "_");
             for e in rd.flatten() {
                 let p = e.path();
@@ -367,7 +495,9 @@ fn collect_browsers(ctx: &mut Ctx) -> Result<()> {
         }
         for base in &firefox {
             let dir = profile.join(base);
-            let Ok(rd) = std::fs::read_dir(&dir) else { continue };
+            let Ok(rd) = std::fs::read_dir(&dir) else {
+                continue;
+            };
             for e in rd.flatten() {
                 let p = e.path();
                 if p.join("places.sqlite").is_file() {
@@ -380,6 +510,7 @@ fn collect_browsers(ctx: &mut Ctx) -> Result<()> {
             }
         }
     }
-    ctx.bundle.add_json("browsers", "browsers/profiles_found.json", &found)?;
+    ctx.bundle
+        .add_json("browsers", "browsers/profiles_found.json", &found)?;
     Ok(())
 }

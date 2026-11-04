@@ -99,9 +99,15 @@ pub fn zip_name(raw: &str) -> String {
         })
         .collect();
     while s.starts_with('/') || s.starts_with("./") {
-        s = s.trim_start_matches('/').trim_start_matches("./").to_string();
+        s = s
+            .trim_start_matches('/')
+            .trim_start_matches("./")
+            .to_string();
     }
-    let parts: Vec<&str> = s.split('/').filter(|p| !p.is_empty() && *p != "." && *p != "..").collect();
+    let parts: Vec<&str> = s
+        .split('/')
+        .filter(|p| !p.is_empty() && *p != "." && *p != "..")
+        .collect();
     if parts.is_empty() {
         "unnamed".to_string()
     } else {
@@ -112,14 +118,21 @@ pub fn zip_name(raw: &str) -> String {
 impl BundleWriter {
     /// Create the ZIP (refuses to overwrite an existing file).
     pub fn create(path: &Path, profile: &str, max_file_bytes: u64) -> Result<Self> {
-        let file = std::fs::OpenOptions::new().write(true).create_new(true).open(path)?;
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)?;
         let manifest = Manifest {
             format: "veritas-triage".into(),
             format_version: 1,
             tool: crate::AGENT_NAME.into(),
             tool_version: crate::AGENT_VERSION.into(),
             host: sysinfo::System::host_name(),
-            os: format!("{} {}", std::env::consts::OS, sysinfo::System::long_os_version().unwrap_or_default()),
+            os: format!(
+                "{} {}",
+                std::env::consts::OS,
+                sysinfo::System::long_os_version().unwrap_or_default()
+            ),
             profile: profile.into(),
             elevated: None,
             started_at: Utc::now(),
@@ -127,7 +140,12 @@ impl BundleWriter {
             files: Vec::new(),
             errors: Vec::new(),
         };
-        Ok(Self { zip: ZipWriter::new(BufWriter::new(file)), manifest, names: BTreeSet::new(), max_file_bytes })
+        Ok(Self {
+            zip: ZipWriter::new(BufWriter::new(file)),
+            manifest,
+            names: BTreeSet::new(),
+            max_file_bytes,
+        })
     }
 
     pub fn set_elevated(&mut self, elevated: Option<bool>) {
@@ -152,18 +170,36 @@ impl BundleWriter {
 
     /// Record a per-item failure.
     pub fn error(&mut self, collector: &str, item: &str, error: impl ToString) {
-        self.manifest.errors.push(CollectionError { collector: collector.into(), item: item.into(), error: error.to_string(), at: Utc::now() });
+        self.manifest.errors.push(CollectionError {
+            collector: collector.into(),
+            item: item.into(),
+            error: error.to_string(),
+            at: Utc::now(),
+        });
     }
 
     /// Store an entry produced by `fill`, hashing what it writes.
-    fn add_entry<F>(&mut self, collector: &str, name: &str, source: Option<String>, large: bool, fill: F) -> Result<String>
+    fn add_entry<F>(
+        &mut self,
+        collector: &str,
+        name: &str,
+        source: Option<String>,
+        large: bool,
+        fill: F,
+    ) -> Result<String>
     where
         F: FnOnce(&mut dyn Write) -> std::result::Result<bool, String>,
     {
         let name = self.unique_name(name);
-        let opts = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated).large_file(large);
+        let opts = SimpleFileOptions::default()
+            .compression_method(CompressionMethod::Deflated)
+            .large_file(large);
         self.zip.start_file(name.as_str(), opts)?;
-        let mut hw = HashingWriter { inner: &mut self.zip, hasher: sha2::Sha256::new(), count: 0 };
+        let mut hw = HashingWriter {
+            inner: &mut self.zip,
+            hasher: sha2::Sha256::new(),
+            count: 0,
+        };
         let result = fill(&mut hw);
         let (sha, size) = (hex::encode(hw.hasher.finalize()), hw.count);
         let (truncated, error) = match result {
@@ -187,15 +223,32 @@ impl BundleWriter {
     }
 
     /// Store an in-memory buffer.
-    pub fn add_bytes(&mut self, collector: &str, name: &str, data: &[u8], source: Option<&str>) -> Result<String> {
-        self.add_entry(collector, name, source.map(String::from), data.len() as u64 > u32::MAX as u64, |w| {
-            w.write_all(data).map_err(|e| e.to_string())?;
-            Ok(false)
-        })
+    pub fn add_bytes(
+        &mut self,
+        collector: &str,
+        name: &str,
+        data: &[u8],
+        source: Option<&str>,
+    ) -> Result<String> {
+        self.add_entry(
+            collector,
+            name,
+            source.map(String::from),
+            data.len() as u64 > u32::MAX as u64,
+            |w| {
+                w.write_all(data).map_err(|e| e.to_string())?;
+                Ok(false)
+            },
+        )
     }
 
     /// Store a value as pretty JSON.
-    pub fn add_json<T: Serialize>(&mut self, collector: &str, name: &str, value: &T) -> Result<String> {
+    pub fn add_json<T: Serialize>(
+        &mut self,
+        collector: &str,
+        name: &str,
+        value: &T,
+    ) -> Result<String> {
         let data = serde_json::to_vec_pretty(value)?;
         self.add_bytes(collector, name, &data, None)
     }
@@ -212,25 +265,48 @@ impl BundleWriter {
         };
         let len = file.metadata().map(|m| m.len()).unwrap_or(0);
         let cap = self.max_file_bytes;
-        let name = self.add_entry(collector, name, Some(src.display().to_string()), len > u32::MAX as u64 && cap > u32::MAX as u64, move |w| {
-            let mut limited = file.take(cap);
-            copy_stream(&mut limited, w)?;
-            Ok(len > cap)
-        })?;
+        let name = self.add_entry(
+            collector,
+            name,
+            Some(src.display().to_string()),
+            len > u32::MAX as u64 && cap > u32::MAX as u64,
+            move |w| {
+                let mut limited = file.take(cap);
+                copy_stream(&mut limited, w)?;
+                Ok(len > cap)
+            },
+        )?;
         Ok(Some(name))
     }
 
     /// Store bytes produced by a streaming writer callback (used for raw NTFS streams).
-    pub fn add_stream<F>(&mut self, collector: &str, name: &str, source: Option<&str>, large: bool, fill: F) -> Result<String>
+    pub fn add_stream<F>(
+        &mut self,
+        collector: &str,
+        name: &str,
+        source: Option<&str>,
+        large: bool,
+        fill: F,
+    ) -> Result<String>
     where
         F: FnOnce(&mut dyn Write) -> std::result::Result<(), String>,
     {
-        self.add_entry(collector, name, source.map(String::from), large, |w| fill(w).map(|_| false))
+        self.add_entry(collector, name, source.map(String::from), large, |w| {
+            fill(w).map(|_| false)
+        })
     }
 
     /// Copy files from a directory tree. `filter` selects files by path; `max_files` caps the
     /// count. Unreadable directories and files are recorded as errors.
-    pub fn add_tree(&mut self, collector: &str, prefix: &str, dir: &Path, recursive: bool, max_files: usize, filter: &dyn Fn(&Path) -> bool) -> Result<usize> {
+    pub fn add_tree(
+        &mut self,
+        collector: &str,
+        prefix: &str,
+        dir: &Path,
+        recursive: bool,
+        max_files: usize,
+        filter: &dyn Fn(&Path) -> bool,
+    ) -> Result<usize> {
         let mut stack = vec![dir.to_path_buf()];
         let mut count = 0usize;
         while let Some(d) = stack.pop() {
@@ -264,11 +340,21 @@ impl BundleWriter {
                     continue;
                 }
                 if count >= max_files {
-                    self.error(collector, &p.display().to_string(), format!("file limit {} reached", max_files));
+                    self.error(
+                        collector,
+                        &p.display().to_string(),
+                        format!("file limit {} reached", max_files),
+                    );
                     return Ok(count);
                 }
-                let rel = p.strip_prefix(dir).map(|r| r.to_string_lossy().into_owned()).unwrap_or_else(|_| p.display().to_string());
-                if self.add_file(collector, &format!("{}/{}", prefix, rel), &p)?.is_some() {
+                let rel = p
+                    .strip_prefix(dir)
+                    .map(|r| r.to_string_lossy().into_owned())
+                    .unwrap_or_else(|_| p.display().to_string());
+                if self
+                    .add_file(collector, &format!("{}/{}", prefix, rel), &p)?
+                    .is_some()
+                {
                     count += 1;
                 }
             }
@@ -280,7 +366,10 @@ impl BundleWriter {
     pub fn finish(mut self) -> Result<Manifest> {
         self.manifest.finished_at = Some(Utc::now());
         let data = serde_json::to_vec_pretty(&self.manifest)?;
-        self.zip.start_file(MANIFEST_NAME, SimpleFileOptions::default().compression_method(CompressionMethod::Deflated))?;
+        self.zip.start_file(
+            MANIFEST_NAME,
+            SimpleFileOptions::default().compression_method(CompressionMethod::Deflated),
+        )?;
         self.zip.write_all(&data)?;
         let mut inner = self.zip.finish()?;
         inner.flush()?;
@@ -298,7 +387,8 @@ fn copy_stream(r: &mut dyn Read, w: &mut dyn Write) -> std::result::Result<(), S
             Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
             Err(e) => return Err(format!("read failed: {}", e)),
         };
-        w.write_all(&buf[..n]).map_err(|e| format!("write failed: {}", e))?;
+        w.write_all(&buf[..n])
+            .map_err(|e| format!("write failed: {}", e))?;
     }
 }
 
@@ -326,11 +416,18 @@ pub fn verify_bundle(path: &Path) -> Result<Manifest> {
         }
         let sha = hex::encode(h.finalize());
         if sha != entry.sha256 || size != entry.size {
-            return Err(AgentError::Integrity(format!("{}: manifest sha256 {} size {}, stored {} size {}", entry.path, entry.sha256, entry.size, sha, size)));
+            return Err(AgentError::Integrity(format!(
+                "{}: manifest sha256 {} size {}, stored {} size {}",
+                entry.path, entry.sha256, entry.size, sha, size
+            )));
         }
     }
     if zip.len() != manifest.files.len() + 1 {
-        return Err(AgentError::Integrity(format!("archive has {} entries, manifest lists {}", zip.len(), manifest.files.len())));
+        return Err(AgentError::Integrity(format!(
+            "archive has {} entries, manifest lists {}",
+            zip.len(),
+            manifest.files.len()
+        )));
     }
     Ok(manifest)
 }
@@ -341,7 +438,10 @@ mod tests {
 
     #[test]
     fn zip_names_are_sanitised() {
-        assert_eq!(zip_name(r"C:\Windows\System32\Tasks\x"), "C_/Windows/System32/Tasks/x");
+        assert_eq!(
+            zip_name(r"C:\Windows\System32\Tasks\x"),
+            "C_/Windows/System32/Tasks/x"
+        );
         assert_eq!(zip_name("/etc/../passwd"), "etc/passwd");
         assert_eq!(zip_name(""), "unnamed");
     }
@@ -356,7 +456,8 @@ mod tests {
         b.add_bytes("t", "x/one.txt", b"one", None).unwrap();
         b.add_bytes("t", "x/one.txt", b"two", None).unwrap();
         b.add_file("t", "copied/a.txt", &src).unwrap();
-        b.add_file("t", "missing", &dir.path().join("nope")).unwrap();
+        b.add_file("t", "missing", &dir.path().join("nope"))
+            .unwrap();
         let m = b.finish().unwrap();
         assert_eq!(m.files.len(), 3);
         assert_eq!(m.errors.len(), 1);

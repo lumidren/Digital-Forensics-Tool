@@ -15,7 +15,10 @@ pub fn decompress(input: &[u8], max_out: usize) -> Result<Vec<u8>> {
         let size = (hdr & 0x0FFF) as usize + 1;
         let compressed = hdr & 0x8000 != 0;
         let start = pos + 2;
-        let end = start.checked_add(size).filter(|&e| e <= input.len()).ok_or_else(|| FsError::invalid(pos as u64, "LZNT1 chunk exceeds input"))?;
+        let end = start
+            .checked_add(size)
+            .filter(|&e| e <= input.len())
+            .ok_or_else(|| FsError::invalid(pos as u64, "LZNT1 chunk exceeds input"))?;
         let chunk = &input[start..end];
         if !compressed {
             let take = chunk.len().min(max_out - out.len());
@@ -50,7 +53,10 @@ fn decompress_chunk(chunk: &[u8], out: &mut Vec<u8>, max_out: usize) -> Result<(
                 i += 2;
                 let cur = out.len() - base;
                 if cur == 0 {
-                    return Err(FsError::invalid(i as u64, "LZNT1 back-reference at chunk start"));
+                    return Err(FsError::invalid(
+                        i as u64,
+                        "LZNT1 back-reference at chunk start",
+                    ));
                 }
                 let mut len_mask = 0x0FFFusize;
                 let mut shift = 12u32;
@@ -63,7 +69,10 @@ fn decompress_chunk(chunk: &[u8], out: &mut Vec<u8>, max_out: usize) -> Result<(
                 let length = (token & len_mask) + 3;
                 let disp = (token >> shift) + 1;
                 if disp > cur {
-                    return Err(FsError::invalid(i as u64, "LZNT1 displacement before chunk start"));
+                    return Err(FsError::invalid(
+                        i as u64,
+                        "LZNT1 displacement before chunk start",
+                    ));
                 }
                 let from = out.len() - disp;
                 for k in 0..length {

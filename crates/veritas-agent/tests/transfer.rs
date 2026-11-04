@@ -62,10 +62,16 @@ fn handle(mut stream: TcpStream, state: Shared) {
             headers.insert(k.trim().to_ascii_lowercase(), v.trim().to_string());
         }
     }
-    assert!(!headers.contains_key("transfer-encoding"), "client must send Content-Length");
+    assert!(
+        !headers.contains_key("transfer-encoding"),
+        "client must send Content-Length"
+    );
     let parts: Vec<&str> = request_line.split_whitespace().collect();
     let (method, path) = (parts[0], parts[1]);
-    let len: usize = headers.get("content-length").and_then(|v| v.parse().ok()).unwrap_or(0);
+    let len: usize = headers
+        .get("content-length")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
     let segs: Vec<&str> = path.trim_start_matches('/').split('/').collect();
 
     if method == "PUT" && segs.len() == 7 && segs[5] == "segments" {
@@ -127,7 +133,13 @@ fn handle(mut stream: TcpStream, state: Shared) {
             let id = format!("sess-{}", st.created);
             let mut sess = Session::default();
             for s in v["segments"].as_array().unwrap() {
-                sess.manifest.insert(s["index"].as_u64().unwrap() as u32, (s["size"].as_u64().unwrap(), s["sha256"].as_str().unwrap().to_string()));
+                sess.manifest.insert(
+                    s["index"].as_u64().unwrap() as u32,
+                    (
+                        s["size"].as_u64().unwrap(),
+                        s["sha256"].as_str().unwrap().to_string(),
+                    ),
+                );
             }
             st.sessions.insert(id.clone(), sess);
             drop(st);
@@ -137,7 +149,13 @@ fn handle(mut stream: TcpStream, state: Shared) {
             let id = segs[4];
             match st.sessions.get(id) {
                 Some(sess) => {
-                    let list: Vec<_> = sess.received.iter().map(|(i, (sz, h))| serde_json::json!({"index": i, "size": sz, "sha256": h})).collect();
+                    let list: Vec<_> = sess
+                        .received
+                        .iter()
+                        .map(
+                            |(i, (sz, h))| serde_json::json!({"index": i, "size": sz, "sha256": h}),
+                        )
+                        .collect();
                     let b = serde_json::json!({ "session_id": id, "segments": list, "complete": sess.completed }).to_string();
                     drop(st);
                     respond(&mut stream, 200, &b);
@@ -186,12 +204,24 @@ fn start_server(state: Shared) -> String {
 fn make_manifest(dir: &Path, n: u32, size: usize) -> UploadManifest {
     let mut segments = Vec::new();
     for i in 0..n {
-        let data: Vec<u8> = (0..size).map(|j| ((j * 31 + i as usize * 7) % 251) as u8).collect();
+        let data: Vec<u8> = (0..size)
+            .map(|j| ((j * 31 + i as usize * 7) % 251) as u8)
+            .collect();
         let path = dir.join(format!("img.{:03}", i));
         std::fs::write(&path, &data).unwrap();
-        segments.push(UploadSegment { index: i, name: format!("img.{:03}", i), path, size: size as u64, sha256: hex::encode(sha2::Sha256::digest(&data)) });
+        segments.push(UploadSegment {
+            index: i,
+            name: format!("img.{:03}", i),
+            path,
+            size: size as u64,
+            sha256: hex::encode(sha2::Sha256::digest(&data)),
+        });
     }
-    UploadManifest { evidence_id: "EV-1".into(), case_id: Some("CASE-1".into()), segments }
+    UploadManifest {
+        evidence_id: "EV-1".into(),
+        case_id: Some("CASE-1".into()),
+        segments,
+    }
 }
 
 #[test]
@@ -207,7 +237,9 @@ fn dropped_connection_resumes_in_a_later_run() {
     let first = client.upload(&m, Some(&state_file), &mut |_, _| {});
     assert!(matches!(first, Err(AgentError::Http(_))), "{:?}", first);
     assert!(state_file.exists());
-    let second = client.upload(&m, Some(&state_file), &mut |_, _| {}).unwrap();
+    let second = client
+        .upload(&m, Some(&state_file), &mut |_, _| {})
+        .unwrap();
     assert!(second.completed);
     assert_eq!(second.skipped, vec![0]);
     assert_eq!(second.uploaded, vec![1, 2]);
@@ -276,7 +308,13 @@ fn server_rejects_tampered_body() {
 
 #[test]
 fn https_requires_client_identity_and_plain_http_only_on_loopback() {
-    assert!(matches!(UploadClient::new("https://intake.example", None), Err(AgentError::Tls(_))));
-    assert!(matches!(UploadClient::new("http://intake.example", None), Err(AgentError::Tls(_))));
+    assert!(matches!(
+        UploadClient::new("https://intake.example", None),
+        Err(AgentError::Tls(_))
+    ));
+    assert!(matches!(
+        UploadClient::new("http://intake.example", None),
+        Err(AgentError::Tls(_))
+    ));
     assert!(UploadClient::new("http://127.0.0.1:9", None).is_ok());
 }

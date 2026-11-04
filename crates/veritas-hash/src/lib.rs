@@ -104,8 +104,14 @@ mod tests {
     fn empty_input_known_vectors() {
         let h = hash_bytes(b"");
         assert_eq!(h.md5, "d41d8cd98f00b204e9800998ecf8427e");
-        assert_eq!(h.sha256, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
-        assert_eq!(h.sha3_256, "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a");
+        assert_eq!(
+            h.sha256,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_eq!(
+            h.sha3_256,
+            "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a"
+        );
         assert_eq!(h.length, 0);
     }
 
@@ -113,14 +119,22 @@ mod tests {
     fn abc_known_vectors() {
         let h = hash_bytes(b"abc");
         assert_eq!(h.md5, "900150983cd24fb0d6963f7d28e17f72");
-        assert_eq!(h.sha256, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
-        assert_eq!(h.sha3_256, "3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532");
+        assert_eq!(
+            h.sha256,
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        assert_eq!(
+            h.sha3_256,
+            "3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532"
+        );
         assert_eq!(h.length, 3);
     }
 
     #[test]
     fn reader_matches_bytes_across_chunk_boundaries() {
-        let data: Vec<u8> = (0..(9 * 1024 * 1024 + 17)).map(|i| (i % 251) as u8).collect();
+        let data: Vec<u8> = (0..(9 * 1024 * 1024 + 17))
+            .map(|i| (i % 251) as u8)
+            .collect();
         let mut calls = 0;
         let streamed = hash_reader(&data[..], |_| calls += 1).unwrap();
         assert_eq!(streamed, hash_bytes(&data));

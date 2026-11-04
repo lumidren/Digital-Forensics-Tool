@@ -10,11 +10,11 @@ pub mod error;
 pub mod io;
 pub mod util;
 
-pub mod volume;
-pub mod ntfs;
-pub mod fat;
-pub mod ext4;
 pub mod apfs;
+pub mod ext4;
+pub mod fat;
+pub mod ntfs;
+pub mod volume;
 pub mod vss;
 
 pub mod carve;

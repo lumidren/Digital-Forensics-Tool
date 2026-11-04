@@ -31,7 +31,9 @@ fn corpus() -> PathBuf {
 }
 
 fn out_root() -> PathBuf {
-    std::env::var_os("VERITAS_PARITY_OUT").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/parity"))
+    std::env::var_os("VERITAS_PARITY_OUT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/parity"))
 }
 
 fn safe(name: &str) -> String {
@@ -103,6 +105,10 @@ fn regf_parity_dump() {
             "deleted_keys": deleted.keys.len(),
             "deleted_values": deleted.values.len(),
         });
-        std::fs::write(reg_dir.join(format!("{}.json", safe(name))), serde_json::to_vec_pretty(&doc).unwrap()).unwrap();
+        std::fs::write(
+            reg_dir.join(format!("{}.json", safe(name))),
+            serde_json::to_vec_pretty(&doc).unwrap(),
+        )
+        .unwrap();
     }
 }

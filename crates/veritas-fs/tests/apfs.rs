@@ -24,7 +24,10 @@ fn apfs_container_and_volume() {
 fn apfs_entries() {
     let fs = Apfs::open(src("dfvfs/apfs.raw")).unwrap();
     let w = fs.walk(0).unwrap();
-    let got: Vec<(&str, u64, u64, u64)> = w.iter().map(|e| (e.path.as_str(), e.id, e.parent_id, e.size)).collect();
+    let got: Vec<(&str, u64, u64, u64)> = w
+        .iter()
+        .map(|e| (e.path.as_str(), e.id, e.parent_id, e.size))
+        .collect();
     assert_eq!(
         got,
         vec![
@@ -41,12 +44,24 @@ fn apfs_entries() {
         ]
     );
     let a = &w[5];
-    assert_eq!((a.crtime, a.mtime, a.ctime, a.atime, a.added), (Some(1642144781197370938), Some(1642144781201997443), Some(1642144781211025598), Some(1642144781197370938), Some(1642144781197370938)));
+    assert_eq!(
+        (a.crtime, a.mtime, a.ctime, a.atime, a.added),
+        (
+            Some(1642144781197370938),
+            Some(1642144781201997443),
+            Some(1642144781211025598),
+            Some(1642144781197370938),
+            Some(1642144781197370938)
+        )
+    );
     assert_eq!(a.mode, 0o100644);
     assert_eq!((a.uid, a.gid, a.nlink), (99, 99, 1));
     assert_eq!(a.xattrs, vec!["myxattr".to_string()]);
     assert_eq!(w[6].xattrs, vec!["com.apple.ResourceFork".to_string()]);
-    assert_eq!(w[8].symlink_target.as_deref(), Some("a_directory/another_file"));
+    assert_eq!(
+        w[8].symlink_target.as_deref(),
+        Some("a_directory/another_file")
+    );
     assert_eq!(w[8].kind, "symlink");
     assert_eq!(fs.read_file(0, "/a_directory/a_file").unwrap(), A_FILE);
     assert_eq!(fs.read_file(0, "/passwords.txt").unwrap().len(), 116);
@@ -67,8 +82,14 @@ fn apfs_encrypted_volume_is_reported() {
 fn apfs_checksum_detects_corruption() {
     let d = bytes("dfvfs/apfs.raw");
     let b0 = &d[..4096];
-    assert_eq!(u64::from_le_bytes(b0[..8].try_into().unwrap()), fletcher64(b0));
+    assert_eq!(
+        u64::from_le_bytes(b0[..8].try_into().unwrap()),
+        fletcher64(b0)
+    );
     let mut c = b0.to_vec();
     c[100] ^= 1;
-    assert_ne!(u64::from_le_bytes(c[..8].try_into().unwrap()), fletcher64(&c));
+    assert_ne!(
+        u64::from_le_bytes(c[..8].try_into().unwrap()),
+        fletcher64(&c)
+    );
 }

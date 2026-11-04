@@ -7,11 +7,16 @@ use veritas_artifacts::taskjob;
 use veritas_timeline::format_ns;
 
 fn corpus(rel: &str) -> Option<Vec<u8>> {
-    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/corpus/plaso").join(rel);
+    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../testdata/corpus/plaso")
+        .join(rel);
     match std::fs::read(&p) {
         Ok(d) => Some(d),
         Err(_) if std::env::var("VERITAS_REQUIRE_CORPUS").is_err() => {
-            eprintln!("skipping: corpus file {} missing (run testdata/fetch.py)", p.display());
+            eprintln!(
+                "skipping: corpus file {} missing (run testdata/fetch.py)",
+                p.display()
+            );
             None
         }
         Err(e) => panic!("corpus file {} missing: {e}", p.display()),
@@ -20,24 +25,45 @@ fn corpus(rel: &str) -> Option<Vec<u8>> {
 
 #[test]
 fn wintask_job() {
-    let Some(d) = corpus("wintask.job") else { return };
+    let Some(d) = corpus("wintask.job") else {
+        return;
+    };
     let j = taskjob::parse_job(&d).unwrap();
-    assert_eq!(j.application_name, r"C:\Program Files (x86)\Google\Update\GoogleUpdate.exe");
+    assert_eq!(
+        j.application_name,
+        r"C:\Program Files (x86)\Google\Update\GoogleUpdate.exe"
+    );
     assert_eq!(j.parameters, "/ua /installsource scheduler");
     assert_eq!(j.author, "Brian");
     assert_eq!(j.working_directory, "");
-    assert!(j.comment.starts_with("Keeps your Google software up to date."));
+    assert!(j
+        .comment
+        .starts_with("Keeps your Google software up to date."));
     assert_eq!(j.uuid, "0df2cfeb-5293-41e9-a45e-733720c2e1fa");
-    assert_eq!(format_ns(j.last_run_time.to_ns().unwrap()), "2013-08-24T12:42:00.112000Z");
+    assert_eq!(
+        format_ns(j.last_run_time.to_ns().unwrap()),
+        "2013-08-24T12:42:00.112000Z"
+    );
     assert_eq!(j.triggers.len(), 1);
     assert_eq!(j.triggers[0].trigger_type_name, "DAILY");
-    assert_eq!(format_ns(j.triggers[0].start_ns().unwrap()), "2013-07-12T15:42:00.000000Z");
+    assert_eq!(
+        format_ns(j.triggers[0].start_ns().unwrap()),
+        "2013-07-12T15:42:00.000000Z"
+    );
     let ev = taskjob::job_events(&j, "s", "wintask.job");
     assert_eq!(ev.len(), 2);
     assert_eq!(ev[0].data_type, "windows:tasks:job");
     assert_eq!(ev[0].timestamp_desc, "Last Time Executed");
     assert_eq!(ev[1].timestamp_desc, "Scheduled to start");
-    assert_eq!(serde_json::to_string(&ev).unwrap(), serde_json::to_string(&taskjob::job_events(&taskjob::parse_job(&d).unwrap(), "s", "wintask.job")).unwrap());
+    assert_eq!(
+        serde_json::to_string(&ev).unwrap(),
+        serde_json::to_string(&taskjob::job_events(
+            &taskjob::parse_job(&d).unwrap(),
+            "s",
+            "wintask.job"
+        ))
+        .unwrap()
+    );
 }
 
 const TASK_XML: &str = r#"<?xml version="1.0" encoding="UTF-16"?>
@@ -71,13 +97,22 @@ fn task_xml_utf16() {
     assert_eq!(t.run_level.as_deref(), Some("HighestAvailable"));
     assert_eq!(t.hidden.as_deref(), Some("true"));
     assert_eq!(t.triggers.len(), 2);
-    assert_eq!(t.actions[0].command.as_deref(), Some(r"C:\Windows\System32\cmd.exe"));
+    assert_eq!(
+        t.actions[0].command.as_deref(),
+        Some(r"C:\Windows\System32\cmd.exe")
+    );
     assert_eq!(t.actions[0].arguments.as_deref(), Some("/c evil.bat"));
     let ev = taskjob::xml_events(&t, "s", "Updater");
     assert_eq!(ev.len(), 2);
     assert_eq!(ev[0].data_type, "windows:tasks:xml");
-    assert_eq!(format_ns(ev[0].timestamp.unwrap()), "2021-03-04T05:06:07.123456Z");
-    assert_eq!(format_ns(ev[1].timestamp.unwrap()), "2021-03-05T00:00:00.000000Z");
+    assert_eq!(
+        format_ns(ev[0].timestamp.unwrap()),
+        "2021-03-04T05:06:07.123456Z"
+    );
+    assert_eq!(
+        format_ns(ev[1].timestamp.unwrap()),
+        "2021-03-05T00:00:00.000000Z"
+    );
     assert_eq!(ev[0].attrs["command"], r"C:\Windows\System32\cmd.exe");
     // UTF-8 input works too
     assert!(taskjob::parse_task_xml(TASK_XML.replace("UTF-16", "UTF-8").as_bytes()).is_ok());

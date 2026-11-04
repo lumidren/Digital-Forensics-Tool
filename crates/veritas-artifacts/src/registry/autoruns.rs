@@ -23,31 +23,154 @@ struct Loc {
     mode: Mode,
 }
 
-const RUN_KEYS: &[&str] = &["Run", "RunOnce", "RunOnceEx", "RunServices", "RunServicesOnce", "Policies\\Explorer\\Run"];
+const RUN_KEYS: &[&str] = &[
+    "Run",
+    "RunOnce",
+    "RunOnceEx",
+    "RunServices",
+    "RunServicesOnce",
+    "Policies\\Explorer\\Run",
+];
 
 const LOCS: &[Loc] = &[
-    Loc { kind: HiveKind::Software, path: "Microsoft\\Windows NT\\CurrentVersion\\Winlogon", location: "Winlogon", mode: Mode::Values(&["Shell", "Userinit", "Taskman", "AppSetup", "GinaDLL", "System"]) },
-    Loc { kind: HiveKind::Software, path: "Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon", location: "Winlogon", mode: Mode::Values(&["Shell", "Userinit"]) },
-    Loc { kind: HiveKind::Software, path: "Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Notify", location: "Winlogon Notify", mode: Mode::SubkeyValues(&["DllName"]) },
-    Loc { kind: HiveKind::Software, path: "Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options", location: "Image File Execution Options", mode: Mode::SubkeyValues(&["Debugger"]) },
-    Loc { kind: HiveKind::Software, path: "Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options", location: "Image File Execution Options", mode: Mode::SubkeyValues(&["Debugger"]) },
-    Loc { kind: HiveKind::Software, path: "Microsoft\\Windows NT\\CurrentVersion\\Windows", location: "AppInit_DLLs", mode: Mode::Values(&["AppInit_DLLs"]) },
-    Loc { kind: HiveKind::Software, path: "Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Windows", location: "AppInit_DLLs", mode: Mode::Values(&["AppInit_DLLs"]) },
-    Loc { kind: HiveKind::Software, path: "Microsoft\\Active Setup\\Installed Components", location: "Active Setup", mode: Mode::SubkeyValues(&["StubPath"]) },
-    Loc { kind: HiveKind::Software, path: "Wow6432Node\\Microsoft\\Active Setup\\Installed Components", location: "Active Setup", mode: Mode::SubkeyValues(&["StubPath"]) },
-    Loc { kind: HiveKind::Software, path: "Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders", location: "Startup folder", mode: Mode::Values(&["Common Startup"]) },
-    Loc { kind: HiveKind::Software, path: "Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders", location: "Startup folder", mode: Mode::Values(&["Common Startup"]) },
-    Loc { kind: HiveKind::Software, path: "Policies\\Microsoft\\Windows NT\\Terminal Services", location: "Terminal Server InitialProgram", mode: Mode::Values(&["InitialProgram"]) },
-    Loc { kind: HiveKind::NtUser, path: "Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows", location: "Windows Load/Run", mode: Mode::Values(&["Load", "Run"]) },
-    Loc { kind: HiveKind::NtUser, path: "Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon", location: "Winlogon", mode: Mode::Values(&["Shell"]) },
-    Loc { kind: HiveKind::NtUser, path: "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders", location: "Startup folder", mode: Mode::Values(&["Startup"]) },
-    Loc { kind: HiveKind::NtUser, path: "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders", location: "Startup folder", mode: Mode::Values(&["Startup"]) },
-    Loc { kind: HiveKind::NtUser, path: "Software\\Policies\\Microsoft\\Windows NT\\Terminal Services", location: "Terminal Server InitialProgram", mode: Mode::Values(&["InitialProgram"]) },
-    Loc { kind: HiveKind::System, path: "{CCS}\\Control\\Session Manager", location: "BootExecute", mode: Mode::Values(&["BootExecute", "SetupExecute", "Execute", "S0InitialCommand"]) },
-    Loc { kind: HiveKind::System, path: "{CCS}\\Control\\Lsa", location: "LSA packages", mode: Mode::Values(&["Authentication Packages", "Notification Packages", "Security Packages"]) },
-    Loc { kind: HiveKind::System, path: "{CCS}\\Control\\Lsa\\OSConfig", location: "LSA packages", mode: Mode::Values(&["Security Packages"]) },
-    Loc { kind: HiveKind::System, path: "{CCS}\\Control\\Terminal Server\\WinStations\\RDP-Tcp", location: "Terminal Server InitialProgram", mode: Mode::Values(&["InitialProgram"]) },
-    Loc { kind: HiveKind::System, path: "{CCS}\\Control\\Terminal Server\\Wds\\rdpwd", location: "Terminal Server StartupPrograms", mode: Mode::Values(&["StartupPrograms"]) },
+    Loc {
+        kind: HiveKind::Software,
+        path: "Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
+        location: "Winlogon",
+        mode: Mode::Values(&[
+            "Shell", "Userinit", "Taskman", "AppSetup", "GinaDLL", "System",
+        ]),
+    },
+    Loc {
+        kind: HiveKind::Software,
+        path: "Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
+        location: "Winlogon",
+        mode: Mode::Values(&["Shell", "Userinit"]),
+    },
+    Loc {
+        kind: HiveKind::Software,
+        path: "Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Notify",
+        location: "Winlogon Notify",
+        mode: Mode::SubkeyValues(&["DllName"]),
+    },
+    Loc {
+        kind: HiveKind::Software,
+        path: "Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options",
+        location: "Image File Execution Options",
+        mode: Mode::SubkeyValues(&["Debugger"]),
+    },
+    Loc {
+        kind: HiveKind::Software,
+        path: "Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options",
+        location: "Image File Execution Options",
+        mode: Mode::SubkeyValues(&["Debugger"]),
+    },
+    Loc {
+        kind: HiveKind::Software,
+        path: "Microsoft\\Windows NT\\CurrentVersion\\Windows",
+        location: "AppInit_DLLs",
+        mode: Mode::Values(&["AppInit_DLLs"]),
+    },
+    Loc {
+        kind: HiveKind::Software,
+        path: "Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Windows",
+        location: "AppInit_DLLs",
+        mode: Mode::Values(&["AppInit_DLLs"]),
+    },
+    Loc {
+        kind: HiveKind::Software,
+        path: "Microsoft\\Active Setup\\Installed Components",
+        location: "Active Setup",
+        mode: Mode::SubkeyValues(&["StubPath"]),
+    },
+    Loc {
+        kind: HiveKind::Software,
+        path: "Wow6432Node\\Microsoft\\Active Setup\\Installed Components",
+        location: "Active Setup",
+        mode: Mode::SubkeyValues(&["StubPath"]),
+    },
+    Loc {
+        kind: HiveKind::Software,
+        path: "Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders",
+        location: "Startup folder",
+        mode: Mode::Values(&["Common Startup"]),
+    },
+    Loc {
+        kind: HiveKind::Software,
+        path: "Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders",
+        location: "Startup folder",
+        mode: Mode::Values(&["Common Startup"]),
+    },
+    Loc {
+        kind: HiveKind::Software,
+        path: "Policies\\Microsoft\\Windows NT\\Terminal Services",
+        location: "Terminal Server InitialProgram",
+        mode: Mode::Values(&["InitialProgram"]),
+    },
+    Loc {
+        kind: HiveKind::NtUser,
+        path: "Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows",
+        location: "Windows Load/Run",
+        mode: Mode::Values(&["Load", "Run"]),
+    },
+    Loc {
+        kind: HiveKind::NtUser,
+        path: "Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
+        location: "Winlogon",
+        mode: Mode::Values(&["Shell"]),
+    },
+    Loc {
+        kind: HiveKind::NtUser,
+        path: "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders",
+        location: "Startup folder",
+        mode: Mode::Values(&["Startup"]),
+    },
+    Loc {
+        kind: HiveKind::NtUser,
+        path: "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders",
+        location: "Startup folder",
+        mode: Mode::Values(&["Startup"]),
+    },
+    Loc {
+        kind: HiveKind::NtUser,
+        path: "Software\\Policies\\Microsoft\\Windows NT\\Terminal Services",
+        location: "Terminal Server InitialProgram",
+        mode: Mode::Values(&["InitialProgram"]),
+    },
+    Loc {
+        kind: HiveKind::System,
+        path: "{CCS}\\Control\\Session Manager",
+        location: "BootExecute",
+        mode: Mode::Values(&["BootExecute", "SetupExecute", "Execute", "S0InitialCommand"]),
+    },
+    Loc {
+        kind: HiveKind::System,
+        path: "{CCS}\\Control\\Lsa",
+        location: "LSA packages",
+        mode: Mode::Values(&[
+            "Authentication Packages",
+            "Notification Packages",
+            "Security Packages",
+        ]),
+    },
+    Loc {
+        kind: HiveKind::System,
+        path: "{CCS}\\Control\\Lsa\\OSConfig",
+        location: "LSA packages",
+        mode: Mode::Values(&["Security Packages"]),
+    },
+    Loc {
+        kind: HiveKind::System,
+        path: "{CCS}\\Control\\Terminal Server\\WinStations\\RDP-Tcp",
+        location: "Terminal Server InitialProgram",
+        mode: Mode::Values(&["InitialProgram"]),
+    },
+    Loc {
+        kind: HiveKind::System,
+        path: "{CCS}\\Control\\Terminal Server\\Wds\\rdpwd",
+        location: "Terminal Server StartupPrograms",
+        mode: Mode::Values(&["StartupPrograms"]),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -69,16 +192,33 @@ fn collect(k: &Key<'_>, rel: &str, location: &str, names: Option<&[&str]>) -> Op
             }
         }
         let data = v.as_multi().join(" ");
-        let data = if data.is_empty() { v.as_string().unwrap_or_default() } else { data };
+        let data = if data.is_empty() {
+            v.as_string().unwrap_or_default()
+        } else {
+            data
+        };
         if data.trim().is_empty() {
             continue;
         }
-        entries.push((if v.name.is_empty() { "(default)".to_string() } else { v.name.clone() }, data));
+        entries.push((
+            if v.name.is_empty() {
+                "(default)".to_string()
+            } else {
+                v.name.clone()
+            },
+            data,
+        ));
     }
     if entries.is_empty() {
         return None;
     }
-    Some(AutorunKey { location: location.to_string(), key_rel_path: rel.to_string(), key_offset: k.offset, last_written_ns: k.last_written_ns, entries })
+    Some(AutorunKey {
+        location: location.to_string(),
+        key_rel_path: rel.to_string(),
+        key_offset: k.offset,
+        last_written_ns: k.last_written_ns,
+        entries,
+    })
 }
 
 pub fn autorun_keys(hive: &Hive, kind: HiveKind) -> Vec<AutorunKey> {
@@ -86,8 +226,14 @@ pub fn autorun_keys(hive: &Hive, kind: HiveKind) -> Vec<AutorunKey> {
     let ccs = current_control_set(hive).unwrap_or_else(|| "ControlSet001".into());
     // Run keys.
     let prefixes: &[&str] = match kind {
-        HiveKind::Software => &["Microsoft\\Windows\\CurrentVersion", "Wow6432Node\\Microsoft\\Windows\\CurrentVersion"],
-        HiveKind::NtUser => &["Software\\Microsoft\\Windows\\CurrentVersion", "Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion"],
+        HiveKind::Software => &[
+            "Microsoft\\Windows\\CurrentVersion",
+            "Wow6432Node\\Microsoft\\Windows\\CurrentVersion",
+        ],
+        HiveKind::NtUser => &[
+            "Software\\Microsoft\\Windows\\CurrentVersion",
+            "Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion",
+        ],
         _ => &[],
     };
     for p in prefixes {
@@ -123,10 +269,22 @@ pub fn events(hive: &Hive, ctx: &Ctx<'_>) -> Vec<Event> {
         .into_iter()
         .map(|a| {
             let parts: Vec<String> = a.entries.iter().map(|(n, d)| format!("{n}: {d}")).collect();
-            let entries: Vec<serde_json::Value> = a.entries.iter().map(|(n, d)| json!({"name": n, "data": d})).collect();
-            ctx.event("run", "windows:registry:run", desc::WRITTEN, a.last_written_ns, format!("[{}] {}", ctx.full_path(&a.key_rel_path), parts.join(" ")), &a.key_rel_path, a.key_offset)
-                .attr("location", a.location)
-                .attr("entries", serde_json::Value::Array(entries))
+            let entries: Vec<serde_json::Value> = a
+                .entries
+                .iter()
+                .map(|(n, d)| json!({"name": n, "data": d}))
+                .collect();
+            ctx.event(
+                "run",
+                "windows:registry:run",
+                desc::WRITTEN,
+                a.last_written_ns,
+                format!("[{}] {}", ctx.full_path(&a.key_rel_path), parts.join(" ")),
+                &a.key_rel_path,
+                a.key_offset,
+            )
+            .attr("location", a.location)
+            .attr("entries", serde_json::Value::Array(entries))
         })
         .collect()
 }

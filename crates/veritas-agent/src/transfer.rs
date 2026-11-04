@@ -39,7 +39,11 @@ pub struct UploadManifest {
 }
 
 impl UploadManifest {
-    pub fn from_segments(evidence_id: &str, case_id: Option<&str>, segs: &[crate::image::SegmentInfo]) -> Self {
+    pub fn from_segments(
+        evidence_id: &str,
+        case_id: Option<&str>,
+        segs: &[crate::image::SegmentInfo],
+    ) -> Self {
         Self {
             evidence_id: evidence_id.to_string(),
             case_id: case_id.map(String::from),
@@ -48,7 +52,11 @@ impl UploadManifest {
                 .enumerate()
                 .map(|(i, s)| UploadSegment {
                     index: i as u32,
-                    name: s.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+                    name: s
+                        .path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_default(),
                     path: s.path.clone(),
                     size: s.size,
                     sha256: s.sha256.clone(),
@@ -63,7 +71,10 @@ impl UploadManifest {
 
     /// Segment paths are resolved relative to the manifest's directory when not absolute.
     pub fn resolve_paths(&mut self, manifest_path: &Path) {
-        let dir = manifest_path.parent().map(Path::to_path_buf).unwrap_or_default();
+        let dir = manifest_path
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_default();
         for s in &mut self.segments {
             if s.path.is_relative() && !s.path.exists() {
                 s.path = dir.join(&s.path);
@@ -128,7 +139,11 @@ fn http_err(e: ureq::Error) -> AgentError {
     match e {
         ureq::Error::Status(code, resp) => {
             let body = resp.into_string().unwrap_or_default();
-            AgentError::Http(format!("HTTP {}: {}", code, body.chars().take(300).collect::<String>()))
+            AgentError::Http(format!(
+                "HTTP {}: {}",
+                code,
+                body.chars().take(300).collect::<String>()
+            ))
         }
         ureq::Error::Transport(t) => AgentError::Http(format!("transport: {}", t)),
     }
@@ -145,12 +160,16 @@ impl UploadClient {
             .timeout_write(Duration::from_secs(600))
             .max_idle_connections(0);
         if base.starts_with("https://") {
-            let tls = tls.ok_or_else(|| AgentError::Tls("https upload requires --client-cert, --client-key and --ca".into()))?;
+            let tls = tls.ok_or_else(|| {
+                AgentError::Tls("https upload requires --client-cert, --client-key and --ca".into())
+            })?;
             let cert = std::fs::read(&tls.client_cert)?;
             let key = std::fs::read(&tls.client_key)?;
             let ca = std::fs::read(&tls.ca)?;
-            let identity = native_tls::Identity::from_pkcs8(&cert, &key).map_err(|e| AgentError::Tls(format!("client identity: {}", e)))?;
-            let ca = native_tls::Certificate::from_pem(&ca).map_err(|e| AgentError::Tls(format!("CA certificate: {}", e)))?;
+            let identity = native_tls::Identity::from_pkcs8(&cert, &key)
+                .map_err(|e| AgentError::Tls(format!("client identity: {}", e)))?;
+            let ca = native_tls::Certificate::from_pem(&ca)
+                .map_err(|e| AgentError::Tls(format!("CA certificate: {}", e)))?;
             let connector = native_tls::TlsConnector::builder()
                 .identity(identity) // THREAT:T8.1 per-engagement client certificate presented on every connection (mTLS)
                 .add_root_certificate(ca)
@@ -161,13 +180,25 @@ impl UploadClient {
             builder = builder.tls_connector(Arc::new(connector));
         } else if base.starts_with("http://") {
             let host = base.trim_start_matches("http://");
-            if !(host.starts_with("127.0.0.1") || host.starts_with("localhost") || host.starts_with("[::1]")) {
-                return Err(AgentError::Tls("plain http is only allowed to a loopback address".into()));
+            if !(host.starts_with("127.0.0.1")
+                || host.starts_with("localhost")
+                || host.starts_with("[::1]"))
+            {
+                return Err(AgentError::Tls(
+                    "plain http is only allowed to a loopback address".into(),
+                ));
             }
         } else {
-            return Err(AgentError::Invalid(format!("unsupported server URL {}", server)));
+            return Err(AgentError::Invalid(format!(
+                "unsupported server URL {}",
+                server
+            )));
         }
-        Ok(Self { agent: builder.build(), base, retries: 3 })
+        Ok(Self {
+            agent: builder.build(),
+            base,
+            retries: 3,
+        })
     }
 
     fn create_session(&self, m: &UploadManifest) -> Result<String> {
@@ -183,8 +214,15 @@ impl UploadClient {
             .send_string(&body.to_string())
             .map_err(http_err)?;
         let created: SessionCreated = serde_json::from_reader(resp.into_reader())?;
-        if created.session_id.is_empty() || !created.session_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
-            return Err(AgentError::Http("server returned an invalid session id".into()));
+        if created.session_id.is_empty()
+            || !created
+                .session_id
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        {
+            return Err(AgentError::Http(
+                "server returned an invalid session id".into(),
+            ));
         }
         Ok(created.session_id)
     }
@@ -192,13 +230,23 @@ impl UploadClient {
     /// Segment indices the server already holds with the manifest's hash; `None` if the session
     /// is unknown to the server.
     fn present(&self, session: &str, m: &UploadManifest) -> Result<Option<Vec<u32>>> {
-        match self.agent.get(&format!("{}/api/v1/intake/sessions/{}", self.base, session)).call() {
+        match self
+            .agent
+            .get(&format!("{}/api/v1/intake/sessions/{}", self.base, session))
+            .call()
+        {
             Ok(resp) => {
                 let st: SessionStatus = serde_json::from_reader(resp.into_reader())?;
                 Ok(Some(
                     st.segments
                         .iter()
-                        .filter(|r| m.segments.iter().any(|s| s.index == r.index && s.size == r.size && s.sha256.eq_ignore_ascii_case(&r.sha256)))
+                        .filter(|r| {
+                            m.segments.iter().any(|s| {
+                                s.index == r.index
+                                    && s.size == r.size
+                                    && s.sha256.eq_ignore_ascii_case(&r.sha256)
+                            })
+                        })
                         .map(|r| r.index)
                         .collect(),
                 ))
@@ -213,12 +261,23 @@ impl UploadClient {
         // server recomputes the hash from the body and rejects any mismatch.
         let actual = crate::sha256_file(&s.path)?;
         let size = std::fs::metadata(&s.path)?.len();
-        if !actual.eq_ignore_ascii_case(&s.sha256) || size != s.size { // THREAT:T8.2 segment hash check
-            return Err(AgentError::Integrity(format!("{}: sha256 {} size {} does not match manifest {} size {}", s.path.display(), actual, size, s.sha256, s.size)));
+        if !actual.eq_ignore_ascii_case(&s.sha256) || size != s.size {
+            // THREAT:T8.2 segment hash check
+            return Err(AgentError::Integrity(format!(
+                "{}: sha256 {} size {} does not match manifest {} size {}",
+                s.path.display(),
+                actual,
+                size,
+                s.sha256,
+                s.size
+            )));
         }
         let file = std::fs::File::open(&s.path)?;
         self.agent
-            .put(&format!("{}/api/v1/intake/sessions/{}/segments/{}", self.base, session, s.index))
+            .put(&format!(
+                "{}/api/v1/intake/sessions/{}/segments/{}",
+                self.base, session, s.index
+            ))
             .set("Content-Type", "application/octet-stream")
             .set("Content-Length", &s.size.to_string())
             .set("X-Segment-SHA256", &s.sha256)
@@ -229,7 +288,10 @@ impl UploadClient {
 
     fn complete(&self, session: &str) -> Result<()> {
         self.agent
-            .post(&format!("{}/api/v1/intake/sessions/{}/complete", self.base, session))
+            .post(&format!(
+                "{}/api/v1/intake/sessions/{}/complete",
+                self.base, session
+            ))
             .set("Content-Type", "application/json")
             .send_string("{}")
             .map_err(http_err)?;
@@ -238,10 +300,19 @@ impl UploadClient {
 
     /// Upload every segment the server does not yet hold, resuming a session recorded in
     /// `state_path` when it belongs to the same server and manifest.
-    pub fn upload(&self, m: &UploadManifest, state_path: Option<&Path>, progress: &mut dyn FnMut(u32, &str)) -> Result<UploadReport> {
+    pub fn upload(
+        &self,
+        m: &UploadManifest,
+        state_path: Option<&Path>,
+        progress: &mut dyn FnMut(u32, &str),
+    ) -> Result<UploadReport> {
         let digest = m.digest();
-        let saved: Option<UploadState> = state_path.and_then(|p| std::fs::read(p).ok()).and_then(|b| serde_json::from_slice(&b).ok());
-        let mut session = saved.filter(|s| s.server == self.base && s.manifest_sha256 == digest).map(|s| s.session_id);
+        let saved: Option<UploadState> = state_path
+            .and_then(|p| std::fs::read(p).ok())
+            .and_then(|b| serde_json::from_slice(&b).ok());
+        let mut session = saved
+            .filter(|s| s.server == self.base && s.manifest_sha256 == digest)
+            .map(|s| s.session_id);
         let mut present = match &session {
             Some(id) => self.present(id, m)?,
             None => None,
@@ -249,7 +320,11 @@ impl UploadClient {
         if present.is_none() {
             let id = self.create_session(m)?;
             if let Some(p) = state_path {
-                let st = UploadState { server: self.base.clone(), manifest_sha256: digest.clone(), session_id: id.clone() };
+                let st = UploadState {
+                    server: self.base.clone(),
+                    manifest_sha256: digest.clone(),
+                    session_id: id.clone(),
+                };
                 std::fs::write(p, serde_json::to_vec_pretty(&st)?)?;
             }
             present = self.present(&id, m)?.or(Some(Vec::new()));
@@ -257,7 +332,12 @@ impl UploadClient {
         }
         let session = session.ok_or_else(|| AgentError::Http("no session".into()))?;
         let mut present = present.unwrap_or_default();
-        let mut report = UploadReport { session_id: session.clone(), uploaded: Vec::new(), skipped: present.clone(), completed: false };
+        let mut report = UploadReport {
+            session_id: session.clone(),
+            uploaded: Vec::new(),
+            skipped: present.clone(),
+            completed: false,
+        };
         for s in &m.segments {
             if present.contains(&s.index) {
                 progress(s.index, "already present");

@@ -13,7 +13,10 @@ fn fat12_listing() {
     assert_eq!(fs.kind, FatType::Fat12);
     assert_eq!(fs.label, "FAT12_TEST");
     let w = fs.walk(false).unwrap();
-    let got: Vec<(&str, u64, u64, bool)> = w.iter().map(|e| (e.path.as_str(), e.size, e.dir_entry_offset, e.is_dir)).collect();
+    let got: Vec<(&str, u64, u64, bool)> = w
+        .iter()
+        .map(|e| (e.path.as_str(), e.size, e.dir_entry_offset, e.is_dir))
+        .collect();
     assert_eq!(
         got,
         vec![
@@ -74,7 +77,9 @@ fn build_exfat() -> Vec<u8> {
     b[510] = 0x55;
     b[511] = 0xAA;
     let fat = 24 * 512;
-    let set = |img: &mut Vec<u8>, c: usize, v: u32| img[fat + c * 4..fat + c * 4 + 4].copy_from_slice(&v.to_le_bytes());
+    let set = |img: &mut Vec<u8>, c: usize, v: u32| {
+        img[fat + c * 4..fat + c * 4 + 4].copy_from_slice(&v.to_le_bytes())
+    };
     set(&mut img, 0, 0xFFFF_FFF8);
     set(&mut img, 1, 0xFFFF_FFFF);
     set(&mut img, 2, 0xFFFF_FFFF);
@@ -82,37 +87,38 @@ fn build_exfat() -> Vec<u8> {
     set(&mut img, 4, 5);
     set(&mut img, 5, 0xFFFF_FFFF);
     let cl = |c: usize| 32 * 512 + (c - 2) * 512;
-    let entry_set = |name: &str, attrs: u16, first: u32, size: u64, nofat: bool, deleted: bool| -> Vec<u8> {
-        let units: Vec<u16> = name.encode_utf16().collect();
-        let nnames = units.len().div_ceil(15);
-        let mut v = vec![0u8; 32 * (2 + nnames)];
-        v[0] = if deleted { 0x05 } else { 0x85 };
-        v[1] = (1 + nnames) as u8;
-        v[4..6].copy_from_slice(&attrs.to_le_bytes());
-        let ts = exfat_ts(2021, 4, 18, 15, 9, 10);
-        v[8..12].copy_from_slice(&ts.to_le_bytes());
-        v[12..16].copy_from_slice(&ts.to_le_bytes());
-        v[16..20].copy_from_slice(&ts.to_le_bytes());
-        v[20] = 50; // +0.50 s
-        v[22] = 0x80 | 0x08; // UTC+2h
-        v[23] = 0x80 | 0x08;
-        v[24] = 0x80 | 0x08;
-        let s = &mut v[32..64];
-        s[0] = if deleted { 0x40 } else { 0xC0 };
-        s[1] = if nofat { 0x03 } else { 0x01 };
-        s[3] = units.len() as u8;
-        s[8..16].copy_from_slice(&size.to_le_bytes());
-        s[20..24].copy_from_slice(&first.to_le_bytes());
-        s[24..32].copy_from_slice(&size.to_le_bytes());
-        for k in 0..nnames {
-            let f = &mut v[64 + k * 32..96 + k * 32];
-            f[0] = if deleted { 0x41 } else { 0xC1 };
-            for (j, u) in units.iter().skip(k * 15).take(15).enumerate() {
-                f[2 + j * 2..4 + j * 2].copy_from_slice(&u.to_le_bytes());
+    let entry_set =
+        |name: &str, attrs: u16, first: u32, size: u64, nofat: bool, deleted: bool| -> Vec<u8> {
+            let units: Vec<u16> = name.encode_utf16().collect();
+            let nnames = units.len().div_ceil(15);
+            let mut v = vec![0u8; 32 * (2 + nnames)];
+            v[0] = if deleted { 0x05 } else { 0x85 };
+            v[1] = (1 + nnames) as u8;
+            v[4..6].copy_from_slice(&attrs.to_le_bytes());
+            let ts = exfat_ts(2021, 4, 18, 15, 9, 10);
+            v[8..12].copy_from_slice(&ts.to_le_bytes());
+            v[12..16].copy_from_slice(&ts.to_le_bytes());
+            v[16..20].copy_from_slice(&ts.to_le_bytes());
+            v[20] = 50; // +0.50 s
+            v[22] = 0x80 | 0x08; // UTC+2h
+            v[23] = 0x80 | 0x08;
+            v[24] = 0x80 | 0x08;
+            let s = &mut v[32..64];
+            s[0] = if deleted { 0x40 } else { 0xC0 };
+            s[1] = if nofat { 0x03 } else { 0x01 };
+            s[3] = units.len() as u8;
+            s[8..16].copy_from_slice(&size.to_le_bytes());
+            s[20..24].copy_from_slice(&first.to_le_bytes());
+            s[24..32].copy_from_slice(&size.to_le_bytes());
+            for k in 0..nnames {
+                let f = &mut v[64 + k * 32..96 + k * 32];
+                f[0] = if deleted { 0x41 } else { 0xC1 };
+                for (j, u) in units.iter().skip(k * 15).take(15).enumerate() {
+                    f[2 + j * 2..4 + j * 2].copy_from_slice(&u.to_le_bytes());
+                }
             }
-        }
-        v
-    };
+            v
+        };
     let mut root = vec![0x83u8, 4];
     root.extend("TEST".encode_utf16().flat_map(|u| u.to_le_bytes()));
     root.resize(32, 0);
@@ -138,15 +144,31 @@ fn exfat_synthetic_volume() {
     assert_eq!(fs.kind, FatType::ExFat);
     assert_eq!(fs.label, "TEST");
     let w = fs.walk(true).unwrap();
-    let paths: Vec<(&str, bool, bool)> = w.iter().map(|e| (e.path.as_str(), e.is_dir, e.deleted)).collect();
-    assert_eq!(paths, vec![("/docs", true, false), ("/docs/a rather long file name.txt", false, false), ("/gone.txt", false, true), ("/hello.txt", false, false)]);
+    let paths: Vec<(&str, bool, bool)> = w
+        .iter()
+        .map(|e| (e.path.as_str(), e.is_dir, e.deleted))
+        .collect();
+    assert_eq!(
+        paths,
+        vec![
+            ("/docs", true, false),
+            ("/docs/a rather long file name.txt", false, false),
+            ("/gone.txt", false, true),
+            ("/hello.txt", false, false)
+        ]
+    );
     assert_eq!(fs.read_file("/hello.txt").unwrap(), b"hello exfat\n");
     let big = fs.read_file("/docs/a rather long file name.txt").unwrap();
     assert_eq!(big.len(), 700);
     assert_eq!(&big[510..515], b"QRSTU");
     let h = w.iter().find(|e| e.name == "hello.txt").unwrap();
     // 2021-04-18 15:09:10.50 at UTC+2 -> 13:09:10.50 UTC.
-    let local = fat_datetime_to_ns(((2021 - 1980) << 9) | (4 << 5) | 18, (15 << 11) | (9 << 5) | 5, 50).unwrap();
+    let local = fat_datetime_to_ns(
+        ((2021 - 1980) << 9) | (4 << 5) | 18,
+        (15 << 11) | (9 << 5) | 5,
+        50,
+    )
+    .unwrap();
     assert_eq!(h.crtime, Some(local - 2 * 3600 * 1_000_000_000));
     let gone = w.iter().find(|e| e.deleted).unwrap();
     assert_eq!(fs.read(gone).unwrap(), b"bye!\n");

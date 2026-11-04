@@ -19,18 +19,30 @@ pub type Source = Arc<dyn ReadAt>;
 /// Read exactly `len` bytes at `offset` or fail with `Truncated`.
 pub fn read_vec(src: &dyn ReadAt, offset: u64, len: u64) -> Result<Vec<u8>> {
     if len > MAX_SINGLE_READ {
-        return Err(FsError::Limit(format!("read of {len} bytes exceeds MAX_SINGLE_READ")));
+        return Err(FsError::Limit(format!(
+            "read of {len} bytes exceeds MAX_SINGLE_READ"
+        )));
     }
-    let end = offset.checked_add(len).ok_or_else(|| FsError::invalid(offset, "offset overflow"))?;
+    let end = offset
+        .checked_add(len)
+        .ok_or_else(|| FsError::invalid(offset, "offset overflow"))?;
     if end > src.size() {
-        return Err(FsError::Truncated { offset, needed: len, available: src.size().saturating_sub(offset) });
+        return Err(FsError::Truncated {
+            offset,
+            needed: len,
+            available: src.size().saturating_sub(offset),
+        });
     }
     let mut buf = vec![0u8; len as usize];
     let mut done = 0usize;
     while done < buf.len() {
         let n = src.read_at(offset + done as u64, &mut buf[done..])?;
         if n == 0 {
-            return Err(FsError::Truncated { offset, needed: len, available: done as u64 });
+            return Err(FsError::Truncated {
+                offset,
+                needed: len,
+                available: done as u64,
+            });
         }
         done += n;
     }
@@ -40,7 +52,9 @@ pub fn read_vec(src: &dyn ReadAt, offset: u64, len: u64) -> Result<Vec<u8>> {
 /// Read up to `len` bytes, zero-filling whatever lies beyond the end of the source.
 pub fn read_vec_padded(src: &dyn ReadAt, offset: u64, len: u64) -> Result<Vec<u8>> {
     if len > MAX_SINGLE_READ {
-        return Err(FsError::Limit(format!("read of {len} bytes exceeds MAX_SINGLE_READ")));
+        return Err(FsError::Limit(format!(
+            "read of {len} bytes exceeds MAX_SINGLE_READ"
+        )));
     }
     let mut buf = vec![0u8; len as usize];
     let size = src.size();
@@ -64,7 +78,9 @@ pub struct MemSource {
 
 impl MemSource {
     pub fn new(data: Vec<u8>) -> Self {
-        Self { data: Arc::new(data) }
+        Self {
+            data: Arc::new(data),
+        }
     }
     pub fn source(data: Vec<u8>) -> Source {
         Arc::new(Self::new(data))
@@ -95,7 +111,10 @@ impl FileSource {
     pub fn open(path: &Path) -> Result<Self> {
         let file = File::open(path)?;
         let size = file.metadata()?.len();
-        Ok(Self { file: Mutex::new(file), size })
+        Ok(Self {
+            file: Mutex::new(file),
+            size,
+        })
     }
     pub fn source(path: &Path) -> Result<Source> {
         Ok(Arc::new(Self::open(path)?))
@@ -110,10 +129,17 @@ impl ReadAt for FileSource {
         if offset >= self.size {
             return Ok(0);
         }
-        let mut f = self.file.lock().map_err(|_| FsError::Io("file lock poisoned".into()))?;
+        let mut f = self
+            .file
+            .lock()
+            .map_err(|_| FsError::Io("file lock poisoned".into()))?;
         f.seek(SeekFrom::Start(offset))?;
         let remaining = self.size - offset;
-        let want = if (buf.len() as u64) < remaining { buf.len() } else { remaining as usize };
+        let want = if (buf.len() as u64) < remaining {
+            buf.len()
+        } else {
+            remaining as usize
+        };
         let mut done = 0;
         while done < want {
             let n = f.read(&mut buf[done..want])?;
@@ -135,8 +161,14 @@ pub struct SubSource {
 
 impl SubSource {
     pub fn new(inner: Source, start: u64, len: u64) -> Result<Self> {
-        let end = start.checked_add(len).ok_or_else(|| FsError::invalid(start, "sub-range overflow"))?;
-        let len = if end > inner.size() { inner.size().saturating_sub(start) } else { len };
+        let end = start
+            .checked_add(len)
+            .ok_or_else(|| FsError::invalid(start, "sub-range overflow"))?;
+        let len = if end > inner.size() {
+            inner.size().saturating_sub(start)
+        } else {
+            len
+        };
         Ok(Self { inner, start, len })
     }
     pub fn source(inner: Source, start: u64, len: u64) -> Result<Source> {
@@ -165,9 +197,13 @@ pub struct EwfSource {
 
 impl EwfSource {
     pub fn open(first_segment: &Path) -> Result<Self> {
-        let r = veritas_ewf::reader::EwfReader::open(first_segment).map_err(|e| FsError::Io(format!("E01: {e}")))?;
+        let r = veritas_ewf::reader::EwfReader::open(first_segment)
+            .map_err(|e| FsError::Io(format!("E01: {e}")))?;
         let size = r.media_size();
-        Ok(Self { reader: Mutex::new(r), size })
+        Ok(Self {
+            reader: Mutex::new(r),
+            size,
+        })
     }
 }
 
@@ -179,11 +215,16 @@ impl ReadAt for EwfSource {
         if offset >= self.size {
             return Ok(0);
         }
-        let mut r = self.reader.lock().map_err(|_| FsError::Io("EWF reader lock poisoned".into()))?;
+        let mut r = self
+            .reader
+            .lock()
+            .map_err(|_| FsError::Io("EWF reader lock poisoned".into()))?;
         let want = buf.len().min((self.size - offset) as usize);
         let mut done = 0;
         while done < want {
-            let n = r.read_at(offset + done as u64, &mut buf[done..want]).map_err(|e| FsError::Io(format!("E01: {e}")))?;
+            let n = r
+                .read_at(offset + done as u64, &mut buf[done..want])
+                .map_err(|e| FsError::Io(format!("E01: {e}")))?;
             if n == 0 {
                 break;
             }
@@ -196,7 +237,10 @@ impl ReadAt for EwfSource {
 /// Open an evidence file: E01 segment sets are read as their media; anything else as raw bytes.
 pub fn open_evidence(path: &Path) -> Result<Source> {
     let mut sig = [0u8; 8];
-    let is_ewf = File::open(path).and_then(|mut f| f.read_exact(&mut sig)).is_ok() && &sig == b"EVF\x09\x0d\x0a\xff\x00";
+    let is_ewf = File::open(path)
+        .and_then(|mut f| f.read_exact(&mut sig))
+        .is_ok()
+        && &sig == b"EVF\x09\x0d\x0a\xff\x00";
     if is_ewf {
         Ok(Arc::new(EwfSource::open(path)?))
     } else {

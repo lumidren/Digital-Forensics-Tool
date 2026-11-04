@@ -60,9 +60,13 @@ pub struct Service {
 }
 
 pub fn services(hive: &Hive) -> Vec<Service> {
-    let Some(ccs) = current_control_set(hive) else { return vec![] };
+    let Some(ccs) = current_control_set(hive) else {
+        return vec![];
+    };
     let rel = format!("{ccs}\\Services");
-    let Some(k) = hive.key(&rel) else { return vec![] };
+    let Some(k) = hive.key(&rel) else {
+        return vec![];
+    };
     k.subkeys()
         .into_iter()
         .map(|s| Service {
@@ -79,7 +83,10 @@ pub fn services(hive: &Hive) -> Vec<Service> {
             error_control: s.value_u32("ErrorControl"),
             object_name: s.value_string("ObjectName"),
             group: s.value_string("Group"),
-            service_dll: s.subkey("Parameters").and_then(|p| p.value_string("ServiceDll")).or_else(|| s.value_string("ServiceDll")),
+            service_dll: s
+                .subkey("Parameters")
+                .and_then(|p| p.value_string("ServiceDll"))
+                .or_else(|| s.value_string("ServiceDll")),
         })
         .collect()
 }
@@ -99,12 +106,27 @@ pub fn events(hive: &Hive, ctx: &Ctx<'_>) -> Vec<Event> {
                 s.display_name.clone().unwrap_or_default()
             );
             let mut e = ctx
-                .event("services", "windows:registry:service", desc::WRITTEN, s.last_written_ns, msg, &s.key_rel_path, s.key_offset)
+                .event(
+                    "services",
+                    "windows:registry:service",
+                    desc::WRITTEN,
+                    s.last_written_ns,
+                    msg,
+                    &s.key_rel_path,
+                    s.key_offset,
+                )
                 .attr("name", s.name.clone())
                 .attr("control_set", s.control_set.clone())
                 .attr("service_type", st)
                 .attr("start_type", sv);
-            for (k, v) in [("display_name", &s.display_name), ("description", &s.description), ("image_path", &s.image_path), ("object_name", &s.object_name), ("group", &s.group), ("service_dll", &s.service_dll)] {
+            for (k, v) in [
+                ("display_name", &s.display_name),
+                ("description", &s.description),
+                ("image_path", &s.image_path),
+                ("object_name", &s.object_name),
+                ("group", &s.group),
+                ("service_dll", &s.service_dll),
+            ] {
                 if let Some(v) = v {
                     e = e.attr(k, v.clone());
                 }
@@ -116,7 +138,9 @@ pub fn events(hive: &Hive, ctx: &Ctx<'_>) -> Vec<Event> {
                 e = e.attr("start_value", t);
             }
             if let Some(t) = s.error_control {
-                e = e.attr("error_control", error_control(t)).attr("error_control_value", t);
+                e = e
+                    .attr("error_control", error_control(t))
+                    .attr("error_control_value", t);
             }
             e
         })

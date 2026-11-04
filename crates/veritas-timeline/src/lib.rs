@@ -96,7 +96,14 @@ impl Event {
         self
     }
 
-    pub fn provenance(mut self, evidence_sha256: &str, evidence_path: &str, offset: i64, parser: &str, parser_version: &str) -> Self {
+    pub fn provenance(
+        mut self,
+        evidence_sha256: &str,
+        evidence_path: &str,
+        offset: i64,
+        parser: &str,
+        parser_version: &str,
+    ) -> Self {
         self.evidence_sha256 = evidence_sha256.to_string();
         self.evidence_path = evidence_path.to_string();
         self.offset = offset;
@@ -106,12 +113,24 @@ impl Event {
     }
 
     pub fn datetime(&self) -> Option<DateTime<Utc>> {
-        self.timestamp.and_then(|ns| Utc.timestamp_opt(ns.div_euclid(1_000_000_000), ns.rem_euclid(1_000_000_000) as u32).single())
+        self.timestamp.and_then(|ns| {
+            Utc.timestamp_opt(
+                ns.div_euclid(1_000_000_000),
+                ns.rem_euclid(1_000_000_000) as u32,
+            )
+            .single()
+        })
     }
 
     /// Deterministic ordering key: `(timestamp, data_type, evidence_path, offset, timestamp_desc)`.
     pub fn sort_key(&self) -> (i64, &str, &str, i64, &str) {
-        (self.timestamp.unwrap_or(i64::MIN), &self.data_type, &self.evidence_path, self.offset, &self.timestamp_desc)
+        (
+            self.timestamp.unwrap_or(i64::MIN),
+            &self.data_type,
+            &self.evidence_path,
+            self.offset,
+            &self.timestamp_desc,
+        )
     }
 }
 
@@ -171,13 +190,21 @@ pub fn fat_datetime_to_ns(date: u16, time: u16, tenths: u8) -> Option<i64> {
     let minute = ((time >> 5) & 0x3f) as u32;
     let second = ((time & 0x1f) as u32) * 2 + (tenths as u32) / 100;
     let millis = ((tenths as u32) % 100) * 10;
-    let dt = Utc.with_ymd_and_hms(year, month, day, hour, minute, second).single()?;
+    let dt = Utc
+        .with_ymd_and_hms(year, month, day, hour, minute, second)
+        .single()?;
     Some(dt.timestamp_nanos_opt()? + (millis as i64) * 1_000_000)
 }
 
 /// Format epoch nanoseconds as RFC 3339 with microsecond precision (Plaso style).
 pub fn format_ns(ns: i64) -> String {
-    match Utc.timestamp_opt(ns.div_euclid(1_000_000_000), ns.rem_euclid(1_000_000_000) as u32).single() {
+    match Utc
+        .timestamp_opt(
+            ns.div_euclid(1_000_000_000),
+            ns.rem_euclid(1_000_000_000) as u32,
+        )
+        .single()
+    {
         Some(dt) => dt.format("%Y-%m-%dT%H:%M:%S%.6fZ").to_string(),
         None => "0000-00-00T00:00:00.000000Z".to_string(),
     }
@@ -200,14 +227,23 @@ mod tests {
     #[test]
     fn filetime_known_values() {
         // 2009-04-27 00:00:00 UTC = 128852640000000000
-        assert_eq!(filetime_to_ns(128_852_640_000_000_000), Some(1_240_790_400_000_000_000));
+        assert_eq!(
+            filetime_to_ns(128_852_640_000_000_000),
+            Some(1_240_790_400_000_000_000)
+        );
         assert_eq!(filetime_to_ns(0), None);
-        assert_eq!(format_ns(1_240_790_400_000_000_000), "2009-04-27T00:00:00.000000Z");
+        assert_eq!(
+            format_ns(1_240_790_400_000_000_000),
+            "2009-04-27T00:00:00.000000Z"
+        );
     }
 
     #[test]
     fn webkit_and_cocoa() {
-        assert_eq!(webkit_us_to_ns(13_000_000_000_000_000), Some((13_000_000_000_000_000i64 - 11_644_473_600_000_000) * 1000));
+        assert_eq!(
+            webkit_us_to_ns(13_000_000_000_000_000),
+            Some((13_000_000_000_000_000i64 - 11_644_473_600_000_000) * 1000)
+        );
         assert_eq!(cocoa_secs_to_ns(0), Some(978_307_200_000_000_000));
     }
 
@@ -216,7 +252,10 @@ mod tests {
         // 2012-03-04 05:06:08
         let date = ((2012 - 1980) << 9) | (3 << 5) | 4;
         let time = (5 << 11) | (6 << 5) | 4;
-        assert_eq!(format_ns(fat_datetime_to_ns(date, time, 0).unwrap()), "2012-03-04T05:06:08.000000Z");
+        assert_eq!(
+            format_ns(fat_datetime_to_ns(date, time, 0).unwrap()),
+            "2012-03-04T05:06:08.000000Z"
+        );
     }
 
     #[test]

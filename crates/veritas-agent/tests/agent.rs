@@ -117,15 +117,35 @@ impl Seek for FaultyDevice {
 fn bad_sectors_are_zero_filled_and_mapped() {
     let dir = tempfile::tempdir().unwrap();
     let data = random_bytes(512 * 4096, 77);
-    let bad = vec![512 * 100..512 * 103, 512 * 2000..512 * 2000 + 1, 512 * 4095..512 * 4096];
+    let bad = vec![
+        512 * 100..512 * 103,
+        512 * 2000..512 * 2000 + 1,
+        512 * 4095..512 * 4096,
+    ];
     for format in [OutputFormat::E01, OutputFormat::Raw] {
-        let mut dev = FaultyDevice { data: data.clone(), pos: 0, bad: bad.clone(), failed_reads: 0 };
+        let mut dev = FaultyDevice {
+            data: data.clone(),
+            pos: 0,
+            bad: bad.clone(),
+            failed_reads: 0,
+        };
         let mut opts = ImageOptions::new(format, dir.path().join(format!("bad_{:?}", format)));
         opts.block_sectors = 64;
         opts.retries = 2;
-        let r = image::image_reader(&mut dev, "faulty", Some(data.len() as u64), &opts, &mut |_| true).unwrap();
+        let r = image::image_reader(
+            &mut dev,
+            "faulty",
+            Some(data.len() as u64),
+            &opts,
+            &mut |_| true,
+        )
+        .unwrap();
         assert!(dev.failed_reads > 0);
-        let ranges: Vec<(u64, u64)> = r.bad_sectors.iter().map(|b| (b.first_sector, b.sector_count)).collect();
+        let ranges: Vec<(u64, u64)> = r
+            .bad_sectors
+            .iter()
+            .map(|b| (b.first_sector, b.sector_count))
+            .collect();
         assert_eq!(ranges, vec![(100, 3), (2000, 1), (4095, 1)]);
         let mut expected = data.clone();
         for rg in &bad {
@@ -155,7 +175,9 @@ fn raw_acquisition_resumes_from_current_segment() {
     opts.state_file = Some(dir.path().join("res.state.json"));
     let err = image::image_path(&src, &opts, &mut |p| p.bytes_done < 2_500_000).unwrap_err();
     assert!(matches!(err, AgentError::Interrupted(_)));
-    let st = image::ImageState::load(opts.state_file.as_ref().unwrap()).unwrap().unwrap();
+    let st = image::ImageState::load(opts.state_file.as_ref().unwrap())
+        .unwrap()
+        .unwrap();
     assert_eq!(st.completed_segments.len(), 2);
     assert_eq!(st.current_segment_start, 2 * 1024 * 1024);
     let r = image::image_path(&src, &opts, &mut |_| true).unwrap();
@@ -171,14 +193,22 @@ fn raw_acquisition_resumes_from_current_segment() {
     let mut b = std::fs::read(&seg0).unwrap();
     b[10] ^= 1;
     std::fs::write(&seg0, b).unwrap();
-    assert!(matches!(image::image_path(&src, &opts2, &mut |_| true), Err(AgentError::Integrity(_))));
+    assert!(matches!(
+        image::image_path(&src, &opts2, &mut |_| true),
+        Err(AgentError::Integrity(_))
+    ));
 }
 
 #[test]
 fn triage_bundle_has_valid_manifest() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("bundle.zip");
-    let opts = TriageOptions { profile: Profile::Quick, max_file_bytes: 32 * 1024 * 1024, command_timeout: Duration::from_secs(120), ..Default::default() };
+    let opts = TriageOptions {
+        profile: Profile::Quick,
+        max_file_bytes: 32 * 1024 * 1024,
+        command_timeout: Duration::from_secs(120),
+        ..Default::default()
+    };
     let mut seen = Vec::new();
     let m = triage::run_triage(&out, &opts, &mut |n, _, _| seen.push(n.to_string())).unwrap();
     assert!(seen.contains(&"processes".to_string()));
@@ -191,13 +221,21 @@ fn triage_bundle_has_valid_manifest() {
     // Processes JSON is well formed and lists this test process.
     let mut zip = zip::ZipArchive::new(std::fs::File::open(&out).unwrap()).unwrap();
     let mut s = String::new();
-    zip.by_name("processes/processes.json").unwrap().read_to_string(&mut s).unwrap();
+    zip.by_name("processes/processes.json")
+        .unwrap()
+        .read_to_string(&mut s)
+        .unwrap();
     let procs: Vec<triage::ProcessRecord> = serde_json::from_str(&s).unwrap();
     assert!(procs.iter().any(|p| p.pid == std::process::id()));
     for f in &m.files {
         assert_eq!(f.sha256.len(), 64);
     }
-    eprintln!("triage: {} files, {} recorded errors, elevated={:?}", m.files.len(), m.errors.len(), m.elevated);
+    eprintln!(
+        "triage: {} files, {} recorded errors, elevated={:?}",
+        m.files.len(),
+        m.errors.len(),
+        m.elevated
+    );
 }
 
 #[test]
@@ -206,7 +244,11 @@ fn writeblock_check_returns_status() {
     let f = dir.path().join("x.img");
     std::fs::write(&f, b"abc").unwrap();
     assert_eq!(writeblock::check(&f).read_only, Some(false));
-    let dev = if cfg!(windows) { r"\\.\PhysicalDrive0" } else { "/dev/sda" };
+    let dev = if cfg!(windows) {
+        r"\\.\PhysicalDrive0"
+    } else {
+        "/dev/sda"
+    };
     let s = writeblock::check(Path::new(dev));
     assert!(!s.method.is_empty());
     eprintln!("{} -> {:?}", dev, s);
@@ -216,7 +258,9 @@ fn writeblock_check_returns_status() {
 fn ledger_entry_appended_and_verifies() {
     let dir = tempfile::tempdir().unwrap();
     let key_path = dir.path().join("key.json");
-    ExaminerKey::generate().save_encrypted(&key_path, "correct horse battery").unwrap();
+    ExaminerKey::generate()
+        .save_encrypted(&key_path, "correct horse battery")
+        .unwrap();
     let key = ExaminerKey::load_encrypted(&key_path, "correct horse battery").unwrap();
     let ledger_path = dir.path().join("ledger.jsonl");
     let acq = Acquisition {
@@ -225,21 +269,47 @@ fn ledger_entry_appended_and_verifies() {
         actor: "alice".into(),
         purpose: "disk image".into(),
         hashes: veritas_hash::hash_bytes(b"evidence bytes"),
-        device: DeviceInfo { description: "test device".into(), write_blocked: Some(true), sector_size: Some(512), ..Default::default() },
+        device: DeviceInfo {
+            description: "test device".into(),
+            write_blocked: Some(true),
+            sector_size: Some(512),
+            ..Default::default()
+        },
         details: Default::default(),
     };
-    let ts = TimeSource { source: "ntp:test".into(), offset_ms: -12, uncertainty_ms: 30 };
+    let ts = TimeSource {
+        source: "ntp:test".into(),
+        offset_ms: -12,
+        uncertainty_ms: 30,
+    };
     let tool = ledger_hook::agent_tool_info();
     assert!(tool.binary_sha256.is_some());
-    ledger_hook::append_acquisition(&ledger_path, &key, &acq, ts.clone(), tool.clone(), chrono::Utc::now()).unwrap();
+    ledger_hook::append_acquisition(
+        &ledger_path,
+        &key,
+        &acq,
+        ts.clone(),
+        tool.clone(),
+        chrono::Utc::now(),
+    )
+    .unwrap();
     // System-clock fallback with unknown uncertainty must also sign and verify.
     let fallback = ledger_hook::measure_time(&["invalid.invalid"], Duration::from_millis(100));
-    ledger_hook::append_acquisition(&ledger_path, &key, &acq, fallback, tool, chrono::Utc::now()).unwrap();
+    ledger_hook::append_acquisition(&ledger_path, &key, &acq, fallback, tool, chrono::Utc::now())
+        .unwrap();
     let ledger = Ledger::load(&ledger_path).unwrap();
     assert_eq!(ledger.entries.len(), 3);
     assert_eq!(ledger.entries[1].body.kind, EntryKind::Acquire);
     assert_eq!(ledger.entries[1].body.time_source.as_ref(), Some(&ts));
-    assert_eq!(ledger.entries[1].body.device.as_ref().unwrap().write_blocked, Some(true));
+    assert_eq!(
+        ledger.entries[1]
+            .body
+            .device
+            .as_ref()
+            .unwrap()
+            .write_blocked,
+        Some(true)
+    );
     let reg = KeyRegistry::default().with_key(&key, "alice", "examiner");
     let report = verify_ledger(&ledger.entries, &reg, &[]);
     assert_eq!(report.verdict, Verdict::Pass, "{:?}", report.failures);

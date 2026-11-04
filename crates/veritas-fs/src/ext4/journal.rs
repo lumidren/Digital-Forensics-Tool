@@ -65,7 +65,15 @@ pub fn parse(d: &[u8]) -> Result<Journal> {
     if !(1024..=65536).contains(&bs) || !bs.is_power_of_two() {
         return Err(FsError::invalid(0x0C, "journal block size"));
     }
-    let (fc, fi, fr) = if bt == 4 { (u32_be_at(d, 0x24)?, u32_be_at(d, 0x28)?, u32_be_at(d, 0x2C)?) } else { (0, 0, 0) };
+    let (fc, fi, fr) = if bt == 4 {
+        (
+            u32_be_at(d, 0x24)?,
+            u32_be_at(d, 0x28)?,
+            u32_be_at(d, 0x2C)?,
+        )
+    } else {
+        (0, 0, 0)
+    };
     let mut j = Journal {
         block_size: bs,
         max_len: u32_be_at(d, 0x10)?,
@@ -82,7 +90,11 @@ pub fn parse(d: &[u8]) -> Result<Journal> {
     let is64 = fi & INCOMPAT_64BIT != 0;
     let v3 = fi & INCOMPAT_CSUM_V3 != 0;
     let tag_size = if v3 {
-        if is64 { 16 } else { 12 }
+        if is64 {
+            16
+        } else {
+            12
+        }
     } else {
         8 + if is64 { 4 } else { 0 } + if fi & INCOMPAT_CSUM_V2 != 0 { 2 } else { 0 }
     };
@@ -96,16 +108,38 @@ pub fn parse(d: &[u8]) -> Result<Journal> {
         }
         let t = u32_be_at(blk, 4)?;
         let seq = u32_be_at(blk, 8)?;
-        let mut jb = JournalBlock { index: i as u64, block_type: t, type_name: type_name(t).into(), sequence: seq, tags: vec![], commit_time: None, revoked: vec![] };
+        let mut jb = JournalBlock {
+            index: i as u64,
+            block_type: t,
+            type_name: type_name(t).into(),
+            sequence: seq,
+            tags: vec![],
+            commit_time: None,
+            revoked: vec![],
+        };
         match t {
             1 => {
                 let mut p = 12usize;
                 while p + tag_size <= bsz && jb.tags.len() < MAX_TAGS {
                     let lo = u32_be_at(blk, p)? as u64;
                     let (hi, flags) = if v3 {
-                        (if is64 { u32_be_at(blk, p + 8)? as u64 } else { 0 }, u32_be_at(blk, p + 4)?)
+                        (
+                            if is64 {
+                                u32_be_at(blk, p + 8)? as u64
+                            } else {
+                                0
+                            },
+                            u32_be_at(blk, p + 4)?,
+                        )
                     } else {
-                        (if is64 { u32_be_at(blk, p + 8)? as u64 } else { 0 }, u16_be_at(blk, p + 6)? as u32)
+                        (
+                            if is64 {
+                                u32_be_at(blk, p + 8)? as u64
+                            } else {
+                                0
+                            },
+                            u16_be_at(blk, p + 6)? as u32,
+                        )
                     };
                     jb.tags.push((hi << 32) | lo);
                     p += tag_size;
@@ -129,7 +163,11 @@ pub fn parse(d: &[u8]) -> Result<Journal> {
                 let w = if is64 { 8 } else { 4 };
                 let mut p = 16usize;
                 while p + w <= count {
-                    jb.revoked.push(if is64 { u64_be_at(blk, p)? } else { u32_be_at(blk, p)? as u64 });
+                    jb.revoked.push(if is64 {
+                        u64_be_at(blk, p)?
+                    } else {
+                        u32_be_at(blk, p)? as u64
+                    });
                     p += w;
                 }
             }

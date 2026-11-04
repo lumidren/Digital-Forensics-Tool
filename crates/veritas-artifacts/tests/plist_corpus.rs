@@ -7,11 +7,16 @@ use std::path::PathBuf;
 use veritas_artifacts::plist::{self, PlistValue};
 
 fn corpus(rel: &str) -> Option<Vec<u8>> {
-    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/corpus/plaso").join(rel);
+    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../testdata/corpus/plaso")
+        .join(rel);
     match std::fs::read(&p) {
         Ok(d) => Some(d),
         Err(_) if std::env::var("VERITAS_REQUIRE_CORPUS").is_err() => {
-            eprintln!("skipping: corpus file {} missing (run testdata/fetch.py)", p.display());
+            eprintln!(
+                "skipping: corpus file {} missing (run testdata/fetch.py)",
+                p.display()
+            );
             None
         }
         Err(e) => panic!("corpus file {} missing: {e}", p.display()),
@@ -46,8 +51,14 @@ fn norm(v: &Value) -> Value {
 
 fn norm_fixture(v: &Value) -> Value {
     match v {
-        Value::Object(m) if m.contains_key("__real__") => serde_json::json!({"__real__": m["__real__"].as_str().unwrap().parse::<f64>().unwrap()}),
-        Value::Object(m) => Value::Object(m.iter().map(|(k, x)| (k.clone(), norm_fixture(x))).collect()),
+        Value::Object(m) if m.contains_key("__real__") => {
+            serde_json::json!({"__real__": m["__real__"].as_str().unwrap().parse::<f64>().unwrap()})
+        }
+        Value::Object(m) => Value::Object(
+            m.iter()
+                .map(|(k, x)| (k.clone(), norm_fixture(x)))
+                .collect(),
+        ),
         Value::Array(a) => Value::Array(a.iter().map(norm_fixture).collect()),
         other => other.clone(),
     }
@@ -71,7 +82,9 @@ fn values_equal_plistlib() {
     for f in FILES {
         let Some(d) = corpus(f) else { return };
         let p = plist::parse(&d).unwrap_or_else(|e| panic!("{f}: {e}"));
-        let fx = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/plist").join(format!("{}.json", f.replace('/', "__")));
+        let fx = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/plist")
+            .join(format!("{}.json", f.replace('/', "__")));
         let expected: Value = serde_json::from_str(&std::fs::read_to_string(fx).unwrap()).unwrap();
         assert_eq!(norm(&p.to_json()), norm_fixture(&expected), "{f}");
     }
@@ -79,27 +92,61 @@ fn values_equal_plistlib() {
 
 #[test]
 fn ns_keyed_archiver_unarchive() {
-    let Some(d) = corpus("plist/NSKeyedArchiver.plist") else { return };
+    let Some(d) = corpus("plist/NSKeyedArchiver.plist") else {
+        return;
+    };
     let p = plist::parse(&d).unwrap();
     let u = plist::unarchive(&p).unwrap();
-    assert_eq!(u.get("MyString").and_then(|v| v.as_str()), Some("Some string"));
+    assert_eq!(
+        u.get("MyString").and_then(|v| v.as_str()),
+        Some("Some string")
+    );
     assert_eq!(u.get("MyInteger"), Some(&PlistValue::Int(98)));
     assert_eq!(u.get("MyBool"), Some(&PlistValue::Bool(true)));
-    assert_eq!(u.get("MyDate").and_then(|v| v.date_ns()), Some(1_707_759_649_000_000_000));
+    assert_eq!(
+        u.get("MyDate").and_then(|v| v.date_ns()),
+        Some(1_707_759_649_000_000_000)
+    );
     assert_eq!(u.get("MyData"), Some(&PlistValue::Data(b"DATA\n".to_vec())));
     let ev = plist::events(&p, "s", "NSKeyedArchiver.plist");
-    assert!(ev.iter().any(|e| e.data_type == "plist:key" && e.attrs["key"] == "MyDate"));
+    assert!(ev
+        .iter()
+        .any(|e| e.data_type == "plist:key" && e.attrs["key"] == "MyDate"));
 }
 
 #[test]
 fn well_known_events() {
     let cases: &[(&str, &str, usize)] = &[
-        ("plist/InstallHistory.plist", "macos:install_history:entry", 7),
-        ("plist/com.apple.SoftwareUpdate.plist", "macos:software_update:entry", 2),
-        ("plist/com.apple.TimeMachine.plist", "macos:time_machine:backup", 13),
-        ("plist/com.apple.airport.preferences.plist", "macos:airport:entry", 4),
-        ("plist/com.apple.bluetooth.plist", "macos:bluetooth:entry", 12),
-        ("plist/com.apple.loginitems.plist", "macos:login_items:entry", 1),
+        (
+            "plist/InstallHistory.plist",
+            "macos:install_history:entry",
+            7,
+        ),
+        (
+            "plist/com.apple.SoftwareUpdate.plist",
+            "macos:software_update:entry",
+            2,
+        ),
+        (
+            "plist/com.apple.TimeMachine.plist",
+            "macos:time_machine:backup",
+            13,
+        ),
+        (
+            "plist/com.apple.airport.preferences.plist",
+            "macos:airport:entry",
+            4,
+        ),
+        (
+            "plist/com.apple.bluetooth.plist",
+            "macos:bluetooth:entry",
+            12,
+        ),
+        (
+            "plist/com.apple.loginitems.plist",
+            "macos:login_items:entry",
+            1,
+        ),
     ];
     for (f, dt, n) in cases {
         let Some(d) = corpus(f) else { return };
@@ -112,9 +159,14 @@ fn well_known_events() {
         count_dates(&p, &mut dates);
         assert_eq!(generic, dates, "{f}");
     }
-    let Some(d) = corpus("plist/InstallHistory.plist") else { return };
+    let Some(d) = corpus("plist/InstallHistory.plist") else {
+        return;
+    };
     let ev = plist::events(&plist::parse(&d).unwrap(), "s", "InstallHistory.plist");
-    let first = ev.iter().find(|e| e.data_type == "macos:install_history:entry").unwrap();
+    let first = ev
+        .iter()
+        .find(|e| e.data_type == "macos:install_history:entry")
+        .unwrap();
     assert_eq!(first.attrs["display_name"], "OS X");
     assert_eq!(first.attrs["display_version"], "10.9 (13A603)");
     assert_eq!(first.attrs["process_name"], "OS X Installer");
@@ -132,11 +184,16 @@ fn count_dates(v: &PlistValue, n: &mut usize) {
 
 #[test]
 fn to_json_sorted_and_deterministic() {
-    let Some(d) = corpus("plist/com.apple.bluetooth.plist") else { return };
+    let Some(d) = corpus("plist/com.apple.bluetooth.plist") else {
+        return;
+    };
     let a = plist::parse(&d).unwrap().to_json().to_string();
     let b = plist::parse(&d).unwrap().to_json().to_string();
     assert_eq!(a, b);
-    let p = plist::parse_xml(b"<plist><dict><key>b</key><integer>1</integer><key>a</key><real>0.5</real></dict></plist>").unwrap();
+    let p = plist::parse_xml(
+        b"<plist><dict><key>b</key><integer>1</integer><key>a</key><real>0.5</real></dict></plist>",
+    )
+    .unwrap();
     assert_eq!(p.to_json().to_string(), r#"{"a":{"__real__":"0.5"},"b":1}"#);
 }
 

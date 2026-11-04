@@ -63,7 +63,11 @@ pub struct FatEntry {
 #[derive(Debug, Clone, Copy)]
 enum DirLoc {
     FixedRoot,
-    Chain { cluster: u32, contiguous: bool, size: u64 },
+    Chain {
+        cluster: u32,
+        contiguous: bool,
+        size: u64,
+    },
 }
 
 pub struct FatFs {
@@ -84,7 +88,9 @@ pub struct FatFs {
 }
 
 fn sfn_checksum(n: &[u8]) -> u8 {
-    n.iter().fold(0u8, |s, &c| ((s & 1) << 7).wrapping_add(s >> 1).wrapping_add(c))
+    n.iter().fold(0u8, |s, &c| {
+        ((s & 1) << 7).wrapping_add(s >> 1).wrapping_add(c)
+    })
 }
 
 fn sfn_to_string(n: &[u8], nt_res: u8) -> String {
@@ -94,7 +100,13 @@ fn sfn_to_string(n: &[u8], nt_res: u8) -> String {
     } else if base[0] == 0x05 {
         base[0] = 0xE5;
     }
-    let trim = |v: &[u8]| -> String { v.iter().map(|&b| b as char).collect::<String>().trim_end().to_string() };
+    let trim = |v: &[u8]| -> String {
+        v.iter()
+            .map(|&b| b as char)
+            .collect::<String>()
+            .trim_end()
+            .to_string()
+    };
     let mut b = trim(&base);
     let mut e = trim(&n[8..11]);
     if nt_res & 0x08 != 0 {
@@ -103,7 +115,11 @@ fn sfn_to_string(n: &[u8], nt_res: u8) -> String {
     if nt_res & 0x10 != 0 {
         e = e.to_lowercase();
     }
-    if e.is_empty() { b } else { format!("{b}.{e}") }
+    if e.is_empty() {
+        b
+    } else {
+        format!("{b}.{e}")
+    }
 }
 
 /// exFAT timestamp + 10 ms increment + UTC offset byte -> epoch ns (UTC).
@@ -138,7 +154,13 @@ impl FatFs {
         let fatsz16 = u16_at(&b, 22)? as u64;
         let tot32 = u32_at(&b, 32)? as u64;
         let fatsz32 = u32_at(&b, 36)? as u64;
-        if !matches!(bps, 512 | 1024 | 2048 | 4096) || spc == 0 || !spc.is_power_of_two() || nfats == 0 || nfats > 4 || reserved == 0 {
+        if !matches!(bps, 512 | 1024 | 2048 | 4096)
+            || spc == 0
+            || !spc.is_power_of_two()
+            || nfats == 0
+            || nfats > 4
+            || reserved == 0
+        {
             return Err(FsError::invalid(11, "not a FAT boot sector"));
         }
         let fat_sectors = if fatsz16 != 0 { fatsz16 } else { fatsz32 };
@@ -156,7 +178,11 @@ impl FatFs {
         } else {
             FatType::Fat32
         };
-        let (label_off, serial_off, root_cluster) = if kind == FatType::Fat32 { (71usize, 67usize, u32_at(&b, 44)?) } else { (43, 39, 0) };
+        let (label_off, serial_off, root_cluster) = if kind == FatType::Fat32 {
+            (71usize, 67usize, u32_at(&b, 44)?)
+        } else {
+            (43, 39, 0)
+        };
         let fat_offset = reserved * bps;
         let fat_size = fat_sectors * bps;
         if fat_size > MAX_FAT_BYTES {
@@ -174,7 +200,9 @@ impl FatFs {
             data_offset: data_start * bps,
             root_cluster,
             cluster_count: clusters.min(u32::MAX as u64) as u32,
-            label: crate::util::ascii(need(&b, label_off, 11)?, false).trim_end().to_string(),
+            label: crate::util::ascii(need(&b, label_off, 11)?, false)
+                .trim_end()
+                .to_string(),
             serial: u32_at(&b, serial_off)?,
             fat,
             src,
@@ -211,7 +239,11 @@ impl FatFs {
             fat,
             src,
         };
-        if let Ok(root) = fs.read_dir_bytes(DirLoc::Chain { cluster: fs.root_cluster, contiguous: false, size: 0 }) {
+        if let Ok(root) = fs.read_dir_bytes(DirLoc::Chain {
+            cluster: fs.root_cluster,
+            contiguous: false,
+            size: 0,
+        }) {
             for e in root.chunks_exact(32) {
                 if e[0] == 0x83 {
                     let n = (e[1] as usize).min(11);
@@ -225,7 +257,9 @@ impl FatFs {
         Ok(fs)
     }
 
-    pub fn source(&self) -> &Source { &self.src }
+    pub fn source(&self) -> &Source {
+        &self.src
+    }
 
     /// Next cluster in the chain, `None` at end-of-chain / bad / free / out of range.
     pub fn next_cluster(&self, c: u32) -> Option<u32> {
@@ -258,7 +292,9 @@ impl FatFs {
         }
     }
 
-    pub fn cluster_allocated(&self, c: u32) -> bool { self.fat_entry(c).is_some_and(|v| v != 0) }
+    pub fn cluster_allocated(&self, c: u32) -> bool {
+        self.fat_entry(c).is_some_and(|v| v != 0)
+    }
 
     pub fn cluster_offset(&self, c: u32) -> Option<u64> {
         if c < 2 || c > self.cluster_count + 1 {
@@ -300,7 +336,9 @@ impl FatFs {
             if out.len() as u64 >= size {
                 break;
             }
-            let off = self.cluster_offset(c).ok_or_else(|| FsError::invalid(c as u64, "cluster out of range"))?;
+            let off = self
+                .cluster_offset(c)
+                .ok_or_else(|| FsError::invalid(c as u64, "cluster out of range"))?;
             let want = self.cluster_size.min(size - out.len() as u64);
             out.extend_from_slice(&read_vec_padded(self.src.as_ref(), off, want)?);
         }
@@ -312,7 +350,9 @@ impl FatFs {
         if size > MAX_FILE_READ {
             return Err(FsError::Limit("file too large".into()));
         }
-        let off = self.cluster_offset(first).ok_or_else(|| FsError::invalid(first as u64, "cluster out of range"))?;
+        let off = self
+            .cluster_offset(first)
+            .ok_or_else(|| FsError::invalid(first as u64, "cluster out of range"))?;
         read_vec_padded(self.src.as_ref(), off, size)
     }
 
@@ -335,13 +375,22 @@ impl FatFs {
 
     fn read_dir_bytes(&self, loc: DirLoc) -> Result<Vec<u8>> {
         match loc {
-            DirLoc::FixedRoot => read_vec_padded(self.src.as_ref(), self.root_dir_offset, self.root_dir_size),
-            DirLoc::Chain { cluster, contiguous, size } => {
+            DirLoc::FixedRoot => {
+                read_vec_padded(self.src.as_ref(), self.root_dir_offset, self.root_dir_size)
+            }
+            DirLoc::Chain {
+                cluster,
+                contiguous,
+                size,
+            } => {
                 if contiguous && size > 0 {
                     return self.read_contiguous(cluster, size.min(MAX_DIR_BYTES));
                 }
                 let ch = self.chain(cluster, MAX_DIR_BYTES / self.cluster_size.max(1))?;
-                self.read_clusters(&ch, (ch.len() as u64 * self.cluster_size).min(MAX_DIR_BYTES))
+                self.read_clusters(
+                    &ch,
+                    (ch.len() as u64 * self.cluster_size).min(MAX_DIR_BYTES),
+                )
             }
         }
     }
@@ -350,10 +399,22 @@ impl FatFs {
     fn dir_byte_offset(&self, loc: DirLoc, i: u64) -> u64 {
         match loc {
             DirLoc::FixedRoot => self.root_dir_offset + i,
-            DirLoc::Chain { cluster, contiguous, .. } => {
+            DirLoc::Chain {
+                cluster,
+                contiguous,
+                ..
+            } => {
                 let idx = i / self.cluster_size;
-                let c = if contiguous { cluster.checked_add(idx as u32) } else { self.chain(cluster, idx + 1).ok().and_then(|v| v.get(idx as usize).copied()) };
-                c.and_then(|c| self.cluster_offset(c)).map(|o| o + i % self.cluster_size).unwrap_or(0)
+                let c = if contiguous {
+                    cluster.checked_add(idx as u32)
+                } else {
+                    self.chain(cluster, idx + 1)
+                        .ok()
+                        .and_then(|v| v.get(idx as usize).copied())
+                };
+                c.and_then(|c| self.cluster_offset(c))
+                    .map(|o| o + i % self.cluster_size)
+                    .unwrap_or(0)
             }
         }
     }
@@ -377,7 +438,10 @@ impl FatFs {
                     b.extend_from_slice(&e[1..11]);
                     b.extend_from_slice(&e[14..26]);
                     b.extend_from_slice(&e[28..32]);
-                    let mut units: Vec<u16> = b.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
+                    let mut units: Vec<u16> = b
+                        .chunks_exact(2)
+                        .map(|c| u16::from_le_bytes([c[0], c[1]]))
+                        .collect();
                     if let Some(p) = units.iter().position(|&u| u == 0 || u == 0xFFFF) {
                         units.truncate(p);
                     }
@@ -421,7 +485,11 @@ impl FatFs {
                 continue;
             }
             let fc = ((u16_at(e, 20)? as u32) << 16) | u16_at(e, 26)? as u32;
-            let fc = if self.kind == FatType::Fat32 { fc } else { fc & 0xFFFF };
+            let fc = if self.kind == FatType::Fat32 {
+                fc
+            } else {
+                fc & 0xFFFF
+            };
             let is_dir = attr & 0x10 != 0;
             let date = |o: usize| u16_at(e, o).unwrap_or(0);
             out.push(FatEntry {
@@ -433,9 +501,21 @@ impl FatFs {
                 size: if is_dir { 0 } else { u32_at(e, 28)? as u64 },
                 first_cluster: fc,
                 attributes: attr as u16,
-                crtime: if date(16) != 0 { fat_datetime_to_ns(date(16), date(14), e[13]) } else { None },
-                mtime: if date(24) != 0 { fat_datetime_to_ns(date(24), date(22), 0) } else { None },
-                atime: if date(18) != 0 { fat_datetime_to_ns(date(18), 0, 0) } else { None },
+                crtime: if date(16) != 0 {
+                    fat_datetime_to_ns(date(16), date(14), e[13])
+                } else {
+                    None
+                },
+                mtime: if date(24) != 0 {
+                    fat_datetime_to_ns(date(24), date(22), 0)
+                } else {
+                    None
+                },
+                atime: if date(18) != 0 {
+                    fat_datetime_to_ns(date(18), 0, 0)
+                } else {
+                    None
+                },
                 dir_entry_offset: self.dir_byte_offset(loc, (i * 32) as u64),
                 no_fat_chain: false,
                 lfn_mismatch,
@@ -479,7 +559,11 @@ impl FatFs {
                 if f[0] & 0x7F != 0x41 {
                     break;
                 }
-                units.extend(f[2..32].chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])));
+                units.extend(
+                    f[2..32]
+                        .chunks_exact(2)
+                        .map(|c| u16::from_le_bytes([c[0], c[1]])),
+                );
             }
             units.truncate(name_len);
             let name = String::from_utf16_lossy(&units);
@@ -508,23 +592,41 @@ impl FatFs {
     }
 
     fn dir_loc_of(&self, e: &FatEntry) -> DirLoc {
-        DirLoc::Chain { cluster: e.first_cluster, contiguous: e.no_fat_chain || e.deleted, size: if e.no_fat_chain || e.deleted { self.exfat_dir_size(e) } else { 0 } }
+        DirLoc::Chain {
+            cluster: e.first_cluster,
+            contiguous: e.no_fat_chain || e.deleted,
+            size: if e.no_fat_chain || e.deleted {
+                self.exfat_dir_size(e)
+            } else {
+                0
+            },
+        }
     }
 
     fn exfat_dir_size(&self, e: &FatEntry) -> u64 {
         // Contiguous directory: exFAT data length, else one cluster when the true size is unknown.
-        if e.data_length > 0 { e.data_length } else { self.cluster_size }
+        if e.data_length > 0 {
+            e.data_length
+        } else {
+            self.cluster_size
+        }
     }
 
     fn root_loc(&self) -> DirLoc {
         match self.kind {
             FatType::Fat12 | FatType::Fat16 => DirLoc::FixedRoot,
-            _ => DirLoc::Chain { cluster: self.root_cluster, contiguous: false, size: 0 },
+            _ => DirLoc::Chain {
+                cluster: self.root_cluster,
+                contiguous: false,
+                size: 0,
+            },
         }
     }
 
     /// Entries of the root directory (including deleted ones).
-    pub fn root(&self) -> Result<Vec<FatEntry>> { self.parse_dir(self.root_loc(), "/") }
+    pub fn root(&self) -> Result<Vec<FatEntry>> {
+        self.parse_dir(self.root_loc(), "/")
+    }
 
     /// Entries of directory `e` (including deleted ones).
     pub fn list_dir(&self, e: &FatEntry) -> Result<Vec<FatEntry>> {
@@ -547,7 +649,12 @@ impl FatFs {
                 if e.deleted && !include_deleted {
                     continue;
                 }
-                if e.is_dir && !e.deleted && depth < MAX_DIR_DEPTH && e.first_cluster >= 2 && seen_dirs.insert(e.first_cluster) {
+                if e.is_dir
+                    && !e.deleted
+                    && depth < MAX_DIR_DEPTH
+                    && e.first_cluster >= 2
+                    && seen_dirs.insert(e.first_cluster)
+                {
                     if let Ok(children) = self.list_dir(&e) {
                         stack.push((children, depth + 1));
                     }
@@ -566,7 +673,13 @@ impl FatFs {
             let hit = list
                 .iter()
                 .find(|e| !e.deleted && (e.name == *comp || e.short_name == *comp))
-                .or_else(|| list.iter().find(|e| !e.deleted && (e.name.eq_ignore_ascii_case(comp) || e.short_name.eq_ignore_ascii_case(comp))))
+                .or_else(|| {
+                    list.iter().find(|e| {
+                        !e.deleted
+                            && (e.name.eq_ignore_ascii_case(comp)
+                                || e.short_name.eq_ignore_ascii_case(comp))
+                    })
+                })
                 .cloned()
                 .ok_or_else(|| FsError::NotFound(path.to_string()))?;
             if k + 1 == comps.len() {
@@ -597,5 +710,9 @@ pub fn probe(b: &[u8]) -> bool {
     let bps = u16::from_le_bytes([b[11], b[12]]);
     let spc = b[13];
     let nfats = b[16];
-    matches!(bps, 512 | 1024 | 2048 | 4096) && spc != 0 && spc.is_power_of_two() && (1..=4).contains(&nfats) && (b[0] == 0xEB || b[0] == 0xE9)
+    matches!(bps, 512 | 1024 | 2048 | 4096)
+        && spc != 0
+        && spc.is_power_of_two()
+        && (1..=4).contains(&nfats)
+        && (b[0] == 0xEB || b[0] == 0xE9)
 }

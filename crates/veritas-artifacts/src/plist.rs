@@ -94,8 +94,12 @@ impl PlistValue {
             PlistValue::Data(b) => json!({"__bytes__": hex::encode(b)}),
             PlistValue::String(s) => json!(s),
             PlistValue::Uid(u) => json!({"__uid__": u}),
-            PlistValue::Array(a) => Value::Array(a.iter().map(|v| v.to_json_d(depth + 1)).collect()),
-            PlistValue::Set(a) => json!({"__set__": a.iter().map(|v| v.to_json_d(depth + 1)).collect::<Vec<_>>()}),
+            PlistValue::Array(a) => {
+                Value::Array(a.iter().map(|v| v.to_json_d(depth + 1)).collect())
+            }
+            PlistValue::Set(a) => {
+                json!({"__set__": a.iter().map(|v| v.to_json_d(depth + 1)).collect::<Vec<_>>()})
+            }
             PlistValue::Dict(kv) => {
                 let mut sorted: Vec<&(String, PlistValue)> = kv.iter().collect();
                 sorted.sort_by(|a, b| a.0.cmp(&b.0));
@@ -132,7 +136,11 @@ fn be_uint(b: &[u8]) -> u64 {
 
 pub fn parse_binary(d: &[u8]) -> Result<PlistValue> {
     if d.len() < 40 {
-        return Err(ParseError::Truncated { offset: 0, needed: 40, available: d.len() });
+        return Err(ParseError::Truncated {
+            offset: 0,
+            needed: 40,
+            available: d.len(),
+        });
     }
     let t = d.len() - 32;
     let off_size = u8_at(d, t + 6)? as usize;
@@ -141,11 +149,27 @@ pub fn parse_binary(d: &[u8]) -> Result<PlistValue> {
     let top = u64_be_at(d, t + 16)? as usize;
     let table = u64_be_at(d, t + 24)? as usize;
     if !(1..=8).contains(&off_size) || !(1..=8).contains(&ref_size) {
-        return Err(ParseError::Invalid { offset: t, reason: format!("offset/ref size {off_size}/{ref_size}") });
+        return Err(ParseError::Invalid {
+            offset: t,
+            reason: format!("offset/ref size {off_size}/{ref_size}"),
+        });
     }
-    let tb = need(d, table, n.checked_mul(off_size).ok_or_else(|| ParseError::Limit("object count".into()))?)?;
-    let offsets: Vec<usize> = tb.chunks_exact(off_size).map(|c| be_uint(c) as usize).collect();
-    let mut b = Bin { d, offsets, ref_size, nodes: 0 };
+    let tb = need(
+        d,
+        table,
+        n.checked_mul(off_size)
+            .ok_or_else(|| ParseError::Limit("object count".into()))?,
+    )?;
+    let offsets: Vec<usize> = tb
+        .chunks_exact(off_size)
+        .map(|c| be_uint(c) as usize)
+        .collect();
+    let mut b = Bin {
+        d,
+        offsets,
+        ref_size,
+        nodes: 0,
+    };
     let mut stack = BTreeSet::new();
     b.obj(top, &mut stack, 0)
 }
@@ -158,36 +182,63 @@ impl Bin<'_> {
         }
         let im = u8_at(self.d, o + 1)?;
         if im >> 4 != 1 {
-            return Err(ParseError::Invalid { offset: o + 1, reason: "bad length integer".into() });
+            return Err(ParseError::Invalid {
+                offset: o + 1,
+                reason: "bad length integer".into(),
+            });
         }
         let nb = 1usize << (im & 0x0f);
         if nb > 8 {
-            return Err(ParseError::Invalid { offset: o + 1, reason: "length integer too wide".into() });
+            return Err(ParseError::Invalid {
+                offset: o + 1,
+                reason: "length integer too wide".into(),
+            });
         }
         let v = be_uint(need(self.d, o + 2, nb)?) as usize;
         Ok((v, o + 2 + nb))
     }
 
     fn refs(&self, start: usize, count: usize) -> Result<Vec<usize>> {
-        let b = need(self.d, start, count.checked_mul(self.ref_size).ok_or_else(|| ParseError::Limit("ref count".into()))?)?;
-        Ok(b.chunks_exact(self.ref_size).map(|c| be_uint(c) as usize).collect())
+        let b = need(
+            self.d,
+            start,
+            count
+                .checked_mul(self.ref_size)
+                .ok_or_else(|| ParseError::Limit("ref count".into()))?,
+        )?;
+        Ok(b.chunks_exact(self.ref_size)
+            .map(|c| be_uint(c) as usize)
+            .collect())
     }
 
     fn obj(&mut self, idx: usize, stack: &mut BTreeSet<usize>, depth: usize) -> Result<PlistValue> {
         self.nodes += 1;
         if self.nodes > MAX_NODES || depth > MAX_DEPTH {
-            return Err(ParseError::Limit("plist object graph too large or deep".into()));
+            return Err(ParseError::Limit(
+                "plist object graph too large or deep".into(),
+            ));
         }
         if !stack.insert(idx) {
-            return Err(ParseError::Invalid { offset: idx, reason: "object reference cycle".into() });
+            return Err(ParseError::Invalid {
+                offset: idx,
+                reason: "object reference cycle".into(),
+            });
         }
         let r = self.obj_inner(idx, stack, depth);
         stack.remove(&idx);
         r
     }
 
-    fn obj_inner(&mut self, idx: usize, stack: &mut BTreeSet<usize>, depth: usize) -> Result<PlistValue> {
-        let o = *self.offsets.get(idx).ok_or_else(|| ParseError::Invalid { offset: idx, reason: "object index out of range".into() })?;
+    fn obj_inner(
+        &mut self,
+        idx: usize,
+        stack: &mut BTreeSet<usize>,
+        depth: usize,
+    ) -> Result<PlistValue> {
+        let o = *self.offsets.get(idx).ok_or_else(|| ParseError::Invalid {
+            offset: idx,
+            reason: "object index out of range".into(),
+        })?;
         let m = u8_at(self.d, o)?;
         let low = (m & 0x0f) as usize;
         Ok(match m >> 4 {
@@ -203,8 +254,16 @@ impl Bin<'_> {
                 let v: i128 = match nb {
                     1 | 2 | 4 => be_uint(b) as i128,
                     8 => be_uint(b) as i64 as i128,
-                    16 => i128::from_be_bytes(b.try_into().map_err(|_| ParseError::Invalid { offset: o, reason: "int128".into() })?),
-                    _ => return Err(ParseError::Invalid { offset: o, reason: "integer width".into() }),
+                    16 => i128::from_be_bytes(b.try_into().map_err(|_| ParseError::Invalid {
+                        offset: o,
+                        reason: "int128".into(),
+                    })?),
+                    _ => {
+                        return Err(ParseError::Invalid {
+                            offset: o,
+                            reason: "integer width".into(),
+                        })
+                    }
                 };
                 PlistValue::Int(v)
             }
@@ -212,12 +271,21 @@ impl Bin<'_> {
                 let nb = 1usize << low;
                 let b = need(self.d, o + 1, nb.min(8))?;
                 match nb {
-                    4 => PlistValue::Real(f32::from_be_bytes(b.try_into().unwrap_or([0; 4])) as f64),
+                    4 => {
+                        PlistValue::Real(f32::from_be_bytes(b.try_into().unwrap_or([0; 4])) as f64)
+                    }
                     8 => PlistValue::Real(f64::from_be_bytes(b.try_into().unwrap_or([0; 8]))),
-                    _ => return Err(ParseError::Invalid { offset: o, reason: "real width".into() }),
+                    _ => {
+                        return Err(ParseError::Invalid {
+                            offset: o,
+                            reason: "real width".into(),
+                        })
+                    }
                 }
             }
-            0x3 => PlistValue::Date(f64::from_be_bytes(need(self.d, o + 1, 8)?.try_into().unwrap_or([0; 8]))),
+            0x3 => PlistValue::Date(f64::from_be_bytes(
+                need(self.d, o + 1, 8)?.try_into().unwrap_or([0; 8]),
+            )),
             0x4 => {
                 let (n, s) = self.len_and_start(m, o)?;
                 PlistValue::Data(need(self.d, s, n)?.to_vec())
@@ -228,8 +296,16 @@ impl Bin<'_> {
             }
             0x6 => {
                 let (n, s) = self.len_and_start(m, o)?;
-                let b = need(self.d, s, n.checked_mul(2).ok_or_else(|| ParseError::Limit("string".into()))?)?;
-                let units: Vec<u16> = b.chunks_exact(2).map(|c| u16::from_be_bytes([c[0], c[1]])).collect();
+                let b = need(
+                    self.d,
+                    s,
+                    n.checked_mul(2)
+                        .ok_or_else(|| ParseError::Limit("string".into()))?,
+                )?;
+                let units: Vec<u16> = b
+                    .chunks_exact(2)
+                    .map(|c| u16::from_be_bytes([c[0], c[1]]))
+                    .collect();
                 PlistValue::String(String::from_utf16_lossy(&units))
             }
             0x7 => {
@@ -243,7 +319,11 @@ impl Bin<'_> {
                 for r in self.refs(s, n)? {
                     v.push(self.obj(r, stack, depth + 1)?);
                 }
-                if m >> 4 == 0xa { PlistValue::Array(v) } else { PlistValue::Set(v) }
+                if m >> 4 == 0xa {
+                    PlistValue::Array(v)
+                } else {
+                    PlistValue::Set(v)
+                }
             }
             0xd => {
                 let (n, s) = self.len_and_start(m, o)?;
@@ -294,18 +374,35 @@ fn parse_iso_date(s: &str) -> Option<f64> {
     let s = s.trim();
     let dt = chrono::DateTime::parse_from_rfc3339(s)
         .map(|d| d.with_timezone(&chrono::Utc))
-        .or_else(|_| chrono::NaiveDateTime::parse_from_str(s.trim_end_matches('Z'), "%Y-%m-%dT%H:%M:%S").map(|n| n.and_utc()))
+        .or_else(|_| {
+            chrono::NaiveDateTime::parse_from_str(s.trim_end_matches('Z'), "%Y-%m-%dT%H:%M:%S")
+                .map(|n| n.and_utc())
+        })
         .ok()?;
     let ns = dt.timestamp_nanos_opt()?;
     Some((ns as f64 / 1e9) - 978_307_200.0)
 }
 
 pub fn parse_xml(data: &[u8]) -> Result<PlistValue> {
-    let text = std::str::from_utf8(data).map_err(|e| ParseError::Invalid { offset: e.valid_up_to(), reason: "plist XML is not UTF-8".into() })?;
-    let opts = roxmltree::ParsingOptions { allow_dtd: true, ..Default::default() };
-    let doc = roxmltree::Document::parse_with_options(text, opts).map_err(|e| ParseError::Invalid { offset: 0, reason: format!("XML: {e}") })?;
+    let text = std::str::from_utf8(data).map_err(|e| ParseError::Invalid {
+        offset: e.valid_up_to(),
+        reason: "plist XML is not UTF-8".into(),
+    })?;
+    let opts = roxmltree::ParsingOptions {
+        allow_dtd: true,
+        ..Default::default()
+    };
+    let doc =
+        roxmltree::Document::parse_with_options(text, opts).map_err(|e| ParseError::Invalid {
+            offset: 0,
+            reason: format!("XML: {e}"),
+        })?;
     let root = doc.root_element();
-    let first = if root.tag_name().name() == "plist" { root.children().find(|n| n.is_element()) } else { Some(root) };
+    let first = if root.tag_name().name() == "plist" {
+        root.children().find(|n| n.is_element())
+    } else {
+        Some(root)
+    };
     match first {
         Some(n) => xml_value(n, 0),
         None => Ok(PlistValue::Null),
@@ -322,15 +419,30 @@ fn xml_value(n: roxmltree::Node, depth: usize) -> Result<PlistValue> {
         "integer" => {
             let t = text();
             let t = t.trim();
-            let v = if let Some(h) = t.strip_prefix("0x") { i128::from_str_radix(h, 16).ok() } else { t.parse::<i128>().ok() };
-            PlistValue::Int(v.ok_or_else(|| ParseError::Invalid { offset: 0, reason: format!("integer {t}") })?)
+            let v = if let Some(h) = t.strip_prefix("0x") {
+                i128::from_str_radix(h, 16).ok()
+            } else {
+                t.parse::<i128>().ok()
+            };
+            PlistValue::Int(v.ok_or_else(|| ParseError::Invalid {
+                offset: 0,
+                reason: format!("integer {t}"),
+            })?)
         }
         "real" => PlistValue::Real(text().trim().parse().unwrap_or(f64::NAN)),
         "true" => PlistValue::Bool(true),
         "false" => PlistValue::Bool(false),
-        "date" => PlistValue::Date(parse_iso_date(&text()).ok_or_else(|| ParseError::Invalid { offset: 0, reason: "date".into() })?),
+        "date" => PlistValue::Date(parse_iso_date(&text()).ok_or_else(|| ParseError::Invalid {
+            offset: 0,
+            reason: "date".into(),
+        })?),
         "data" => PlistValue::Data(b64_decode(&text())),
-        "array" => PlistValue::Array(n.children().filter(|c| c.is_element()).map(|c| xml_value(c, depth + 1)).collect::<Result<_>>()?),
+        "array" => PlistValue::Array(
+            n.children()
+                .filter(|c| c.is_element())
+                .map(|c| xml_value(c, depth + 1))
+                .collect::<Result<_>>()?,
+        ),
         "dict" => {
             let mut kv = Vec::new();
             let mut key: Option<String> = None;
@@ -362,12 +474,21 @@ pub fn unarchive(p: &PlistValue) -> Option<PlistValue> {
         return Some(resolve_top(root, &mut stack));
     }
     if let PlistValue::Dict(kv) = top {
-        return Some(PlistValue::Dict(kv.iter().map(|(k, v)| (k.clone(), resolve_top(v, &mut stack))).collect()));
+        return Some(PlistValue::Dict(
+            kv.iter()
+                .map(|(k, v)| (k.clone(), resolve_top(v, &mut stack)))
+                .collect(),
+        ));
     }
     None
 }
 
-fn resolve_ka(v: &PlistValue, objs: &[PlistValue], stack: &mut BTreeSet<u64>, depth: usize) -> PlistValue {
+fn resolve_ka(
+    v: &PlistValue,
+    objs: &[PlistValue],
+    stack: &mut BTreeSet<u64>,
+    depth: usize,
+) -> PlistValue {
     if depth > 128 {
         return PlistValue::Null;
     }
@@ -383,51 +504,115 @@ fn resolve_ka(v: &PlistValue, objs: &[PlistValue], stack: &mut BTreeSet<u64>, de
             stack.remove(u);
             r
         }
-        PlistValue::Array(a) => PlistValue::Array(a.iter().map(|x| resolve_ka(x, objs, stack, depth + 1)).collect()),
+        PlistValue::Array(a) => PlistValue::Array(
+            a.iter()
+                .map(|x| resolve_ka(x, objs, stack, depth + 1))
+                .collect(),
+        ),
         other => other.clone(),
     }
 }
 
-fn resolve_obj(o: &PlistValue, objs: &[PlistValue], stack: &mut BTreeSet<u64>, depth: usize) -> PlistValue {
+fn resolve_obj(
+    o: &PlistValue,
+    objs: &[PlistValue],
+    stack: &mut BTreeSet<u64>,
+    depth: usize,
+) -> PlistValue {
     match o {
         PlistValue::String(s) if s == "$null" => PlistValue::Null,
         PlistValue::Dict(_) => {
-            let class_obj = o.get("$class").map(|c| resolve_ka(c, objs, stack, depth + 1));
-            let class = class_obj.as_ref().and_then(|c| c.get("$classname").and_then(|n| n.as_str()).map(String::from)).unwrap_or_default();
+            let class_obj = o
+                .get("$class")
+                .map(|c| resolve_ka(c, objs, stack, depth + 1));
+            let class = class_obj
+                .as_ref()
+                .and_then(|c| {
+                    c.get("$classname")
+                        .and_then(|n| n.as_str())
+                        .map(String::from)
+                })
+                .unwrap_or_default();
             // Inheritance chain ($classes) lets bridged subclasses (e.g. OC_BuiltinPythonDate)
             // resolve to their Foundation base class; fall back to the object's shape.
             let chain: Vec<String> = class_obj
                 .as_ref()
                 .and_then(|c| c.get("$classes"))
                 .and_then(|c| c.as_array())
-                .map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_str().map(String::from))
+                        .collect()
+                })
                 .unwrap_or_default();
-            const BASES: &[&str] = &["NSMutableDictionary", "NSDictionary", "NSMutableArray", "NSArray", "NSMutableOrderedSet", "NSOrderedSet", "NSMutableSet", "NSSet", "NSMutableString", "NSString", "NSDate", "NSMutableData", "NSData", "NSUUID", "NSURL"];
-            let base = std::iter::once(class.clone()).chain(chain).find(|c| BASES.contains(&c.as_str())).unwrap_or_else(|| {
-                if o.get("NS.keys").is_some() && o.get("NS.objects").is_some() {
-                    "NSDictionary".into()
-                } else if o.get("NS.objects").is_some() {
-                    "NSArray".into()
-                } else if o.get("NS.string").is_some() {
-                    "NSString".into()
-                } else if o.get("NS.time").is_some() {
-                    "NSDate".into()
-                } else {
-                    class.clone()
-                }
-            });
+            const BASES: &[&str] = &[
+                "NSMutableDictionary",
+                "NSDictionary",
+                "NSMutableArray",
+                "NSArray",
+                "NSMutableOrderedSet",
+                "NSOrderedSet",
+                "NSMutableSet",
+                "NSSet",
+                "NSMutableString",
+                "NSString",
+                "NSDate",
+                "NSMutableData",
+                "NSData",
+                "NSUUID",
+                "NSURL",
+            ];
+            let base = std::iter::once(class.clone())
+                .chain(chain)
+                .find(|c| BASES.contains(&c.as_str()))
+                .unwrap_or_else(|| {
+                    if o.get("NS.keys").is_some() && o.get("NS.objects").is_some() {
+                        "NSDictionary".into()
+                    } else if o.get("NS.objects").is_some() {
+                        "NSArray".into()
+                    } else if o.get("NS.string").is_some() {
+                        "NSString".into()
+                    } else if o.get("NS.time").is_some() {
+                        "NSDate".into()
+                    } else {
+                        class.clone()
+                    }
+                });
             let list = |k: &str, stack: &mut BTreeSet<u64>| -> Vec<PlistValue> {
-                o.get(k).and_then(|a| a.as_array()).map(|a| a.iter().map(|x| resolve_ka(x, objs, stack, depth + 1)).collect()).unwrap_or_default()
+                o.get(k)
+                    .and_then(|a| a.as_array())
+                    .map(|a| {
+                        a.iter()
+                            .map(|x| resolve_ka(x, objs, stack, depth + 1))
+                            .collect()
+                    })
+                    .unwrap_or_default()
             };
             match base.as_str() {
                 "NSDictionary" | "NSMutableDictionary" => {
                     let keys = list("NS.keys", stack);
                     let vals = list("NS.objects", stack);
-                    PlistValue::Dict(keys.into_iter().zip(vals).map(|(k, v)| (k.as_str().map(String::from).unwrap_or_else(|| format!("{k:?}")), v)).collect())
+                    PlistValue::Dict(
+                        keys.into_iter()
+                            .zip(vals)
+                            .map(|(k, v)| {
+                                (
+                                    k.as_str()
+                                        .map(String::from)
+                                        .unwrap_or_else(|| format!("{k:?}")),
+                                    v,
+                                )
+                            })
+                            .collect(),
+                    )
                 }
                 "NSArray" | "NSMutableArray" => PlistValue::Array(list("NS.objects", stack)),
-                "NSSet" | "NSMutableSet" | "NSOrderedSet" | "NSMutableOrderedSet" => PlistValue::Set(list("NS.objects", stack)),
-                "NSString" | "NSMutableString" => o.get("NS.string").cloned().unwrap_or(PlistValue::Null),
+                "NSSet" | "NSMutableSet" | "NSOrderedSet" | "NSMutableOrderedSet" => {
+                    PlistValue::Set(list("NS.objects", stack))
+                }
+                "NSString" | "NSMutableString" => {
+                    o.get("NS.string").cloned().unwrap_or(PlistValue::Null)
+                }
                 "NSDate" => match o.get("NS.time") {
                     Some(PlistValue::Real(f)) => PlistValue::Date(*f),
                     Some(PlistValue::Int(i)) => PlistValue::Date(*i as f64),
@@ -435,7 +620,10 @@ fn resolve_obj(o: &PlistValue, objs: &[PlistValue], stack: &mut BTreeSet<u64>, d
                 },
                 "NSData" | "NSMutableData" => o.get("NS.data").cloned().unwrap_or(PlistValue::Null),
                 "NSUUID" => o.get("NS.uuidbytes").cloned().unwrap_or(PlistValue::Null),
-                "NSURL" => o.get("NS.relative").map(|x| resolve_ka(x, objs, stack, depth + 1)).unwrap_or(PlistValue::Null),
+                "NSURL" => o
+                    .get("NS.relative")
+                    .map(|x| resolve_ka(x, objs, stack, depth + 1))
+                    .unwrap_or(PlistValue::Null),
                 _ => {
                     let mut kv: Vec<(String, PlistValue)> = Vec::new();
                     if let PlistValue::Dict(items) = o {
@@ -500,7 +688,11 @@ fn s(v: Option<&PlistValue>) -> Value {
 /// Timeline events. `path` decides which well-known plist handler applies (by file name).
 pub fn events(p: &PlistValue, sha: &str, path: &str) -> Vec<Event> {
     let mut out = Vec::new();
-    let base = path.rsplit(['/', '\\']).next().unwrap_or(path).to_ascii_lowercase();
+    let base = path
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or(path)
+        .to_ascii_lowercase();
     let mut idx = 0i64;
     let mut push = |e: Event, out: &mut Vec<Event>| {
         out.push(finish(e, sha, path, idx));
@@ -510,70 +702,155 @@ pub fn events(p: &PlistValue, sha: &str, path: &str) -> Vec<Event> {
         "installhistory.plist" => {
             for it in p.as_array().unwrap_or(&[]) {
                 let name = it.get("displayName").and_then(|v| v.as_str()).unwrap_or("");
-                let ver = it.get("displayVersion").and_then(|v| v.as_str()).unwrap_or("");
+                let ver = it
+                    .get("displayVersion")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
                 let proc_ = it.get("processName").and_then(|v| v.as_str()).unwrap_or("");
-                let pkgs: Vec<String> = it.get("packageIdentifiers").and_then(|v| v.as_array()).unwrap_or(&[]).iter().filter_map(|x| x.as_str().map(String::from)).collect();
-                let e = Event::new("macos:install_history:entry", desc::INSTALLATION, format!("Installation of: {name} {ver} ({proc_}). Packages: {}.", pkgs.join(", ")))
-                    .with_time(it.get("date").and_then(|d| d.date_ns()))
-                    .attr("display_name", name)
-                    .attr("display_version", ver)
-                    .attr("process_name", proc_)
-                    .attr("package_identifiers", json!(pkgs));
+                let pkgs: Vec<String> = it
+                    .get("packageIdentifiers")
+                    .and_then(|v| v.as_array())
+                    .unwrap_or(&[])
+                    .iter()
+                    .filter_map(|x| x.as_str().map(String::from))
+                    .collect();
+                let e = Event::new(
+                    "macos:install_history:entry",
+                    desc::INSTALLATION,
+                    format!(
+                        "Installation of: {name} {ver} ({proc_}). Packages: {}.",
+                        pkgs.join(", ")
+                    ),
+                )
+                .with_time(it.get("date").and_then(|d| d.date_ns()))
+                .attr("display_name", name)
+                .attr("display_version", ver)
+                .attr("process_name", proc_)
+                .attr("package_identifiers", json!(pkgs));
                 push(e, &mut out);
             }
         }
         "com.apple.softwareupdate.plist" => {
-            let ver = p.get("LastAttemptSystemVersion").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            for (key, what) in [("LastFullSuccessfulDate", "full"), ("LastSuccessfulDate", "partial")] {
+            let ver = p
+                .get("LastAttemptSystemVersion")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            for (key, what) in [
+                ("LastFullSuccessfulDate", "full"),
+                ("LastSuccessfulDate", "partial"),
+            ] {
                 if let Some(t) = p.get(key).and_then(|d| d.date_ns()) {
-                    let pending = p.get("LastUpdatesAvailable").map(|v| v.to_json()).unwrap_or(Value::Null);
-                    let e = Event::new("macos:software_update:entry", desc::WRITTEN, format!("Last Mac OS {ver} {what} update."))
-                        .with_time(Some(t))
-                        .attr("key", key)
-                        .attr("system_version", ver.clone())
-                        .attr("updates_available", pending)
-                        .attr("recommended_updates", s(p.get("RecommendedUpdates")));
+                    let pending = p
+                        .get("LastUpdatesAvailable")
+                        .map(|v| v.to_json())
+                        .unwrap_or(Value::Null);
+                    let e = Event::new(
+                        "macos:software_update:entry",
+                        desc::WRITTEN,
+                        format!("Last Mac OS {ver} {what} update."),
+                    )
+                    .with_time(Some(t))
+                    .attr("key", key)
+                    .attr("system_version", ver.clone())
+                    .attr("updates_available", pending)
+                    .attr("recommended_updates", s(p.get("RecommendedUpdates")));
                     push(e, &mut out);
                 }
             }
         }
         "com.apple.loginitems.plist" => {
-            let items = p.get("SessionItems").and_then(|v| v.get("CustomListItems")).and_then(|v| v.as_array()).unwrap_or(&[]);
+            let items = p
+                .get("SessionItems")
+                .and_then(|v| v.get("CustomListItems"))
+                .and_then(|v| v.as_array())
+                .unwrap_or(&[]);
             for it in items {
-                let name = it.get("Name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let e = Event::new("macos:login_items:entry", desc::NOT_A_TIME, format!("Login item: {name}"))
-                    .attr("name", name)
-                    .attr("alias_hex", s(it.get("Alias")));
+                let name = it
+                    .get("Name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let e = Event::new(
+                    "macos:login_items:entry",
+                    desc::NOT_A_TIME,
+                    format!("Login item: {name}"),
+                )
+                .attr("name", name)
+                .attr("alias_hex", s(it.get("Alias")));
                 push(e, &mut out);
             }
         }
         "com.apple.timemachine.plist" => {
-            for dst in p.get("Destinations").and_then(|v| v.as_array()).unwrap_or(&[]) {
+            for dst in p
+                .get("Destinations")
+                .and_then(|v| v.as_array())
+                .unwrap_or(&[])
+            {
                 let id = s(dst.get("DestinationID"));
-                for d in dst.get("SnapshotDates").and_then(|v| v.as_array()).unwrap_or(&[]) {
-                    let e = Event::new("macos:time_machine:backup", desc::WRITTEN, format!("TimeMachine Backup in {} ({})", id.as_str().unwrap_or(""), dst.get("BackupAlias").map(|_| "alias").unwrap_or("")))
-                        .with_time(d.date_ns())
-                        .attr("destination_identifier", id.clone());
+                for d in dst
+                    .get("SnapshotDates")
+                    .and_then(|v| v.as_array())
+                    .unwrap_or(&[])
+                {
+                    let e = Event::new(
+                        "macos:time_machine:backup",
+                        desc::WRITTEN,
+                        format!(
+                            "TimeMachine Backup in {} ({})",
+                            id.as_str().unwrap_or(""),
+                            dst.get("BackupAlias").map(|_| "alias").unwrap_or("")
+                        ),
+                    )
+                    .with_time(d.date_ns())
+                    .attr("destination_identifier", id.clone());
                     push(e, &mut out);
                 }
             }
         }
         "com.apple.airport.preferences.plist" => {
-            for n in p.get("RememberedNetworks").and_then(|v| v.as_array()).unwrap_or(&[]) {
-                let ssid = n.get("SSIDString").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let sec = n.get("SecurityType").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let e = Event::new("macos:airport:entry", desc::LAST_VISITED, format!("[WiFi] Connected to network: <{ssid}> using security {sec}"))
-                    .with_time(n.get("LastConnected").and_then(|d| d.date_ns()))
-                    .attr("ssid", ssid)
-                    .attr("security_type", sec);
+            for n in p
+                .get("RememberedNetworks")
+                .and_then(|v| v.as_array())
+                .unwrap_or(&[])
+            {
+                let ssid = n
+                    .get("SSIDString")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let sec = n
+                    .get("SecurityType")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let e = Event::new(
+                    "macos:airport:entry",
+                    desc::LAST_VISITED,
+                    format!("[WiFi] Connected to network: <{ssid}> using security {sec}"),
+                )
+                .with_time(n.get("LastConnected").and_then(|d| d.date_ns()))
+                .attr("ssid", ssid)
+                .attr("security_type", sec);
                 push(e, &mut out);
             }
             if let Some(PlistValue::Dict(kn)) = p.get("KnownNetworks") {
                 for (k, n) in kn {
-                    let ssid = n.get("SSIDString").and_then(|v| v.as_str()).unwrap_or(k).to_string();
+                    let ssid = n
+                        .get("SSIDString")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or(k)
+                        .to_string();
                     for key in ["LastConnected", "LastAutoJoinAt", "AddedAt"] {
                         if let Some(t) = n.get(key).and_then(|d| d.date_ns()) {
-                            let e = Event::new("macos:airport:entry", desc::LAST_VISITED, format!("[WiFi] {key}: <{ssid}>")).with_time(Some(t)).attr("ssid", ssid.clone()).attr("key", key);
+                            let e = Event::new(
+                                "macos:airport:entry",
+                                desc::LAST_VISITED,
+                                format!("[WiFi] {key}: <{ssid}>"),
+                            )
+                            .with_time(Some(t))
+                            .attr("ssid", ssid.clone())
+                            .attr("key", key);
                             push(e, &mut out);
                         }
                     }
@@ -583,14 +860,26 @@ pub fn events(p: &PlistValue, sha: &str, path: &str) -> Vec<Event> {
         "com.apple.bluetooth.plist" => {
             if let Some(PlistValue::Dict(cache)) = p.get("DeviceCache") {
                 for (mac, dev) in cache {
-                    let name = dev.get("Name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    for (key, d) in [("LastInquiryUpdate", "Last Inquiry Update"), ("LastNameUpdate", "Last Name Update"), ("LastServicesUpdate", "Last Services Update")] {
+                    let name = dev
+                        .get("Name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    for (key, d) in [
+                        ("LastInquiryUpdate", "Last Inquiry Update"),
+                        ("LastNameUpdate", "Last Name Update"),
+                        ("LastServicesUpdate", "Last Services Update"),
+                    ] {
                         if let Some(t) = dev.get(key).and_then(|x| x.date_ns()) {
-                            let e = Event::new("macos:bluetooth:entry", desc::WRITTEN, format!("Bluetooth {mac} [{name}] {d}"))
-                                .with_time(Some(t))
-                                .attr("mac_address", mac.clone())
-                                .attr("name", name.clone())
-                                .attr("key", key);
+                            let e = Event::new(
+                                "macos:bluetooth:entry",
+                                desc::WRITTEN,
+                                format!("Bluetooth {mac} [{name}] {d}"),
+                            )
+                            .with_time(Some(t))
+                            .attr("mac_address", mac.clone())
+                            .attr("name", name.clone())
+                            .attr("key", key);
                             push(e, &mut out);
                         }
                     }
@@ -606,11 +895,15 @@ pub fn events(p: &PlistValue, sha: &str, path: &str) -> Vec<Event> {
     for (kp, ns) in dates {
         let (root, key) = kp.rsplit_once('/').unwrap_or(("", &kp));
         let root = if root.is_empty() { "/" } else { root };
-        let e = Event::new("plist:key", desc::WRITTEN, format!("{}/{key} {}", root.trim_end_matches('/'), format_ns(ns)))
-            .with_time(Some(ns))
-            .attr("root", root)
-            .attr("key", key)
-            .attr("key_path", kp.clone());
+        let e = Event::new(
+            "plist:key",
+            desc::WRITTEN,
+            format!("{}/{key} {}", root.trim_end_matches('/'), format_ns(ns)),
+        )
+        .with_time(Some(ns))
+        .attr("root", root)
+        .attr("key", key)
+        .attr("key_path", kp.clone());
         push(e, &mut out);
     }
     out

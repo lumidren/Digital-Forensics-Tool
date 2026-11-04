@@ -48,7 +48,17 @@ pub struct MruList {
 
 fn shell_path(raw: &[u8]) -> String {
     match crate::shellitems::parse_shell_item_list(raw) {
-        Ok(items) => super::join_shell_path(&items.iter().map(|i| i.long_name.clone().filter(|s| !s.is_empty()).unwrap_or_else(|| i.name.clone())).collect::<Vec<_>>()),
+        Ok(items) => super::join_shell_path(
+            &items
+                .iter()
+                .map(|i| {
+                    i.long_name
+                        .clone()
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or_else(|| i.name.clone())
+                })
+                .collect::<Vec<_>>(),
+        ),
         Err(_) => format!("<shell item list: {} bytes>", raw.len()),
     }
 }
@@ -59,12 +69,18 @@ fn decode(v: &Value, f: EntryFormat) -> String {
         EntryFormat::ShellItemList => shell_path(&v.raw),
         EntryFormat::Utf16ThenShellItemList => {
             let (name, rest) = split_utf16z(&v.raw);
-            format!("{name} {}", shell_path(rest)).trim_end().to_string()
+            format!("{name} {}", shell_path(rest))
+                .trim_end()
+                .to_string()
         }
         EntryFormat::Utf16Pair => {
             let (a, rest) = split_utf16z(&v.raw);
             let (b, _) = split_utf16z(rest);
-            if b.is_empty() { a } else { format!("{a} {b}") }
+            if b.is_empty() {
+                a
+            } else {
+                format!("{a} {b}")
+            }
         }
         EntryFormat::String => {
             let s = v.as_string().unwrap_or_default();
@@ -76,7 +92,12 @@ fn decode(v: &Value, f: EntryFormat) -> String {
 /// Decode an MRUListEx key.
 pub fn mrulistex(key: &Key<'_>, rel: &str, f: EntryFormat) -> Option<MruList> {
     let values = key.values();
-    let order = parse_mrulistex(&values.iter().find(|v| v.name.eq_ignore_ascii_case("MRUListEx"))?.raw);
+    let order = parse_mrulistex(
+        &values
+            .iter()
+            .find(|v| v.name.eq_ignore_ascii_case("MRUListEx"))?
+            .raw,
+    );
     let mut entries = Vec::new();
     for (i, n) in order.iter().enumerate() {
         let name = n.to_string();
@@ -84,24 +105,49 @@ pub fn mrulistex(key: &Key<'_>, rel: &str, f: EntryFormat) -> Option<MruList> {
             Some(v) => decode(v, f),
             None => "<missing value>".to_string(),
         };
-        entries.push(MruEntry { index: i, value_name: name, data });
+        entries.push(MruEntry {
+            index: i,
+            value_name: name,
+            data,
+        });
     }
-    Some(MruList { data_type: "windows:registry:mrulistex", key_rel_path: rel.into(), key_offset: key.offset, last_written_ns: key.last_written_ns, entries })
+    Some(MruList {
+        data_type: "windows:registry:mrulistex",
+        key_rel_path: rel.into(),
+        key_offset: key.offset,
+        last_written_ns: key.last_written_ns,
+        entries,
+    })
 }
 
 /// Decode an MRUList key.
 pub fn mrulist(key: &Key<'_>, rel: &str, f: EntryFormat) -> Option<MruList> {
     let values = key.values();
-    let order = parse_mrulist(&values.iter().find(|v| v.name.eq_ignore_ascii_case("MRUList"))?.as_string()?);
+    let order = parse_mrulist(
+        &values
+            .iter()
+            .find(|v| v.name.eq_ignore_ascii_case("MRUList"))?
+            .as_string()?,
+    );
     let mut entries = Vec::new();
     for (i, n) in order.iter().enumerate() {
         let data = match values.iter().find(|v| &v.name == n) {
             Some(v) => decode(v, f),
             None => "<missing value>".to_string(),
         };
-        entries.push(MruEntry { index: i, value_name: n.clone(), data });
+        entries.push(MruEntry {
+            index: i,
+            value_name: n.clone(),
+            data,
+        });
     }
-    Some(MruList { data_type: "windows:registry:mrulist", key_rel_path: rel.into(), key_offset: key.offset, last_written_ns: key.last_written_ns, entries })
+    Some(MruList {
+        data_type: "windows:registry:mrulist",
+        key_rel_path: rel.into(),
+        key_offset: key.offset,
+        last_written_ns: key.last_written_ns,
+        entries,
+    })
 }
 
 /// TypedURLs / TypedPaths: `url1`, `url2`, ... in numeric order.
@@ -109,11 +155,31 @@ pub fn typed(key: &Key<'_>, rel: &str) -> MruList {
     let mut vals: Vec<(u32, Value)> = key
         .values()
         .into_iter()
-        .filter_map(|v| v.name.to_ascii_lowercase().strip_prefix("url").and_then(|n| n.parse::<u32>().ok()).map(|n| (n, v)))
+        .filter_map(|v| {
+            v.name
+                .to_ascii_lowercase()
+                .strip_prefix("url")
+                .and_then(|n| n.parse::<u32>().ok())
+                .map(|n| (n, v))
+        })
         .collect();
     vals.sort_by_key(|(n, _)| *n);
-    let entries = vals.into_iter().enumerate().map(|(i, (_, v))| MruEntry { index: i, data: v.as_string().unwrap_or_default(), value_name: v.name }).collect();
-    MruList { data_type: "windows:registry:typedurls", key_rel_path: rel.into(), key_offset: key.offset, last_written_ns: key.last_written_ns, entries }
+    let entries = vals
+        .into_iter()
+        .enumerate()
+        .map(|(i, (_, v))| MruEntry {
+            index: i,
+            data: v.as_string().unwrap_or_default(),
+            value_name: v.name,
+        })
+        .collect();
+    MruList {
+        data_type: "windows:registry:typedurls",
+        key_rel_path: rel.into(),
+        key_offset: key.offset,
+        last_written_ns: key.last_written_ns,
+        entries,
+    }
 }
 
 pub fn lists(hive: &Hive) -> Vec<MruList> {
@@ -126,12 +192,36 @@ pub fn lists(hive: &Hive) -> Vec<MruList> {
             }
         }
     };
-    ex(format!("{EXPLORER}\\RecentDocs"), EntryFormat::Utf16, &mut out);
-    ex(format!("{EXPLORER}\\ComDlg32\\OpenSavePidlMRU"), EntryFormat::ShellItemList, &mut out);
-    ex(format!("{EXPLORER}\\ComDlg32\\LastVisitedPidlMRU"), EntryFormat::Utf16ThenShellItemList, &mut out);
-    ex(format!("{EXPLORER}\\ComDlg32\\LastVisitedPidlMRULegacy"), EntryFormat::Utf16ThenShellItemList, &mut out);
-    ex(format!("{EXPLORER}\\ComDlg32\\CIDSizeMRU"), EntryFormat::Utf16, &mut out);
-    ex(format!("{EXPLORER}\\WordWheelQuery"), EntryFormat::Utf16, &mut out);
+    ex(
+        format!("{EXPLORER}\\RecentDocs"),
+        EntryFormat::Utf16,
+        &mut out,
+    );
+    ex(
+        format!("{EXPLORER}\\ComDlg32\\OpenSavePidlMRU"),
+        EntryFormat::ShellItemList,
+        &mut out,
+    );
+    ex(
+        format!("{EXPLORER}\\ComDlg32\\LastVisitedPidlMRU"),
+        EntryFormat::Utf16ThenShellItemList,
+        &mut out,
+    );
+    ex(
+        format!("{EXPLORER}\\ComDlg32\\LastVisitedPidlMRULegacy"),
+        EntryFormat::Utf16ThenShellItemList,
+        &mut out,
+    );
+    ex(
+        format!("{EXPLORER}\\ComDlg32\\CIDSizeMRU"),
+        EntryFormat::Utf16,
+        &mut out,
+    );
+    ex(
+        format!("{EXPLORER}\\WordWheelQuery"),
+        EntryFormat::Utf16,
+        &mut out,
+    );
     let l = |rel: String, f: EntryFormat, sub: bool, out: &mut Vec<MruList>| {
         if let Some(k) = hive.key(&rel) {
             out.extend(mrulist(&k, &rel, f));
@@ -142,10 +232,28 @@ pub fn lists(hive: &Hive) -> Vec<MruList> {
             }
         }
     };
-    l(format!("{EXPLORER}\\RunMRU"), EntryFormat::String, false, &mut out);
-    l(format!("{EXPLORER}\\ComDlg32\\OpenSaveMRU"), EntryFormat::String, true, &mut out);
-    l(format!("{EXPLORER}\\ComDlg32\\LastVisitedMRU"), EntryFormat::Utf16Pair, false, &mut out);
-    for rel in ["Software\\Microsoft\\Internet Explorer\\TypedURLs".to_string(), format!("{EXPLORER}\\TypedPaths")] {
+    l(
+        format!("{EXPLORER}\\RunMRU"),
+        EntryFormat::String,
+        false,
+        &mut out,
+    );
+    l(
+        format!("{EXPLORER}\\ComDlg32\\OpenSaveMRU"),
+        EntryFormat::String,
+        true,
+        &mut out,
+    );
+    l(
+        format!("{EXPLORER}\\ComDlg32\\LastVisitedMRU"),
+        EntryFormat::Utf16Pair,
+        false,
+        &mut out,
+    );
+    for rel in [
+        "Software\\Microsoft\\Internet Explorer\\TypedURLs".to_string(),
+        format!("{EXPLORER}\\TypedPaths"),
+    ] {
         if let Some(k) = hive.key(&rel) {
             out.push(typed(&k, &rel));
         }
@@ -158,15 +266,39 @@ pub fn events(hive: &Hive, ctx: &Ctx<'_>) -> Vec<Event> {
         .into_iter()
         .filter(|l| !l.entries.is_empty())
         .map(|l| {
-            let parts: Vec<String> = l.entries.iter().map(|e| format!("Index: {} [MRU Value {}]: {}", e.index + 1, e.value_name, e.data)).collect();
+            let parts: Vec<String> = l
+                .entries
+                .iter()
+                .map(|e| {
+                    format!(
+                        "Index: {} [MRU Value {}]: {}",
+                        e.index + 1,
+                        e.value_name,
+                        e.data
+                    )
+                })
+                .collect();
             let msg = format!("[{}] {}", ctx.full_path(&l.key_rel_path), parts.join(" "));
-            let entries: Vec<serde_json::Value> = l.entries.iter().map(|e| json!({"index": e.index, "value_name": e.value_name, "data": e.data})).collect();
+            let entries: Vec<serde_json::Value> = l
+                .entries
+                .iter()
+                .map(|e| json!({"index": e.index, "value_name": e.value_name, "data": e.data}))
+                .collect();
             let parser = match l.data_type {
                 "windows:registry:typedurls" => "typedurls",
                 "windows:registry:mrulist" => "mrulist",
                 _ => "mrulistex",
             };
-            ctx.event(parser, l.data_type, desc::WRITTEN, l.last_written_ns, msg, &l.key_rel_path, l.key_offset).attr("entries", serde_json::Value::Array(entries))
+            ctx.event(
+                parser,
+                l.data_type,
+                desc::WRITTEN,
+                l.last_written_ns,
+                msg,
+                &l.key_rel_path,
+                l.key_offset,
+            )
+            .attr("entries", serde_json::Value::Array(entries))
         })
         .collect()
 }

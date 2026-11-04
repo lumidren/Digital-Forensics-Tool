@@ -27,8 +27,14 @@ impl SystemTime {
         if self.year == 0 {
             return None;
         }
-        let d = chrono::NaiveDate::from_ymd_opt(self.year as i32, self.month as u32, self.day as u32)?;
-        let t = d.and_hms_milli_opt(self.hour as u32, self.minute as u32, self.second as u32, self.millisecond as u32)?;
+        let d =
+            chrono::NaiveDate::from_ymd_opt(self.year as i32, self.month as u32, self.day as u32)?;
+        let t = d.and_hms_milli_opt(
+            self.hour as u32,
+            self.minute as u32,
+            self.second as u32,
+            self.millisecond as u32,
+        )?;
         t.and_utc().timestamp_nanos_opt()
     }
 }
@@ -52,14 +58,24 @@ pub struct Trigger {
 
 impl Trigger {
     pub fn start_ns(&self) -> Option<i64> {
-        let d = chrono::NaiveDate::from_ymd_opt(self.begin_year as i32, self.begin_month as u32, self.begin_day as u32)?;
-        d.and_hms_opt(self.start_hour as u32, self.start_minute as u32, 0)?.and_utc().timestamp_nanos_opt()
+        let d = chrono::NaiveDate::from_ymd_opt(
+            self.begin_year as i32,
+            self.begin_month as u32,
+            self.begin_day as u32,
+        )?;
+        d.and_hms_opt(self.start_hour as u32, self.start_minute as u32, 0)?
+            .and_utc()
+            .timestamp_nanos_opt()
     }
     pub fn end_ns(&self) -> Option<i64> {
         if self.end_year == 0 {
             return None;
         }
-        let d = chrono::NaiveDate::from_ymd_opt(self.end_year as i32, self.end_month as u32, self.end_day as u32)?;
+        let d = chrono::NaiveDate::from_ymd_opt(
+            self.end_year as i32,
+            self.end_month as u32,
+            self.end_day as u32,
+        )?;
         d.and_hms_opt(0, 0, 0)?.and_utc().timestamp_nanos_opt()
     }
 }
@@ -112,10 +128,23 @@ pub fn parse_job(d: &[u8]) -> Result<JobFile> {
     need(d, 0, 68)?;
     let fv = u16_at(d, 2)?;
     if fv != 1 {
-        return Err(ParseError::BadSignature { offset: 2, expected: "file version 1".into(), found: fv.to_string() });
+        return Err(ParseError::BadSignature {
+            offset: 2,
+            expected: "file version 1".into(),
+            found: fv.to_string(),
+        });
     }
     let st = |o: usize| -> Result<u16> { u16_at(d, 52 + o * 2) };
-    let last = SystemTime { year: st(0)?, month: st(1)?, weekday: st(2)?, day: st(3)?, hour: st(4)?, minute: st(5)?, second: st(6)?, millisecond: st(7)? };
+    let last = SystemTime {
+        year: st(0)?,
+        month: st(1)?,
+        weekday: st(2)?,
+        day: st(3)?,
+        hour: st(4)?,
+        minute: st(5)?,
+        second: st(6)?,
+        millisecond: st(7)?,
+    };
     let mut p = 68usize;
     let running = u16_at(d, p)?;
     p += 2;
@@ -185,7 +214,10 @@ fn finish(mut e: Event, sha: &str, path: &str, off: i64, parser: &str) -> Event 
 }
 
 pub fn job_events(j: &JobFile, sha: &str, path: &str) -> Vec<Event> {
-    let msg = format!("Application: {} {} Scheduled by: {} Working directory: {}", j.application_name, j.parameters, j.author, j.working_directory);
+    let msg = format!(
+        "Application: {} {} Scheduled by: {} Working directory: {}",
+        j.application_name, j.parameters, j.author, j.working_directory
+    );
     let base = |d: &str, ts: Option<i64>| {
         Event::new("windows:tasks:job", d, msg.clone())
             .with_time(ts)
@@ -200,15 +232,25 @@ pub fn job_events(j: &JobFile, sha: &str, path: &str) -> Vec<Event> {
     };
     let mut out = Vec::new();
     if let Some(t) = j.last_run_time.to_ns() {
-        out.push(finish(base(desc::LAST_RUN, Some(t)), sha, path, 0, "taskjob"));
+        out.push(finish(
+            base(desc::LAST_RUN, Some(t)),
+            sha,
+            path,
+            0,
+            "taskjob",
+        ));
     }
     for (i, tr) in j.triggers.iter().enumerate() {
         if let Some(t) = tr.start_ns() {
-            let e = base("Scheduled to start", Some(t)).attr("trigger_type", tr.trigger_type_name.clone()).attr("trigger_index", i as u64);
+            let e = base("Scheduled to start", Some(t))
+                .attr("trigger_type", tr.trigger_type_name.clone())
+                .attr("trigger_index", i as u64);
             out.push(finish(e, sha, path, 1 + i as i64, "taskjob"));
         }
         if let Some(t) = tr.end_ns() {
-            let e = base("Scheduled to end", Some(t)).attr("trigger_type", tr.trigger_type_name.clone()).attr("trigger_index", i as u64);
+            let e = base("Scheduled to end", Some(t))
+                .attr("trigger_type", tr.trigger_type_name.clone())
+                .attr("trigger_index", i as u64);
             out.push(finish(e, sha, path, 1 + i as i64, "taskjob"));
         }
     }
@@ -256,11 +298,15 @@ fn decode_text(d: &[u8]) -> Result<String> {
         return Ok(utf16le(d, false));
     }
     let d = d.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(d);
-    String::from_utf8(d.to_vec()).map_err(|e| ParseError::Invalid { offset: e.utf8_error().valid_up_to(), reason: "task XML is not UTF-8/UTF-16".into() })
+    String::from_utf8(d.to_vec()).map_err(|e| ParseError::Invalid {
+        offset: e.utf8_error().valid_up_to(),
+        reason: "task XML is not UTF-8/UTF-16".into(),
+    })
 }
 
 fn child<'a, 'i>(n: roxmltree::Node<'a, 'i>, name: &str) -> Option<roxmltree::Node<'a, 'i>> {
-    n.children().find(|c| c.is_element() && c.tag_name().name() == name)
+    n.children()
+        .find(|c| c.is_element() && c.tag_name().name() == name)
 }
 
 fn txt(n: Option<roxmltree::Node<'_, '_>>) -> Option<String> {
@@ -275,11 +321,22 @@ pub fn parse_task_xml(d: &[u8]) -> Result<XmlTask> {
         Some(i) if text.trim_start().starts_with("<?xml") => &text[i + 2..],
         _ => &text[..],
     };
-    let opts = roxmltree::ParsingOptions { allow_dtd: false, ..Default::default() };
-    let doc = roxmltree::Document::parse_with_options(body.trim_start_matches('\u{feff}'), opts).map_err(|e| ParseError::Invalid { offset: 0, reason: format!("XML: {e}") })?;
+    let opts = roxmltree::ParsingOptions {
+        allow_dtd: false,
+        ..Default::default()
+    };
+    let doc = roxmltree::Document::parse_with_options(body.trim_start_matches('\u{feff}'), opts)
+        .map_err(|e| ParseError::Invalid {
+            offset: 0,
+            reason: format!("XML: {e}"),
+        })?;
     let root = doc.root_element();
     if root.tag_name().name() != "Task" {
-        return Err(ParseError::BadSignature { offset: 0, expected: "<Task>".into(), found: root.tag_name().name().into() });
+        return Err(ParseError::BadSignature {
+            offset: 0,
+            expected: "<Task>".into(),
+            found: root.tag_name().name().into(),
+        });
     }
     let mut t = XmlTask::default();
     if let Some(ri) = child(root, "RegistrationInfo") {
@@ -307,7 +364,11 @@ pub fn parse_task_xml(d: &[u8]) -> Result<XmlTask> {
         }
     }
     if let Some(acts) = child(root, "Actions") {
-        for a in acts.children().filter(|c| c.is_element()).take(MAX_TRIGGERS) {
+        for a in acts
+            .children()
+            .filter(|c| c.is_element())
+            .take(MAX_TRIGGERS)
+        {
             t.actions.push(XmlAction {
                 kind: a.tag_name().name().to_string(),
                 command: txt(child(a, "Command")),
@@ -335,12 +396,25 @@ pub fn parse_xml_datetime(s: &str) -> Option<i64> {
 }
 
 pub fn xml_events(t: &XmlTask, sha: &str, path: &str) -> Vec<Event> {
-    let cmd: Vec<String> = t.actions.iter().map(|a| match (&a.command, &a.class_id) {
-        (Some(c), _) => format!("{} {}", c, a.arguments.clone().unwrap_or_default()).trim().to_string(),
-        (None, Some(cls)) => format!("COM {cls}"),
-        _ => a.kind.clone(),
-    }).collect();
-    let msg = format!("Task: {} Author: {} Actions: [{}] User: {} RunLevel: {}", t.uri.clone().unwrap_or_default(), t.author.clone().unwrap_or_default(), cmd.join("; "), t.user_id.clone().unwrap_or_default(), t.run_level.clone().unwrap_or_default());
+    let cmd: Vec<String> = t
+        .actions
+        .iter()
+        .map(|a| match (&a.command, &a.class_id) {
+            (Some(c), _) => format!("{} {}", c, a.arguments.clone().unwrap_or_default())
+                .trim()
+                .to_string(),
+            (None, Some(cls)) => format!("COM {cls}"),
+            _ => a.kind.clone(),
+        })
+        .collect();
+    let msg = format!(
+        "Task: {} Author: {} Actions: [{}] User: {} RunLevel: {}",
+        t.uri.clone().unwrap_or_default(),
+        t.author.clone().unwrap_or_default(),
+        cmd.join("; "),
+        t.user_id.clone().unwrap_or_default(),
+        t.run_level.clone().unwrap_or_default()
+    );
     let base = |d: &str, ts: Option<i64>| {
         let first = t.actions.iter().find(|a| a.command.is_some());
         Event::new("windows:tasks:xml", d, msg.clone())
@@ -356,10 +430,25 @@ pub fn xml_events(t: &XmlTask, sha: &str, path: &str) -> Vec<Event> {
     };
     let mut out = Vec::new();
     let reg = t.date.as_deref().and_then(parse_xml_datetime);
-    out.push(finish(base(if reg.is_some() { desc::CREATION } else { desc::NOT_A_TIME }, reg), sha, path, 0, "taskxml"));
+    out.push(finish(
+        base(
+            if reg.is_some() {
+                desc::CREATION
+            } else {
+                desc::NOT_A_TIME
+            },
+            reg,
+        ),
+        sha,
+        path,
+        0,
+        "taskxml",
+    ));
     for (i, tr) in t.triggers.iter().enumerate() {
         if let Some(ts) = tr.start_boundary.as_deref().and_then(parse_xml_datetime) {
-            let e = base("Scheduled to start", Some(ts)).attr("trigger_type", tr.kind.clone()).attr("trigger_index", i as u64);
+            let e = base("Scheduled to start", Some(ts))
+                .attr("trigger_type", tr.kind.clone())
+                .attr("trigger_index", i as u64);
             out.push(finish(e, sha, path, 1 + i as i64, "taskxml"));
         }
     }

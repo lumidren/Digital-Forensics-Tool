@@ -74,7 +74,10 @@ pub struct Vss {
 }
 
 fn block_header_ok(b: &[u8], rtype: u32) -> bool {
-    guid_le(&b[0..16]).map(|g| g == VSS_IDENTIFIER).unwrap_or(false) && u32_at(b, 20).ok() == Some(rtype)
+    guid_le(&b[0..16])
+        .map(|g| g == VSS_IDENTIFIER)
+        .unwrap_or(false)
+        && u32_at(b, 20).ok() == Some(rtype)
 }
 
 impl Vss {
@@ -82,10 +85,17 @@ impl Vss {
     pub fn open(src: Source) -> Result<Self> {
         let h = read_vec(src.as_ref(), VOLUME_HEADER_OFFSET, 128)?;
         if guid_le(&h[0..16])? != VSS_IDENTIFIER {
-            return Err(FsError::sig(VOLUME_HEADER_OFFSET, VSS_IDENTIFIER, &h[0..16]));
+            return Err(FsError::sig(
+                VOLUME_HEADER_OFFSET,
+                VSS_IDENTIFIER,
+                &h[0..16],
+            ));
         }
         if u32_at(&h, 20)? != 1 {
-            return Err(FsError::invalid(VOLUME_HEADER_OFFSET + 20, "not a VSS volume header"));
+            return Err(FsError::invalid(
+                VOLUME_HEADER_OFFSET + 20,
+                "not a VSS volume header",
+            ));
         }
         let catalog = u64_at(&h, 48)?;
         let mut info2: BTreeMap<String, (u64, u64, u64)> = BTreeMap::new(); // id -> (vol size, seq, ctime)
@@ -110,7 +120,17 @@ impl Vss {
                         info2.insert(id, (u64_at(e, 8)?, u64_at(e, 32)?, u64_at(e, 48)?));
                     }
                     3 => {
-                        info3.insert(id, [u64_at(e, 8)?, u64_at(e, 32)?, u64_at(e, 40)?, u64_at(e, 48)?, u64_at(e, 72)?, u64_at(e, 64)?]);
+                        info3.insert(
+                            id,
+                            [
+                                u64_at(e, 8)?,
+                                u64_at(e, 32)?,
+                                u64_at(e, 40)?,
+                                u64_at(e, 48)?,
+                                u64_at(e, 72)?,
+                                u64_at(e, 64)?,
+                            ],
+                        );
                     }
                     _ => {}
                 }
@@ -120,11 +140,18 @@ impl Vss {
         let mut stores = Vec::new();
         let mut maps = Vec::new();
         // Oldest first (pyvshadow / libvshadow order).
-        let mut ids: Vec<(u64, u64, String)> = order.iter().filter_map(|id| info2.get(id).map(|i| (i.2, i.1, id.clone()))).collect();
+        let mut ids: Vec<(u64, u64, String)> = order
+            .iter()
+            .filter_map(|id| info2.get(id).map(|i| (i.2, i.1, id.clone())))
+            .collect();
         ids.sort();
         for (_, _, id) in ids.into_iter().take(MAX_STORES) {
-            let Some(&(vsize, seq, ctime)) = info2.get(&id) else { continue };
-            let Some(&[bl, sh, brl, cbm, pbm, _]) = info3.get(&id) else { continue };
+            let Some(&(vsize, seq, ctime)) = info2.get(&id) else {
+                continue;
+            };
+            let Some(&[bl, sh, brl, cbm, pbm, _]) = info3.get(&id) else {
+                continue;
+            };
             let (copy_id, copy_set, attr, om, sm) = match read_vec(src.as_ref(), sh, BLOCK_SIZE) {
                 Ok(b) if block_header_ok(&b, 4) => {
                     let i = &b[128..];
@@ -133,19 +160,39 @@ impl Vss {
                     let sm_off = 66 + om_len;
                     let sm_len = u16_at(i, sm_off)? as usize;
                     let sm = utf16le(need(i, sm_off + 2, sm_len)?, false);
-                    (guid_le(&i[16..32])?, guid_le(&i[32..48])?, u32_at(i, 56)?, om, sm)
+                    (
+                        guid_le(&i[16..32])?,
+                        guid_le(&i[32..48])?,
+                        u32_at(i, 56)?,
+                        om,
+                        sm,
+                    )
                 }
-                _ => (String::new(), String::new(), 0, String::new(), String::new()),
+                _ => (
+                    String::new(),
+                    String::new(),
+                    0,
+                    String::new(),
+                    String::new(),
+                ),
             };
             let descs = read_block_list(src.as_ref(), bl)?;
-            let mut m = StoreMap { direct: BTreeMap::new(), forward: BTreeMap::new(), overlay: BTreeMap::new(), unused: None };
+            let mut m = StoreMap {
+                direct: BTreeMap::new(),
+                forward: BTreeMap::new(),
+                overlay: BTreeMap::new(),
+                unused: None,
+            };
             let mut copied = 0u64;
             for d in &descs {
                 if d.flags & FLAG_NOT_USED != 0 {
                     continue;
                 }
                 if d.flags & FLAG_OVERLAY != 0 {
-                    let e = m.overlay.entry(d.original_offset).or_insert((d.store_data_offset, 0));
+                    let e = m
+                        .overlay
+                        .entry(d.original_offset)
+                        .or_insert((d.store_data_offset, 0));
                     e.0 = d.store_data_offset;
                     e.1 |= d.bitmap;
                     copied += BLOCK_SIZE;
@@ -180,12 +227,20 @@ impl Vss {
             maps.push(m);
         }
         let volume_size = stores.first().map(|s| s.volume_size).unwrap_or(src.size());
-        Ok(Vss { src, volume_size, stores, maps })
+        Ok(Vss {
+            src,
+            volume_size,
+            stores,
+            maps,
+        })
     }
 
     /// Raw block descriptors of a store (for inspection).
     pub fn descriptors(&self, store: usize) -> Result<Vec<BlockDescriptor>> {
-        let s = self.stores.get(store).ok_or_else(|| FsError::NotFound(format!("store {store}")))?;
+        let s = self
+            .stores
+            .get(store)
+            .ok_or_else(|| FsError::NotFound(format!("store {store}")))?;
         read_block_list(self.src.as_ref(), s.block_list_offset)
     }
 
@@ -217,7 +272,8 @@ impl Vss {
             Some(_) if !newest => true,
             Some(bm) => {
                 let idx = block_off / BLOCK_SIZE;
-                !bm.get((idx / 8) as usize).is_some_and(|b| b & (1 << (idx % 8)) != 0)
+                !bm.get((idx / 8) as usize)
+                    .is_some_and(|b| b & (1 << (idx % 8)) != 0)
             }
             None => true,
         };
@@ -230,7 +286,12 @@ impl Vss {
         self.apply_overlay(overlay, out, within)
     }
 
-    fn apply_overlay(&self, overlay: Option<(u64, u32)>, out: &mut [u8], within: u64) -> Result<()> {
+    fn apply_overlay(
+        &self,
+        overlay: Option<(u64, u32)>,
+        out: &mut [u8],
+        within: u64,
+    ) -> Result<()> {
         if let Some((sd, bm)) = overlay {
             let start = within / 512;
             let end = (within + out.len() as u64).div_ceil(512);
@@ -274,7 +335,10 @@ impl Vss {
         if store >= self.maps.len() {
             return Err(FsError::NotFound(format!("store {store}")));
         }
-        Ok(Arc::new(StoreSource { vss: self.clone(), store }))
+        Ok(Arc::new(StoreSource {
+            vss: self.clone(),
+            store,
+        }))
     }
 }
 
@@ -284,7 +348,9 @@ struct StoreSource {
 }
 
 impl ReadAt for StoreSource {
-    fn size(&self) -> u64 { self.vss.volume_size }
+    fn size(&self) -> u64 {
+        self.vss.volume_size
+    }
     fn read_at(&self, offset: u64, buf: &mut [u8]) -> Result<usize> {
         if offset >= self.vss.volume_size {
             return Ok(0);
@@ -313,7 +379,13 @@ fn read_block_list(src: &dyn ReadAt, first: u64) -> Result<Vec<BlockDescriptor>>
             if orig == 0 && rel == 0 && sd == 0 && flags == 0 {
                 continue;
             }
-            out.push(BlockDescriptor { original_offset: orig, relative_offset: rel, store_data_offset: sd, flags, bitmap: u32_at(d, 28)? });
+            out.push(BlockDescriptor {
+                original_offset: orig,
+                relative_offset: rel,
+                store_data_offset: sd,
+                flags,
+                bitmap: u32_at(d, 28)?,
+            });
         }
         off = u64_at(&blk, 40)?;
     }
@@ -344,5 +416,8 @@ fn read_bitmap(src: &dyn ReadAt, first: u64) -> Result<Vec<u8>> {
 
 /// True when the volume carries a VSS volume header.
 pub fn probe(src: &dyn ReadAt) -> bool {
-    read_vec(src, VOLUME_HEADER_OFFSET, 16).ok().and_then(|h| guid_le(&h).ok()).is_some_and(|g| g == VSS_IDENTIFIER)
+    read_vec(src, VOLUME_HEADER_OFFSET, 16)
+        .ok()
+        .and_then(|h| guid_le(&h).ok())
+        .is_some_and(|g| g == VSS_IDENTIFIER)
 }

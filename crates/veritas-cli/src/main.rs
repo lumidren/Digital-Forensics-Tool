@@ -80,7 +80,11 @@ enum StoreCmd {
 fn sibling(name: &str) -> Result<PathBuf> {
     let exe = std::env::current_exe()?;
     let dir = exe.parent().context("executable has no parent directory")?;
-    let file = if cfg!(windows) { format!("{name}.exe") } else { name.to_string() };
+    let file = if cfg!(windows) {
+        format!("{name}.exe")
+    } else {
+        name.to_string()
+    };
     let p = dir.join(&file);
     if p.exists() {
         return Ok(p);
@@ -96,7 +100,9 @@ fn sibling(name: &str) -> Result<PathBuf> {
 
 fn keyring() -> Result<Option<CaseKeyring>> {
     match std::env::var("VERITAS_MASTER_KEY") {
-        Ok(hex) => Ok(Some(CaseKeyring::new(MasterKey::from_hex(&hex).map_err(|e| anyhow::anyhow!("{e}"))?))),
+        Ok(hex) => Ok(Some(CaseKeyring::new(
+            MasterKey::from_hex(&hex).map_err(|e| anyhow::anyhow!("{e}"))?,
+        ))),
         Err(_) => Ok(None),
     }
 }
@@ -125,7 +131,10 @@ struct BenchRow {
     events: Option<u64>,
 }
 
-fn time_median<F: FnMut() -> Result<Option<u64>>>(repeat: usize, mut f: F) -> Result<(f64, Option<u64>)> {
+fn time_median<F: FnMut() -> Result<Option<u64>>>(
+    repeat: usize,
+    mut f: F,
+) -> Result<(f64, Option<u64>)> {
     let mut times = Vec::with_capacity(repeat);
     let mut events = None;
     for _ in 0..repeat.max(1) {
@@ -138,7 +147,10 @@ fn time_median<F: FnMut() -> Result<Option<u64>>>(repeat: usize, mut f: F) -> Re
 }
 
 fn count_lines_of(cmd: &mut Command) -> Result<u64> {
-    let mut child = cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::null()).spawn()?;
+    let mut child = cmd
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()?;
     let out = child.stdout.take().context("no stdout")?;
     let n = BufReader::new(out).lines().count() as u64;
     let st = child.wait()?;
@@ -153,9 +165,11 @@ fn parse_args(kind: &str, path: &Path) -> Result<(String, Vec<String>)> {
     Ok(match kind {
         "fs" => ("fs-tool".into(), vec!["events".into(), p]),
         "mft" | "usn" | "logfile" => ("fs-tool".into(), vec![kind.into(), p, "--events".into()]),
-        "evtx" | "evt" | "prefetch" | "lnk" | "jumplist" | "journald" | "plist" | "taskjob" | "taskxml" | "registry" => {
-            ("veritas-artifacts-dump".into(), vec![kind.into(), p, "--events".into()])
-        }
+        "evtx" | "evt" | "prefetch" | "lnk" | "jumplist" | "journald" | "plist" | "taskjob"
+        | "taskxml" | "registry" => (
+            "veritas-artifacts-dump".into(),
+            vec![kind.into(), p, "--events".into()],
+        ),
         other => bail!("unknown parse kind {other}"),
     })
 }
@@ -230,13 +244,18 @@ fn real_main() -> Result<i32> {
         Cmd::Timeline { inputs, out } => {
             let mut events: Vec<veritas_timeline::Event> = Vec::new();
             for p in &inputs {
-                let f = BufReader::new(std::fs::File::open(p).with_context(|| format!("open {}", p.display()))?);
+                let f = BufReader::new(
+                    std::fs::File::open(p).with_context(|| format!("open {}", p.display()))?,
+                );
                 for (i, line) in f.lines().enumerate() {
                     let line = line?;
                     if line.trim().is_empty() {
                         continue;
                     }
-                    events.push(serde_json::from_str(&line).with_context(|| format!("{}:{}", p.display(), i + 1))?);
+                    events.push(
+                        serde_json::from_str(&line)
+                            .with_context(|| format!("{}:{}", p.display(), i + 1))?,
+                    );
                 }
             }
             let mut sink: Box<dyn Write> = match out {
@@ -248,8 +267,14 @@ fn real_main() -> Result<i32> {
             eprintln!("{} events", events.len());
             Ok(0)
         }
-        Cmd::Verify { export } => run_sibling("veritas-verify", &["export".as_ref(), export.as_os_str()]),
-        Cmd::Bench { inputs, repeat, json } => {
+        Cmd::Verify { export } => {
+            run_sibling("veritas-verify", &["export".as_ref(), export.as_os_str()])
+        }
+        Cmd::Bench {
+            inputs,
+            repeat,
+            json,
+        } => {
             let mut rows = Vec::new();
             for p in &inputs {
                 let bytes = std::fs::metadata(p)?.len();
@@ -268,16 +293,30 @@ fn real_main() -> Result<i32> {
                     Ok(None)
                 })?;
                 rows.push(row(p, bytes, "hash (md5+sha256+sha3)", secs, None));
-                let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("").to_lowercase();
+                let name = p
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("")
+                    .to_lowercase();
                 let kind = if name.ends_with(".evtx") {
                     Some("evtx")
                 } else if name.ends_with(".pf") {
                     Some("prefetch")
                 } else if name == "mft" || name == "$mft" {
                     Some("mft")
-                } else if ["ntuser.dat", "system", "software", "sam", "usrclass.dat", "amcache.hve"].contains(&name.as_str()) {
+                } else if [
+                    "ntuser.dat",
+                    "system",
+                    "software",
+                    "sam",
+                    "usrclass.dat",
+                    "amcache.hve",
+                ]
+                .contains(&name.as_str())
+                {
                     Some("registry")
-                } else if name.ends_with(".raw") || name.ends_with(".dd") || name.ends_with(".img") {
+                } else if name.ends_with(".raw") || name.ends_with(".dd") || name.ends_with(".img")
+                {
                     Some("fs")
                 } else {
                     None
@@ -285,16 +324,29 @@ fn real_main() -> Result<i32> {
                 if let Some(kind) = kind {
                     let (bin, args) = parse_args(kind, p)?;
                     let exe = sibling(&bin)?;
-                    let (secs, events) = time_median(repeat, || Ok(Some(count_lines_of(Command::new(&exe).args(&args))?)))?;
+                    let (secs, events) = time_median(repeat, || {
+                        Ok(Some(count_lines_of(Command::new(&exe).args(&args))?))
+                    })?;
                     rows.push(row(p, bytes, &format!("parse {kind}"), secs, events));
                 }
             }
             if json {
                 println!("{}", serde_json::to_string_pretty(&rows)?);
             } else {
-                println!("{:<40} {:>12} {:<26} {:>10} {:>10} {:>10}", "input", "bytes", "operation", "MB/s", "GB/h", "events");
+                println!(
+                    "{:<40} {:>12} {:<26} {:>10} {:>10} {:>10}",
+                    "input", "bytes", "operation", "MB/s", "GB/h", "events"
+                );
                 for r in &rows {
-                    println!("{:<40} {:>12} {:<26} {:>10.1} {:>10.1} {:>10}", r.input, r.bytes, r.operation, r.mb_per_s, r.gb_per_hour, r.events.map(|e| e.to_string()).unwrap_or_default());
+                    println!(
+                        "{:<40} {:>12} {:<26} {:>10.1} {:>10.1} {:>10}",
+                        r.input,
+                        r.bytes,
+                        r.operation,
+                        r.mb_per_s,
+                        r.gb_per_hour,
+                        r.events.map(|e| e.to_string()).unwrap_or_default()
+                    );
                 }
             }
             Ok(0)
@@ -303,9 +355,17 @@ fn real_main() -> Result<i32> {
 }
 
 fn row(p: &Path, bytes: u64, op: &str, secs: f64, events: Option<u64>) -> BenchRow {
-    let mbs = if secs > 0.0 { bytes as f64 / 1e6 / secs } else { 0.0 };
+    let mbs = if secs > 0.0 {
+        bytes as f64 / 1e6 / secs
+    } else {
+        0.0
+    };
     BenchRow {
-        input: p.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string(),
+        input: p
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string(),
         bytes,
         operation: op.to_string(),
         median_seconds: secs,

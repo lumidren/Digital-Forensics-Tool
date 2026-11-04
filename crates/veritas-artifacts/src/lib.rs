@@ -11,13 +11,13 @@ pub mod registry;
 
 // Binary artifact parsers (owner: binary module set).
 pub mod evtx;
-pub mod prefetch;
-pub mod lnk;
-pub mod shellitems;
-pub mod olecf;
-pub mod jumplist;
 pub mod journald;
+pub mod jumplist;
+pub mod lnk;
+pub mod olecf;
 pub mod plist;
+pub mod prefetch;
+pub mod shellitems;
 pub mod taskjob;
 
 pub const PARSER_VERSION: &str = env!("CARGO_PKG_VERSION");

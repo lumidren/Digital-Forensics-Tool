@@ -57,7 +57,10 @@ pub fn op_name(op: u16) -> &'static str {
 
 /// Operations whose target is an MFT FILE record (the affected entry can be derived from the target VCN).
 fn targets_mft_record(op: u16) -> bool {
-    matches!(op, 0x02..=0x07 | 0x09 | 0x0B | 0x0C | 0x0D | 0x11 | 0x13 | 0x21 | 0x25)
+    matches!(
+        op,
+        0x02..=0x07 | 0x09 | 0x0B | 0x0C | 0x0D | 0x11 | 0x13 | 0x21 | 0x25
+    )
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -146,7 +149,12 @@ fn parse_restart(page: &[u8], off: u64) -> Result<RestartArea> {
     for i in 0..(r.log_clients as usize).min(16) {
         let c = ca + i * 0xA0;
         let nl = (u32_at(&p, c + 0x1C)? as usize).min(64);
-        r.clients.push(ClientRecord { oldest_lsn: u64_at(&p, c)?, client_restart_lsn: u64_at(&p, c + 8)?, seq_number: u16_at(&p, c + 0x14)?, name: utf16le(need(&p, c + 0x20, nl)?, false) });
+        r.clients.push(ClientRecord {
+            oldest_lsn: u64_at(&p, c)?,
+            client_restart_lsn: u64_at(&p, c + 8)?,
+            seq_number: u16_at(&p, c + 0x14)?,
+            name: utf16le(need(&p, c + 0x20, nl)?, false),
+        });
     }
     Ok(r)
 }
@@ -159,7 +167,12 @@ pub fn parse_logfile(data: &[u8], cluster_size: u64, record_size: u64) -> Result
     // A log that was never written (mkntfs fills it with 0xFF; some tools zero it) is valid and
     // empty, not malformed.
     if !data.is_empty() && (data.iter().all(|&b| b == 0xFF) || data.iter().all(|&b| b == 0)) {
-        return Ok(LogFile { restart_areas: Vec::new(), page_size: 0, record_pages: 0, records: Vec::new() });
+        return Ok(LogFile {
+            restart_areas: Vec::new(),
+            page_size: 0,
+            record_pages: 0,
+            records: Vec::new(),
+        });
     }
     if need(data, 0, 4)? != b"RSTR" && need(data, 0, 4)? != b"CHKD" {
         return Err(FsError::sig(0, "RSTR", &data[..4]));
@@ -181,7 +194,11 @@ pub fn parse_logfile(data: &[u8], cluster_size: u64, record_size: u64) -> Result
     }
     let best = restart_areas.iter().max_by_key(|r| r.current_lsn).cloned();
     let seq_bits = best.as_ref().map(|r| r.seq_number_bits).unwrap_or(0);
-    let data_off = best.as_ref().map(|r| r.log_page_data_offset as usize).filter(|&d| d >= 0x28 && d < page_size).unwrap_or(0x40);
+    let data_off = best
+        .as_ref()
+        .map(|r| r.log_page_data_offset as usize)
+        .filter(|&d| d >= 0x28 && d < page_size)
+        .unwrap_or(0x40);
     let offset_bits = 64u32.saturating_sub(seq_bits);
     let lsn_to_off = |lsn: u64| -> Option<u64> {
         if seq_bits == 0 || offset_bits == 0 || offset_bits >= 64 {
@@ -215,10 +232,20 @@ pub fn parse_logfile(data: &[u8], cluster_size: u64, record_size: u64) -> Result
             let undo = u16_at(&pg, p + 0x32)?;
             let lcns = u16_at(&pg, p + 0x3E)?;
             let cbo = u16_at(&pg, p + 0x44)?;
-            let tvcn = if p + 0x50 <= page_size { u64_at(&pg, p + 0x48)? } else { 0 };
-            let tlcn = if lcns > 0 && p + 0x58 <= page_size { Some(u64_at(&pg, p + 0x50)?) } else { None };
+            let tvcn = if p + 0x50 <= page_size {
+                u64_at(&pg, p + 0x48)?
+            } else {
+                0
+            };
+            let tlcn = if lcns > 0 && p + 0x58 <= page_size {
+                Some(u64_at(&pg, p + 0x50)?)
+            } else {
+                None
+            };
             let mft_entry = if targets_mft_record(redo) && record_size > 0 {
-                tvcn.checked_mul(cluster_size).and_then(|v| v.checked_add(cbo as u64 * 512)).map(|v| v / record_size)
+                tvcn.checked_mul(cluster_size)
+                    .and_then(|v| v.checked_add(cbo as u64 * 512))
+                    .map(|v| v / record_size)
             } else {
                 None
             };
@@ -252,7 +279,12 @@ pub fn parse_logfile(data: &[u8], cluster_size: u64, record_size: u64) -> Result
     }
     records.sort_by_key(|r| (r.lsn, r.offset));
     records.dedup_by_key(|r| r.lsn);
-    Ok(LogFile { restart_areas, page_size: page_size as u32, record_pages, records })
+    Ok(LogFile {
+        restart_areas,
+        page_size: page_size as u32,
+        record_pages,
+        records,
+    })
 }
 
 #[cfg(test)]

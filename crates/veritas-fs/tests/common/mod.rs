@@ -5,7 +5,9 @@ use veritas_fs::io::{FileSource, MemSource, Source};
 pub const A_FILE: &[u8] = b"This is a text file.\n\nWe should be able to parse it.\n";
 
 pub fn corpus(rel: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/corpus").join(rel)
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../testdata/corpus")
+        .join(rel)
 }
 
 pub fn src(rel: &str) -> Source {

@@ -59,7 +59,12 @@ pub fn sntp_offset(t1: i128, t2: i128, t3: i128, t4: i128) -> (i64, i64) {
 }
 
 /// Parse an SNTP reply (48 bytes) and compute the local-clock offset.
-pub fn parse_sntp_reply(reply: &[u8], t1_ms: i128, t4_ms: i128, local_unix_secs: u64) -> std::io::Result<SntpSample> {
+pub fn parse_sntp_reply(
+    reply: &[u8],
+    t1_ms: i128,
+    t4_ms: i128,
+    local_unix_secs: u64,
+) -> std::io::Result<SntpSample> {
     let bad = |m: &str| std::io::Error::new(std::io::ErrorKind::InvalidData, m.to_string());
     if reply.len() < 48 {
         return Err(bad("short SNTP reply"));
@@ -73,24 +78,49 @@ pub fn parse_sntp_reply(reply: &[u8], t1_ms: i128, t4_ms: i128, local_unix_secs:
     if li == 3 || stratum == 0 || stratum > 15 {
         return Err(bad("server unsynchronised or kiss-o'-death"));
     }
-    let rd = |o: usize| u64::from_be_bytes([reply[o], reply[o + 1], reply[o + 2], reply[o + 3], reply[o + 4], reply[o + 5], reply[o + 6], reply[o + 7]]);
+    let rd = |o: usize| {
+        u64::from_be_bytes([
+            reply[o],
+            reply[o + 1],
+            reply[o + 2],
+            reply[o + 3],
+            reply[o + 4],
+            reply[o + 5],
+            reply[o + 6],
+            reply[o + 7],
+        ])
+    };
     let t2 = ntp_to_unix_ms(rd(32), local_unix_secs);
     let t3 = ntp_to_unix_ms(rd(40), local_unix_secs);
     if rd(40) == 0 {
         return Err(bad("zero transmit timestamp"));
     }
     let (offset_ms, delay_ms) = sntp_offset(t1_ms, t2, t3, t4_ms);
-    Ok(SntpSample { offset_ms, delay_ms, stratum })
+    Ok(SntpSample {
+        offset_ms,
+        delay_ms,
+        stratum,
+    })
 }
 
 fn now_ms() -> i128 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i128).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i128)
+        .unwrap_or(0)
 }
 
 /// One SNTP query (RFC 4330 client mode) with a timeout.
 pub fn sntp_query(server: &str, timeout: Duration) -> std::io::Result<SntpSample> {
-    let addr = (server, 123u16).to_socket_addrs()?.next().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "no address"))?;
-    let bind = if addr.is_ipv6() { "[::]:0" } else { "0.0.0.0:0" };
+    let addr = (server, 123u16)
+        .to_socket_addrs()?
+        .next()
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "no address"))?;
+    let bind = if addr.is_ipv6() {
+        "[::]:0"
+    } else {
+        "0.0.0.0:0"
+    };
     let sock = UdpSocket::bind(bind)?;
     sock.set_read_timeout(Some(timeout))?;
     sock.set_write_timeout(Some(timeout))?;
@@ -105,7 +135,10 @@ pub fn sntp_query(server: &str, timeout: Duration) -> std::io::Result<SntpSample
     let n = sock.recv(&mut buf)?;
     let t4 = now_ms();
     if n >= 48 && buf[24..32] != req[40..48] {
-        return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "originate timestamp mismatch"));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "originate timestamp mismatch",
+        ));
     }
     let local_secs = (t4 / 1000) as u64;
     parse_sntp_reply(&buf[..n], t1, t4, local_secs)
@@ -116,17 +149,35 @@ pub fn sntp_query(server: &str, timeout: Duration) -> std::io::Result<SntpSample
 pub fn measure_time(servers: &[&str], timeout: Duration) -> TimeSource {
     for s in servers {
         if let Ok(sample) = sntp_query(s, timeout) {
-            return TimeSource { source: format!("ntp:{}", s), offset_ms: sample.offset_ms, uncertainty_ms: (sample.delay_ms / 2 + 1) as u64 };
+            return TimeSource {
+                source: format!("ntp:{}", s),
+                offset_ms: sample.offset_ms,
+                uncertainty_ms: (sample.delay_ms / 2 + 1) as u64,
+            };
         }
     }
-    TimeSource { source: "system-clock".into(), offset_ms: 0, uncertainty_ms: UNCERTAINTY_UNKNOWN }
+    TimeSource {
+        source: "system-clock".into(),
+        offset_ms: 0,
+        uncertainty_ms: UNCERTAINTY_UNKNOWN,
+    }
 }
 
 /// Tool identity of the running agent: binary SHA-256 and the full command line.
 pub fn agent_tool_info() -> ToolInfo {
-    let binary_sha256 = std::env::current_exe().ok().and_then(|p| crate::sha256_file(&p).ok());
-    let command_line = std::env::args_os().map(|a| a.to_string_lossy().into_owned()).collect::<Vec<_>>().join(" ");
-    ToolInfo { name: crate::AGENT_NAME.into(), version: crate::AGENT_VERSION.into(), binary_sha256, command_line }
+    let binary_sha256 = std::env::current_exe()
+        .ok()
+        .and_then(|p| crate::sha256_file(&p).ok());
+    let command_line = std::env::args_os()
+        .map(|a| a.to_string_lossy().into_owned())
+        .collect::<Vec<_>>()
+        .join(" ");
+    ToolInfo {
+        name: crate::AGENT_NAME.into(),
+        version: crate::AGENT_VERSION.into(),
+        binary_sha256,
+        command_line,
+    }
 }
 
 /// Everything recorded about one acquisition.
@@ -146,7 +197,14 @@ pub struct Acquisition {
 ///
 /// The entry is stamped when it is appended (never earlier than the current chain head, so the
 /// verifier's monotonic-time check holds); `acquired_at` is recorded in `details.acquired_at`.
-pub fn append_acquisition(ledger_path: &Path, key: &ExaminerKey, acq: &Acquisition, time_source: TimeSource, tool: ToolInfo, acquired_at: DateTime<Utc>) -> Result<Entry> {
+pub fn append_acquisition(
+    ledger_path: &Path,
+    key: &ExaminerKey,
+    acq: &Acquisition,
+    time_source: TimeSource,
+    tool: ToolInfo,
+    acquired_at: DateTime<Utc>,
+) -> Result<Entry> {
     let mut ledger = if ledger_path.exists() {
         Ledger::load(ledger_path)?
     } else {
@@ -161,7 +219,10 @@ pub fn append_acquisition(ledger_path: &Path, key: &ExaminerKey, acq: &Acquisiti
         _ => Utc::now(),
     };
     let mut details = acq.details.clone();
-    details.insert("acquired_at".into(), serde_json::Value::String(acquired_at.to_rfc3339()));
+    details.insert(
+        "acquired_at".into(),
+        serde_json::Value::String(acquired_at.to_rfc3339()),
+    );
     let new = NewEntry {
         timestamp,
         actor: acq.actor.clone(),
@@ -180,8 +241,21 @@ pub fn append_acquisition(ledger_path: &Path, key: &ExaminerKey, acq: &Acquisiti
 }
 
 /// Convenience: measure time, describe the agent and append.
-pub fn record_acquisition(ledger_path: &Path, key: &ExaminerKey, acq: &Acquisition, measure_ntp: bool) -> Result<Entry> {
-    let ts = if measure_ntp { measure_time(NTP_SERVERS, Duration::from_secs(2)) } else { TimeSource { source: "system-clock".into(), offset_ms: 0, uncertainty_ms: UNCERTAINTY_UNKNOWN } };
+pub fn record_acquisition(
+    ledger_path: &Path,
+    key: &ExaminerKey,
+    acq: &Acquisition,
+    measure_ntp: bool,
+) -> Result<Entry> {
+    let ts = if measure_ntp {
+        measure_time(NTP_SERVERS, Duration::from_secs(2))
+    } else {
+        TimeSource {
+            source: "system-clock".into(),
+            offset_ms: 0,
+            uncertainty_ms: UNCERTAINTY_UNKNOWN,
+        }
+    };
     append_acquisition(ledger_path, key, acq, ts, agent_tool_info(), Utc::now())
 }
 

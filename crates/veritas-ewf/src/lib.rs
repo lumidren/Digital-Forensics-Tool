@@ -30,7 +30,11 @@ pub enum EwfError {
     #[error("truncated {0}")]
     Truncated(&'static str),
     #[error("{what} checksum mismatch: stored {stored:#010x}, calculated {calculated:#010x}")]
-    Checksum { what: String, stored: u32, calculated: u32 },
+    Checksum {
+        what: String,
+        stored: u32,
+        calculated: u32,
+    },
     #[error("corrupt image: {0}")]
     Corrupt(String),
     #[error("missing segment: {0}")]

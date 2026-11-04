@@ -27,7 +27,9 @@ pub struct WriteBlockStatus {
 /// Disk number of `\\.\PhysicalDriveN`.
 pub fn physical_drive_number(path: &str) -> Option<u32> {
     let lower = path.to_ascii_lowercase();
-    lower.strip_prefix(r"\\.\physicaldrive").and_then(|n| n.parse().ok())
+    lower
+        .strip_prefix(r"\\.\physicaldrive")
+        .and_then(|n| n.parse().ok())
 }
 
 /// Linux block device name (`sdb` for `/dev/sdb`, parent `sdb` for `/dev/sdb1`, `nvme0n1` for
@@ -37,16 +39,23 @@ pub fn linux_block_name(path: &str) -> Option<(String, Option<String>)> {
     if name.is_empty() || name.contains('/') {
         return None;
     }
-    let parent = if name.starts_with("nvme") || name.starts_with("mmcblk") || name.starts_with("loop") {
-        name.rfind('p').filter(|&i| i > 0 && name[i + 1..].chars().all(|c| c.is_ascii_digit()) && !name[i + 1..].is_empty()).map(|i| name[..i].to_string())
-    } else {
-        let trimmed = name.trim_end_matches(|c: char| c.is_ascii_digit());
-        if trimmed != name && !trimmed.is_empty() {
-            Some(trimmed.to_string())
+    let parent =
+        if name.starts_with("nvme") || name.starts_with("mmcblk") || name.starts_with("loop") {
+            name.rfind('p')
+                .filter(|&i| {
+                    i > 0
+                        && name[i + 1..].chars().all(|c| c.is_ascii_digit())
+                        && !name[i + 1..].is_empty()
+                })
+                .map(|i| name[..i].to_string())
         } else {
-            None
-        }
-    };
+            let trimmed = name.trim_end_matches(|c: char| c.is_ascii_digit());
+            if trimmed != name && !trimmed.is_empty() {
+                Some(trimmed.to_string())
+            } else {
+                None
+            }
+        };
     Some((name, parent))
 }
 
@@ -68,24 +77,38 @@ pub fn check(device: &Path) -> WriteBlockStatus {
     let meta = std::fs::metadata(device);
     let is_regular_file = meta.as_ref().map(|m| m.is_file()).unwrap_or(false);
     if is_regular_file {
-        let ro = meta.as_ref().map(|m| m.permissions().readonly()).unwrap_or(false);
+        let ro = meta
+            .as_ref()
+            .map(|m| m.permissions().readonly())
+            .unwrap_or(false);
         methods.push("file-permissions".to_string());
         evidence.push(format!("readonly attribute: {}", ro));
         merge(Some(ro));
-        return WriteBlockStatus { read_only: verdict, method: methods.join(";"), evidence: evidence.join("; ") };
+        return WriteBlockStatus {
+            read_only: verdict,
+            method: methods.join(";"),
+            evidence: evidence.join("; "),
+        };
     }
 
     match std::env::consts::OS {
         "windows" => {
             methods.push("open-for-write".to_string());
-            match std::fs::OpenOptions::new().read(true).write(true).open(device) {
+            match std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(device)
+            {
                 Ok(_) => {
                     evidence.push("device opened with write access (not write-blocked)".into());
                     merge(Some(false));
                 }
                 Err(e) if e.raw_os_error() == Some(19) => {
                     // ERROR_WRITE_PROTECT
-                    evidence.push(format!("open for write failed with ERROR_WRITE_PROTECT: {}", e));
+                    evidence.push(format!(
+                        "open for write failed with ERROR_WRITE_PROTECT: {}",
+                        e
+                    ));
                     merge(Some(true));
                 }
                 Err(e) => evidence.push(format!("open for write failed: {} (inconclusive)", e)),
@@ -153,7 +176,11 @@ pub fn check(device: &Path) -> WriteBlockStatus {
     if methods.is_empty() {
         methods.push("none".into());
     }
-    WriteBlockStatus { read_only: verdict, method: methods.join(";"), evidence: evidence.join("; ") }
+    WriteBlockStatus {
+        read_only: verdict,
+        method: methods.join(";"),
+        evidence: evidence.join("; "),
+    }
 }
 
 #[cfg(test)]
@@ -164,10 +191,19 @@ mod tests {
     fn device_name_parsing() {
         assert_eq!(physical_drive_number(r"\\.\PhysicalDrive2"), Some(2));
         assert_eq!(physical_drive_number(r"\\.\C:"), None);
-        assert_eq!(linux_block_name("/dev/sdb1"), Some(("sdb1".into(), Some("sdb".into()))));
+        assert_eq!(
+            linux_block_name("/dev/sdb1"),
+            Some(("sdb1".into(), Some("sdb".into())))
+        );
         assert_eq!(linux_block_name("/dev/sdb"), Some(("sdb".into(), None)));
-        assert_eq!(linux_block_name("/dev/nvme0n1p2"), Some(("nvme0n1p2".into(), Some("nvme0n1".into()))));
-        assert_eq!(linux_block_name("/dev/nvme0n1"), Some(("nvme0n1".into(), None)));
+        assert_eq!(
+            linux_block_name("/dev/nvme0n1p2"),
+            Some(("nvme0n1p2".into(), Some("nvme0n1".into())))
+        );
+        assert_eq!(
+            linux_block_name("/dev/nvme0n1"),
+            Some(("nvme0n1".into(), None))
+        );
         assert_eq!(linux_block_name("/tmp/x"), None);
     }
 

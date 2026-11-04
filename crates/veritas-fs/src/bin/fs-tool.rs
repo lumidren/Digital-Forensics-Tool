@@ -152,9 +152,17 @@ fn with_fs<T: Serialize>(fs_type: &str, v: &T) -> R<Value> {
 }
 
 fn in_scope(path: &str, base: &str, recursive: bool) -> bool {
-    let base = if base == "/" { "" } else { base.trim_end_matches('/') };
-    let Some(rest) = path.strip_prefix(base) else { return false };
-    let Some(rest) = rest.strip_prefix('/') else { return false };
+    let base = if base == "/" {
+        ""
+    } else {
+        base.trim_end_matches('/')
+    };
+    let Some(rest) = path.strip_prefix(base) else {
+        return false;
+    };
+    let Some(rest) = rest.strip_prefix('/') else {
+        return false;
+    };
     !rest.is_empty() && (recursive || !rest.contains('/'))
 }
 
@@ -183,7 +191,10 @@ fn run(cli: Cli) -> R<()> {
                 for p in &vs.partitions {
                     jl(&mut out, p)?;
                 }
-                eprintln!("scheme={} header_crc_ok={:?} entries_crc_ok={:?}", vs.scheme, vs.gpt_header_crc_ok, vs.gpt_entries_crc_ok);
+                eprintln!(
+                    "scheme={} header_crc_ok={:?} entries_crc_ok={:?}",
+                    vs.scheme, vs.gpt_header_crc_ok, vs.gpt_entries_crc_ok
+                );
             }
         }
         Cmd::Info { image } => {
@@ -224,7 +235,14 @@ fn run(cli: Cli) -> R<()> {
                 jl(&mut out, &info)?;
             }
         }
-        Cmd::Ls { image, partition, path, recursive, deleted, index } => {
+        Cmd::Ls {
+            image,
+            partition,
+            path,
+            recursive,
+            deleted,
+            index,
+        } => {
             let v = image::select_volume(open(&image)?, partition)?;
             let fs = AnyFs::open(&v)?;
             let t = fs.type_name();
@@ -237,7 +255,12 @@ fn run(cli: Cli) -> R<()> {
                 }
                 AnyFs::Ntfs(n) => {
                     for e in n.entries()? {
-                        if e.is_base() && (deleted || e.in_use) && e.path.as_deref().is_some_and(|p| in_scope(p, &path, recursive)) {
+                        if e.is_base()
+                            && (deleted || e.in_use)
+                            && e.path
+                                .as_deref()
+                                .is_some_and(|p| in_scope(p, &path, recursive))
+                        {
                             jl(&mut out, &with_fs(&t, &e)?)?;
                         }
                     }
@@ -269,14 +292,23 @@ fn run(cli: Cli) -> R<()> {
                 }
             }
         }
-        Cmd::Cat { image, path, out: dst, partition } => {
+        Cmd::Cat {
+            image,
+            path,
+            out: dst,
+            partition,
+        } => {
             let v = image::select_volume(open(&image)?, partition)?;
             let fs = AnyFs::open(&v)?;
             let data = fs.read_path(&path)?;
             std::fs::write(&dst, &data)?;
             eprintln!("wrote {} bytes to {}", data.len(), dst.display());
         }
-        Cmd::Mft { input, partition, events: as_events } => {
+        Cmd::Mft {
+            input,
+            partition,
+            events: as_events,
+        } => {
             let head = read_vec_padded(open(&input)?.as_ref(), 0, 4)?;
             let mut entries = if head == b"FILE" {
                 ntfs::parse_mft_file(&std::fs::read(&input)?)?
@@ -285,7 +317,10 @@ fn run(cli: Cli) -> R<()> {
             };
             entries.sort_by_key(|e| e.entry);
             if as_events {
-                let ctx = events::Ctx { evidence_sha256: sha256_file(&input)?, volume_prefix: String::new() };
+                let ctx = events::Ctx {
+                    evidence_sha256: sha256_file(&input)?,
+                    volume_prefix: String::new(),
+                };
                 let mut evs = events::ntfs_entry_events(&ctx, &entries);
                 veritas_timeline::write_jsonl(&mut evs, &mut out)?;
             } else {
@@ -294,7 +329,11 @@ fn run(cli: Cli) -> R<()> {
                 }
             }
         }
-        Cmd::Usn { input, partition, events: as_events } => {
+        Cmd::Usn {
+            input,
+            partition,
+            events: as_events,
+        } => {
             let src = open(&input)?;
             let recs = match ntfs_volume(src.clone(), partition) {
                 Ok((_, n)) => n.usn_records()?,
@@ -304,7 +343,10 @@ fn run(cli: Cli) -> R<()> {
                 }
             };
             if as_events {
-                let ctx = events::Ctx { evidence_sha256: sha256_file(&input)?, volume_prefix: String::new() };
+                let ctx = events::Ctx {
+                    evidence_sha256: sha256_file(&input)?,
+                    volume_prefix: String::new(),
+                };
                 let mut evs = events::usn_events(&ctx, &recs, "$Extend/$UsnJrnl:$J");
                 veritas_timeline::write_jsonl(&mut evs, &mut out)?;
             } else {
@@ -313,7 +355,11 @@ fn run(cli: Cli) -> R<()> {
                 }
             }
         }
-        Cmd::Logfile { input, partition, events: as_events } => {
+        Cmd::Logfile {
+            input,
+            partition,
+            events: as_events,
+        } => {
             let src = open(&input)?;
             let lf = match ntfs_volume(src.clone(), partition) {
                 Ok((_, n)) => n.logfile()?,
@@ -323,11 +369,17 @@ fn run(cli: Cli) -> R<()> {
                 }
             };
             if as_events {
-                let ctx = events::Ctx { evidence_sha256: sha256_file(&input)?, volume_prefix: String::new() };
+                let ctx = events::Ctx {
+                    evidence_sha256: sha256_file(&input)?,
+                    volume_prefix: String::new(),
+                };
                 let mut evs = events::logfile_events(&ctx, &lf.records);
                 veritas_timeline::write_jsonl(&mut evs, &mut out)?;
             } else {
-                jl(&mut out, &serde_json::json!({"page_size": lf.page_size, "record_pages": lf.record_pages, "restart_areas": lf.restart_areas}))?;
+                jl(
+                    &mut out,
+                    &serde_json::json!({"page_size": lf.page_size, "record_pages": lf.record_pages, "restart_areas": lf.restart_areas}),
+                )?;
                 for r in &lf.records {
                     jl(&mut out, r)?;
                 }
@@ -337,13 +389,21 @@ fn run(cli: Cli) -> R<()> {
             let sha = sha256_file(&image)?;
             let src = open(&image)?;
             let vols = image::volumes(src)?;
-            let multi = vols.len() > 1 || vols.first().is_some_and(|v| v.description != "whole image");
+            let multi =
+                vols.len() > 1 || vols.first().is_some_and(|v| v.description != "whole image");
             let mut evs = Vec::new();
             for v in vols {
                 if partition.is_some_and(|p| p != v.index) || v.fs == FsKind::Unknown {
                     continue;
                 }
-                let ctx = events::Ctx { evidence_sha256: sha.clone(), volume_prefix: if multi { format!("p{}", v.index) } else { String::new() } };
+                let ctx = events::Ctx {
+                    evidence_sha256: sha.clone(),
+                    volume_prefix: if multi {
+                        format!("p{}", v.index)
+                    } else {
+                        String::new()
+                    },
+                };
                 match events::volume_events(&ctx, &v) {
                     Ok(e) => evs.extend(e),
                     Err(e) => eprintln!("partition {}: {e}", v.index),
@@ -369,9 +429,16 @@ fn run(cli: Cli) -> R<()> {
                 jl(&mut out, &j)?;
             }
         }
-        Cmd::Vss { image, partition, full_hash } => {
+        Cmd::Vss {
+            image,
+            partition,
+            full_hash,
+        } => {
             let vols = image::volumes(open(&image)?)?;
-            let v = vols.into_iter().find(|v| partition.is_none_or(|p| p == v.index) && vss::probe(v.src.as_ref())).ok_or_else(|| FsError::NotFound("VSS volume header".into()))?;
+            let v = vols
+                .into_iter()
+                .find(|v| partition.is_none_or(|p| p == v.index) && vss::probe(v.src.as_ref()))
+                .ok_or_else(|| FsError::NotFound("VSS volume header".into()))?;
             let vs = Arc::new(vss::Vss::open(v.src.clone())?);
             for s in &vs.stores {
                 let mut j = serde_json::to_value(s)?;
@@ -397,24 +464,42 @@ fn run(cli: Cli) -> R<()> {
                 jl(&mut out, &f)?;
             }
         }
-        Cmd::Recover { image, out: dir, partition } => {
+        Cmd::Recover {
+            image,
+            out: dir,
+            partition,
+        } => {
             let v = image::select_volume(open(&image)?, partition)?;
             let items = match AnyFs::open(&v)? {
                 AnyFs::Ntfs(n) => recover::recover_ntfs(&n)?,
                 AnyFs::Fat(f) => recover::recover_fat(&f)?,
-                _ => return Err(Box::new(FsError::Unsupported("recovery supports NTFS and FAT".into()))),
+                _ => {
+                    return Err(Box::new(FsError::Unsupported(
+                        "recovery supports NTFS and FAT".into(),
+                    )))
+                }
             };
             recover::write_recovered(&dir, &items)?;
             for r in &items {
                 jl(&mut out, r)?;
             }
         }
-        Cmd::Harvest { image, out: dir, partition, max_file_size } => {
+        Cmd::Harvest {
+            image,
+            out: dir,
+            partition,
+            max_file_size,
+        } => {
             let rep = harvest::harvest(open(&image)?, &dir, partition, max_file_size)?;
             for e in &rep.errors {
                 eprintln!("skipped partition {} {}: {}", e.partition, e.path, e.error);
             }
-            eprintln!("harvested {} files, {} skipped; manifest at {}", rep.manifest.len(), rep.errors.len(), dir.join("manifest.jsonl").display());
+            eprintln!(
+                "harvested {} files, {} skipped; manifest at {}",
+                rep.manifest.len(),
+                rep.errors.len(),
+                dir.join("manifest.jsonl").display()
+            );
         }
     }
     out.flush()?;

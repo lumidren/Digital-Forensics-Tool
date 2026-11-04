@@ -77,7 +77,10 @@ impl CaseKeyring {
 
     pub fn encryptor(&self, case_id: &str) -> Result<FrameCipher, CryptoError> {
         let key = self.master.derive_case_key(case_id);
-        Ok(FrameCipher { cipher: XChaCha20Poly1305::new((&key).into()), aad: case_id.as_bytes().to_vec() })
+        Ok(FrameCipher {
+            cipher: XChaCha20Poly1305::new((&key).into()),
+            aad: case_id.as_bytes().to_vec(),
+        })
     }
 }
 
@@ -93,15 +96,35 @@ impl FrameCipher {
         *XNonce::from_slice(&n)
     }
 
-    pub fn encrypt_frame(&self, frame_index: u64, plaintext: &[u8]) -> Result<Vec<u8>, CryptoError> {
+    pub fn encrypt_frame(
+        &self,
+        frame_index: u64,
+        plaintext: &[u8],
+    ) -> Result<Vec<u8>, CryptoError> {
         self.cipher
-            .encrypt(&Self::nonce(frame_index), Payload { msg: plaintext, aad: &self.aad })
+            .encrypt(
+                &Self::nonce(frame_index),
+                Payload {
+                    msg: plaintext,
+                    aad: &self.aad,
+                },
+            )
             .map_err(|_| CryptoError::Auth)
     }
 
-    pub fn decrypt_frame(&self, frame_index: u64, ciphertext: &[u8]) -> Result<Vec<u8>, CryptoError> {
+    pub fn decrypt_frame(
+        &self,
+        frame_index: u64,
+        ciphertext: &[u8],
+    ) -> Result<Vec<u8>, CryptoError> {
         self.cipher
-            .decrypt(&Self::nonce(frame_index), Payload { msg: ciphertext, aad: &self.aad })
+            .decrypt(
+                &Self::nonce(frame_index),
+                Payload {
+                    msg: ciphertext,
+                    aad: &self.aad,
+                },
+            )
             .map_err(|_| CryptoError::Auth)
     }
 }
@@ -118,7 +141,14 @@ pub struct DecryptingReader<R: Read> {
 
 impl<R: Read> DecryptingReader<R> {
     pub fn new(inner: R, cipher: FrameCipher) -> Self {
-        Self { inner, cipher, frame_index: 0, buf: Vec::new(), pos: 0, done: false }
+        Self {
+            inner,
+            cipher,
+            frame_index: 0,
+            buf: Vec::new(),
+            pos: 0,
+            done: false,
+        }
     }
 
     fn fill(&mut self) -> io::Result<()> {
@@ -133,7 +163,10 @@ impl<R: Read> DecryptingReader<R> {
         }
         let len = u32::from_le_bytes(len_bytes) as usize;
         if len > FRAME_SIZE + TAG_SIZE {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "frame length exceeds maximum"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "frame length exceeds maximum",
+            ));
         }
         let mut ct = vec![0u8; len];
         self.inner.read_exact(&mut ct)?;

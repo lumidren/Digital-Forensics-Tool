@@ -77,12 +77,22 @@ pub fn parse_dest_list(d: &[u8]) -> Result<DestList> {
         let e = DestListEntry {
             offset: off,
             entry_number: u32_at(d, off + 88)?,
-            hostname: decode_ansi(&need(d, off + 72, 16)?.iter().copied().take_while(|&b| b != 0).collect::<Vec<_>>()),
+            hostname: decode_ansi(
+                &need(d, off + 72, 16)?
+                    .iter()
+                    .copied()
+                    .take_while(|&b| b != 0)
+                    .collect::<Vec<_>>(),
+            ),
             path,
             last_modification_ns: filetime_to_ns(ft),
             last_modification_filetime: ft,
             pin_status: u32_at(d, off + 108)? as i32,
-            access_count: if v1 { None } else { Some(u32_at(d, off + 116)?) },
+            access_count: if v1 {
+                None
+            } else {
+                Some(u32_at(d, off + 116)?)
+            },
             droid_volume_identifier: nonzero_guid(need(d, off + 8, 16)?),
             droid_file_identifier: nonzero_guid(need(d, off + 24, 16)?),
             birth_droid_volume_identifier: nonzero_guid(need(d, off + 40, 16)?),
@@ -96,7 +106,10 @@ pub fn parse_dest_list(d: &[u8]) -> Result<DestList> {
 
 pub fn parse_automatic(data: &[u8]) -> Result<AutomaticDestinations> {
     let ole = Olecf::parse(data)?;
-    let mut out = AutomaticDestinations { dest_list: None, streams: Vec::new() };
+    let mut out = AutomaticDestinations {
+        dest_list: None,
+        streams: Vec::new(),
+    };
     let mut kids = ole.root_children();
     kids.sort_by(|a, b| {
         let (na, nb) = (&ole.entries[*a].name, &ole.entries[*b].name);
@@ -112,7 +125,12 @@ pub fn parse_automatic(data: &[u8]) -> Result<AutomaticDestinations> {
         let bytes = match ole.read_stream(i) {
             Ok(b) => b,
             Err(err) => {
-                out.streams.push(AutoStream { name: e.name.clone(), size: e.size as usize, lnk: None, error: Some(err.to_string()) });
+                out.streams.push(AutoStream {
+                    name: e.name.clone(),
+                    size: e.size as usize,
+                    lnk: None,
+                    error: Some(err.to_string()),
+                });
                 continue;
             }
         };
@@ -124,7 +142,12 @@ pub fn parse_automatic(data: &[u8]) -> Result<AutomaticDestinations> {
             Ok(l) => (Some(l), None),
             Err(err) => (None, Some(err.to_string())),
         };
-        out.streams.push(AutoStream { name: e.name.clone(), size: bytes.len(), lnk, error });
+        out.streams.push(AutoStream {
+            name: e.name.clone(),
+            size: bytes.len(),
+            lnk,
+            error,
+        });
     }
     Ok(out)
 }
@@ -146,7 +169,9 @@ pub struct CustomDestinations {
 pub fn parse_custom(data: &[u8]) -> Result<CustomDestinations> {
     let version = u32_at(data, 0)?;
     if version != 2 {
-        return Err(ParseError::Unsupported(format!("customDestinations version {version}")));
+        return Err(ParseError::Unsupported(format!(
+            "customDestinations version {version}"
+        )));
     }
     // Locate category names (type 0 = custom category with a UTF-16 name) best-effort, and
     // embedded links by the LNK class identifier followed by a shell link header.
@@ -163,7 +188,9 @@ pub fn parse_custom(data: &[u8]) -> Result<CustomDestinations> {
         let Ok(t) = u32_at(data, pos) else { break };
         if t == 0 {
             let Ok(n) = u16_at(data, pos + 4) else { break };
-            let Ok(name) = need(data, pos + 6, n as usize * 2) else { break };
+            let Ok(name) = need(data, pos + 6, n as usize * 2) else {
+                break;
+            };
             categories.push((pos, utf16le(name, false)));
         }
         // jump to the next footer to find the next category header
@@ -179,22 +206,37 @@ pub fn parse_custom(data: &[u8]) -> Result<CustomDestinations> {
         let start = p + 16;
         match lnk::parse(&data[start..]) {
             Ok(l) => {
-                let cat = categories.iter().rev().find(|(cpos, _)| *cpos < p).map(|(_, n)| n.clone());
+                let cat = categories
+                    .iter()
+                    .rev()
+                    .find(|(cpos, _)| *cpos < p)
+                    .map(|(_, n)| n.clone());
                 let adv = l.size.max(76);
-                entries.push(CustomEntry { offset: start, category: cat, lnk: l });
+                entries.push(CustomEntry {
+                    offset: start,
+                    category: cat,
+                    lnk: l,
+                });
                 off = start + adv;
             }
             Err(_) => off = p + 16,
         }
     }
-    Ok(CustomDestinations { version, categories: categories.into_iter().map(|(_, n)| n).collect(), entries })
+    Ok(CustomDestinations {
+        version,
+        categories: categories.into_iter().map(|(_, n)| n).collect(),
+        entries,
+    })
 }
 
 fn find(h: &[u8], n: &[u8], from: usize) -> Option<usize> {
     if n.is_empty() || from >= h.len() || h.len() - from < n.len() {
         return None;
     }
-    h[from..].windows(n.len()).position(|w| w == n).map(|p| p + from)
+    h[from..]
+        .windows(n.len())
+        .position(|w| w == n)
+        .map(|p| p + from)
 }
 
 pub fn automatic_events(a: &AutomaticDestinations, sha: &str, path: &str) -> Vec<Event> {
@@ -220,23 +262,39 @@ pub fn automatic_events(a: &AutomaticDestinations, sha: &str, path: &str) -> Vec
                 en.droid_volume_identifier.clone().unwrap_or_default(),
                 en.droid_file_identifier.clone().unwrap_or_default()
             );
-            let mut e = Event::new("windows:jump_list:automatic_destination", desc::MODIFICATION, msg)
-                .with_time(en.last_modification_ns)
-                .attr("entry_number", en.entry_number)
-                .attr("hostname", en.hostname.clone())
-                .attr("path", en.path.clone())
-                .attr("pin_status", en.pin_status)
-                .attr("dest_list_version", dl.version)
-                .attr("droid_volume_identifier", json!(en.droid_volume_identifier))
-                .attr("droid_file_identifier", json!(en.droid_file_identifier))
-                .attr("birth_droid_volume_identifier", json!(en.birth_droid_volume_identifier))
-                .attr("birth_droid_file_identifier", json!(en.birth_droid_file_identifier));
+            let mut e = Event::new(
+                "windows:jump_list:automatic_destination",
+                desc::MODIFICATION,
+                msg,
+            )
+            .with_time(en.last_modification_ns)
+            .attr("entry_number", en.entry_number)
+            .attr("hostname", en.hostname.clone())
+            .attr("path", en.path.clone())
+            .attr("pin_status", en.pin_status)
+            .attr("dest_list_version", dl.version)
+            .attr("droid_volume_identifier", json!(en.droid_volume_identifier))
+            .attr("droid_file_identifier", json!(en.droid_file_identifier))
+            .attr(
+                "birth_droid_volume_identifier",
+                json!(en.birth_droid_volume_identifier),
+            )
+            .attr(
+                "birth_droid_file_identifier",
+                json!(en.birth_droid_file_identifier),
+            );
             if let Some(c) = en.access_count {
                 e = e.attr("access_count", c);
             }
             e.source_short = "LNK".into();
             e.source_long = "Jump List DestList".into();
-            out.push(e.provenance(sha, path, en.offset as i64, "jumplist", crate::PARSER_VERSION));
+            out.push(e.provenance(
+                sha,
+                path,
+                en.offset as i64,
+                "jumplist",
+                crate::PARSER_VERSION,
+            ));
         }
     }
     out
@@ -249,7 +307,8 @@ pub fn custom_events(c: &CustomDestinations, sha: &str, path: &str) -> Vec<Event
             if e.data_type == "windows:lnk:link" {
                 e.data_type = "windows:jump_list:custom_destination".into();
             }
-            e.attrs.insert("jump_list_category".into(), json!(en.category));
+            e.attrs
+                .insert("jump_list_category".into(), json!(en.category));
             e.parser = "jumplist".into();
             e.source_long = "Jump List CustomDestinations".into();
             out.push(e);

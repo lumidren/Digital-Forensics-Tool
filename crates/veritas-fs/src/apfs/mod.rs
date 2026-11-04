@@ -49,7 +49,8 @@ pub fn fletcher64(block: &[u8]) -> u64 {
 }
 
 pub fn checksum_ok(block: &[u8]) -> bool {
-    block.len() >= 32 && u64::from_le_bytes(block[0..8].try_into().unwrap_or([0; 8])) == fletcher64(block)
+    block.len() >= 32
+        && u64::from_le_bytes(block[0..8].try_into().unwrap_or([0; 8])) == fletcher64(block)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -169,7 +170,11 @@ pub struct Apfs {
 }
 
 fn ns(v: u64) -> Option<i64> {
-    if v == 0 { None } else { i64::try_from(v).ok() }
+    if v == 0 {
+        None
+    } else {
+        i64::try_from(v).ok()
+    }
 }
 
 impl Apfs {
@@ -190,8 +195,14 @@ impl Apfs {
         if desc_blocks & 0x8000_0000 == 0 {
             for i in 0..(desc_blocks as u64).min(MAX_CHECKPOINT_BLOCKS) {
                 let addr = desc_base.saturating_add(i);
-                let Ok(blk) = read_vec(src.as_ref(), addr.saturating_mul(bs as u64), bs as u64) else { break };
-                if u32_at(&blk, 0x18)? & 0xFFFF == OT_NX_SUPERBLOCK && &blk[32..36] == b"NXSB" && checksum_ok(&blk) {
+                let Ok(blk) = read_vec(src.as_ref(), addr.saturating_mul(bs as u64), bs as u64)
+                else {
+                    break;
+                };
+                if u32_at(&blk, 0x18)? & 0xFFFF == OT_NX_SUPERBLOCK
+                    && &blk[32..36] == b"NXSB"
+                    && checksum_ok(&blk)
+                {
                     let xid = u64_at(&blk, 0x10)?;
                     if xid > best.0 || best.2 == 0 && !checksum_ok(&best.1) {
                         best = (xid, blk, addr);
@@ -208,12 +219,30 @@ impl Apfs {
                 fs_oids.push(o);
             }
         }
-        let container = Container { block_size: bs, block_count: u64_at(&nx, 0x28)?, xid: best.0, uuid: crate::util::uuid_be(need(&nx, 0x48, 16)?)?, omap_oid: u64_at(&nx, 0xA0)?, fs_oids, checkpoint_block: best.2 };
-        let mut fs = Apfs { src, container, volumes: Vec::new(), omap: BTreeMap::new(), trees: Mutex::new(BTreeMap::new()) };
+        let container = Container {
+            block_size: bs,
+            block_count: u64_at(&nx, 0x28)?,
+            xid: best.0,
+            uuid: crate::util::uuid_be(need(&nx, 0x48, 16)?)?,
+            omap_oid: u64_at(&nx, 0xA0)?,
+            fs_oids,
+            checkpoint_block: best.2,
+        };
+        let mut fs = Apfs {
+            src,
+            container,
+            volumes: Vec::new(),
+            omap: BTreeMap::new(),
+            trees: Mutex::new(BTreeMap::new()),
+        };
         fs.omap = fs.load_omap(fs.container.omap_oid)?;
         for (i, &oid) in fs.container.fs_oids.clone().iter().enumerate() {
-            let Some(paddr) = Self::omap_lookup(&fs.omap, oid, fs.container.xid) else { continue };
-            let Ok(b) = fs.read_block(paddr) else { continue };
+            let Some(paddr) = Self::omap_lookup(&fs.omap, oid, fs.container.xid) else {
+                continue;
+            };
+            let Ok(b) = fs.read_block(paddr) else {
+                continue;
+            };
             if need(&b, 32, 4)? != b"APSB" || u32_at(&b, 0x18)? & 0xFFFF != OT_FS {
                 continue;
             }
@@ -245,14 +274,25 @@ impl Apfs {
 
     fn read_block(&self, paddr: u64) -> Result<Vec<u8>> {
         let bs = self.container.block_size as u64;
-        if paddr >= self.container.block_count.max(1) && paddr.saturating_mul(bs) >= self.src.size() {
+        if paddr >= self.container.block_count.max(1) && paddr.saturating_mul(bs) >= self.src.size()
+        {
             return Err(FsError::invalid(paddr, "block beyond container"));
         }
-        read_vec(self.src.as_ref(), paddr.checked_mul(bs).ok_or_else(|| FsError::invalid(paddr, "overflow"))?, bs)
+        read_vec(
+            self.src.as_ref(),
+            paddr
+                .checked_mul(bs)
+                .ok_or_else(|| FsError::invalid(paddr, "overflow"))?,
+            bs,
+        )
     }
 
     fn omap_lookup(map: &BTreeMap<u64, Vec<(u64, u64)>>, oid: u64, max_xid: u64) -> Option<u64> {
-        map.get(&oid)?.iter().filter(|(x, _)| *x <= max_xid).max_by_key(|(x, _)| *x).map(|(_, p)| *p)
+        map.get(&oid)?
+            .iter()
+            .filter(|(x, _)| *x <= max_xid)
+            .max_by_key(|(x, _)| *x)
+            .map(|(_, p)| *p)
     }
 
     /// Load an object map (physical omap object) into oid -> [(xid, paddr)].
@@ -280,12 +320,21 @@ impl Apfs {
     }
 
     /// Collect every (key, value) of a B-tree. `resolve` maps child oids to physical addresses.
-    fn collect(&self, root: u64, resolve: &dyn Fn(u64) -> Option<u64>, out: &mut Vec<(Vec<u8>, Vec<u8>)>) -> Result<()> {
-        let paddr = resolve(root).ok_or_else(|| FsError::NotFound(format!("B-tree root oid {root}")))?;
+    fn collect(
+        &self,
+        root: u64,
+        resolve: &dyn Fn(u64) -> Option<u64>,
+        out: &mut Vec<(Vec<u8>, Vec<u8>)>,
+    ) -> Result<()> {
+        let paddr =
+            resolve(root).ok_or_else(|| FsError::NotFound(format!("B-tree root oid {root}")))?;
         let rb = self.read_block(paddr)?;
         let (ks, vs) = if u16_at(&rb, 0x20)? & 0x4 != 0 {
             let info = rb.len() - 0x28;
-            (u32_at(&rb, info + 8)? as usize, u32_at(&rb, info + 12)? as usize)
+            (
+                u32_at(&rb, info + 8)? as usize,
+                u32_at(&rb, info + 12)? as usize,
+            )
         } else {
             (0, 0)
         };
@@ -295,17 +344,36 @@ impl Apfs {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn collect_node(&self, b: Vec<u8>, paddr: u64, depth: usize, ks: usize, vs: usize, resolve: &dyn Fn(u64) -> Option<u64>, out: &mut Vec<(Vec<u8>, Vec<u8>)>, nodes: &mut usize, seen: &mut BTreeSet<u64>) -> Result<()> {
+    fn collect_node(
+        &self,
+        b: Vec<u8>,
+        paddr: u64,
+        depth: usize,
+        ks: usize,
+        vs: usize,
+        resolve: &dyn Fn(u64) -> Option<u64>,
+        out: &mut Vec<(Vec<u8>, Vec<u8>)>,
+        nodes: &mut usize,
+        seen: &mut BTreeSet<u64>,
+    ) -> Result<()> {
         *nodes += 1;
         if depth > MAX_BTREE_DEPTH || *nodes > MAX_BTREE_NODES || !seen.insert(paddr) {
-            return Err(FsError::Limit("B-tree too deep, too large or cyclic".into()));
+            return Err(FsError::Limit(
+                "B-tree too deep, too large or cyclic".into(),
+            ));
         }
         let t = u32_at(&b, 0x18)? & 0xFFFF;
         if t != OT_BTREE && t != OT_BTREE_NODE {
-            return Err(FsError::invalid(paddr, format!("not a B-tree node (type {t:#x})")));
+            return Err(FsError::invalid(
+                paddr,
+                format!("not a B-tree node (type {t:#x})"),
+            ));
         }
         if !checksum_ok(&b) {
-            return Err(FsError::invalid(paddr, "B-tree node checksum mismatch (encrypted or corrupt)"));
+            return Err(FsError::invalid(
+                paddr,
+                "B-tree node checksum mismatch (encrypted or corrupt)",
+            ));
         }
         let flags = u16_at(&b, 0x20)?;
         let level = u16_at(&b, 0x22)?;
@@ -314,22 +382,38 @@ impl Apfs {
         let toc_len = u16_at(&b, 0x2A)? as usize;
         let toc_start = 0x38 + toc_off;
         let key_start = toc_start + toc_len;
-        let val_end = if flags & 0x1 != 0 { b.len() - 0x28 } else { b.len() };
+        let val_end = if flags & 0x1 != 0 {
+            b.len() - 0x28
+        } else {
+            b.len()
+        };
         let fixed = flags & 0x4 != 0;
         let leaf = flags & 0x2 != 0;
         for i in 0..nkeys.min(65536) {
             let (k_off, k_len, v_off, v_len) = if fixed {
                 let e = toc_start + i * 4;
-                (u16_at(&b, e)? as usize, ks, u16_at(&b, e + 2)? as usize, if leaf { vs } else { 8 })
+                (
+                    u16_at(&b, e)? as usize,
+                    ks,
+                    u16_at(&b, e + 2)? as usize,
+                    if leaf { vs } else { 8 },
+                )
             } else {
                 let e = toc_start + i * 8;
-                (u16_at(&b, e)? as usize, u16_at(&b, e + 2)? as usize, u16_at(&b, e + 4)? as usize, u16_at(&b, e + 6)? as usize)
+                (
+                    u16_at(&b, e)? as usize,
+                    u16_at(&b, e + 2)? as usize,
+                    u16_at(&b, e + 4)? as usize,
+                    u16_at(&b, e + 6)? as usize,
+                )
             };
             let key = need(&b, key_start + k_off, k_len)?.to_vec();
             if v_off == 0xFFFF {
                 continue;
             }
-            let vstart = val_end.checked_sub(v_off).ok_or_else(|| FsError::invalid(paddr, "value offset"))?;
+            let vstart = val_end
+                .checked_sub(v_off)
+                .ok_or_else(|| FsError::invalid(paddr, "value offset"))?;
             let val = need(&b, vstart, v_len)?.to_vec();
             if leaf || level == 0 {
                 if out.len() >= MAX_RECORDS {
@@ -347,15 +431,25 @@ impl Apfs {
     }
 
     fn volume(&self, vol: usize) -> Result<&VolumeInfo> {
-        self.volumes.get(vol).ok_or_else(|| FsError::NotFound(format!("APFS volume {vol}")))
+        self.volumes
+            .get(vol)
+            .ok_or_else(|| FsError::NotFound(format!("APFS volume {vol}")))
     }
 
     fn load_tree(&self, vol: usize) -> Result<Arc<FsTree>> {
-        if let Some(t) = self.trees.lock().map_err(|_| FsError::Io("tree cache poisoned".into()))?.get(&vol) {
+        if let Some(t) = self
+            .trees
+            .lock()
+            .map_err(|_| FsError::Io("tree cache poisoned".into()))?
+            .get(&vol)
+        {
             return Ok(t.clone());
         }
         let t = Arc::new(self.parse_tree(vol)?);
-        self.trees.lock().map_err(|_| FsError::Io("tree cache poisoned".into()))?.insert(vol, t.clone());
+        self.trees
+            .lock()
+            .map_err(|_| FsError::Io("tree cache poisoned".into()))?
+            .insert(vol, t.clone());
         Ok(t)
     }
 
@@ -364,11 +458,20 @@ impl Apfs {
         let vomap = self.load_omap(v.omap_oid)?;
         let xid = self.container.xid;
         let physical = v.root_tree_type & OBJ_PHYSICAL != 0;
-        let resolve = |o: u64| if physical { Some(o) } else { Self::omap_lookup(&vomap, o, xid) };
+        let resolve = |o: u64| {
+            if physical {
+                Some(o)
+            } else {
+                Self::omap_lookup(&vomap, o, xid)
+            }
+        };
         let mut recs = Vec::new();
         if let Err(e) = self.collect(v.root_tree_oid, &resolve, &mut recs) {
             if v.encrypted {
-                return Err(FsError::Unsupported(format!("encrypted APFS volume '{}': unlock with the Python decrypt adapter ({e})", v.name)));
+                return Err(FsError::Unsupported(format!(
+                    "encrypted APFS volume '{}': unlock with the Python decrypt adapter ({e})",
+                    v.name
+                )));
             }
             return Err(e);
         }
@@ -411,12 +514,20 @@ impl Apfs {
                         let l = u16_at(&k, 8)? as usize;
                         utf8z(need(&k, 10, l.min(k.len().saturating_sub(10)))?)
                     };
-                    t.drecs.entry(oid).or_default().push((name, u64_at(&val, 0)?, u64_at(&val, 8)?, u16_at(&val, 16)?));
+                    t.drecs.entry(oid).or_default().push((
+                        name,
+                        u64_at(&val, 0)?,
+                        u64_at(&val, 8)?,
+                        u16_at(&val, 16)?,
+                    ));
                 }
                 T_FILE_EXTENT if k.len() >= 16 && val.len() >= 24 => {
                     let logical = u64_at(&k, 8)?;
                     let len = u64_at(&val, 0)? & 0x00FF_FFFF_FFFF_FFFF;
-                    t.extents.entry(oid).or_default().insert(logical, (len, u64_at(&val, 8)?));
+                    t.extents
+                        .entry(oid)
+                        .or_default()
+                        .insert(logical, (len, u64_at(&val, 8)?));
                 }
                 T_XATTR if k.len() >= 10 && val.len() >= 4 => {
                     let l = u16_at(&k, 8)? as usize;
@@ -424,7 +535,10 @@ impl Apfs {
                     let flags = u16_at(&val, 0)?;
                     let dl = u16_at(&val, 2)? as usize;
                     let data = need(&val, 4, dl.min(val.len() - 4))?.to_vec();
-                    t.xattrs.entry(oid).or_default().push(XattrRec { name, flags, data });
+                    t.xattrs
+                        .entry(oid)
+                        .or_default()
+                        .push(XattrRec { name, flags, data });
                 }
                 _ => {}
             }
@@ -461,9 +575,14 @@ impl Apfs {
     }
 
     fn read_with_tree(&self, t: &FsTree, id: u64) -> Result<Vec<u8>> {
-        let ino = t.inodes.get(&id).ok_or_else(|| FsError::NotFound(format!("inode {id}")))?;
+        let ino = t
+            .inodes
+            .get(&id)
+            .ok_or_else(|| FsError::NotFound(format!("inode {id}")))?;
         if ino.bsd_flags & 0x20 != 0 {
-            return Err(FsError::Unsupported("APFS transparent compression (decmpfs)".into()));
+            return Err(FsError::Unsupported(
+                "APFS transparent compression (decmpfs)".into(),
+            ));
         }
         if ino.size > MAX_FILE_READ {
             return Err(FsError::Limit("file too large".into()));
@@ -501,9 +620,19 @@ impl Apfs {
             return Ok(vec![]);
         }
         let physical = v.snap_meta_tree_type & OBJ_PHYSICAL != 0;
-        let vomap = if physical { BTreeMap::new() } else { self.load_omap(v.omap_oid)? };
+        let vomap = if physical {
+            BTreeMap::new()
+        } else {
+            self.load_omap(v.omap_oid)?
+        };
         let xid = self.container.xid;
-        let resolve = |o: u64| if physical { Some(o) } else { Self::omap_lookup(&vomap, o, xid) };
+        let resolve = |o: u64| {
+            if physical {
+                Some(o)
+            } else {
+                Self::omap_lookup(&vomap, o, xid)
+            }
+        };
         let mut recs = Vec::new();
         self.collect(v.snap_meta_tree_oid, &resolve, &mut recs)?;
         let mut out = Vec::new();
@@ -531,7 +660,12 @@ impl Apfs {
 fn lookup_in(t: &FsTree, path: &str) -> Result<u64> {
     let mut cur = 2u64;
     for comp in path.split('/').filter(|c| !c.is_empty()) {
-        cur = t.drecs.get(&cur).and_then(|v| v.iter().find(|(n, ..)| n == comp)).map(|(_, id, ..)| *id).ok_or_else(|| FsError::NotFound(path.to_string()))?;
+        cur = t
+            .drecs
+            .get(&cur)
+            .and_then(|v| v.iter().find(|(n, ..)| n == comp))
+            .map(|(_, id, ..)| *id)
+            .ok_or_else(|| FsError::NotFound(path.to_string()))?;
     }
     Ok(cur)
 }
@@ -549,7 +683,10 @@ fn make_entry(t: &FsTree, path: &str, name: &str, id: u64, added: u64) -> ApfsEn
         0xC000 => "socket",
         _ => "unknown",
     };
-    let symlink_target = xs.iter().find(|x| x.name == "com.apple.fs.symlink" && x.flags & 0x2 != 0).map(|x| utf8z(&x.data));
+    let symlink_target = xs
+        .iter()
+        .find(|x| x.name == "com.apple.fs.symlink" && x.flags & 0x2 != 0)
+        .map(|x| utf8z(&x.data));
     let mut xnames: Vec<String> = xs.iter().map(|x| x.name.clone()).collect();
     xnames.sort();
     ApfsEntry {
@@ -592,4 +729,6 @@ fn xfield_dstream_size(x: &[u8]) -> Option<u64> {
 }
 
 /// True when the block looks like an APFS container superblock.
-pub fn probe(b: &[u8]) -> bool { b.len() >= 36 && &b[32..36] == b"NXSB" }
+pub fn probe(b: &[u8]) -> bool {
+    b.len() >= 36 && &b[32..36] == b"NXSB"
+}

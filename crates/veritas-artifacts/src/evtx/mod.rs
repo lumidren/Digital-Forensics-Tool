@@ -22,7 +22,11 @@ const fn crc_table() -> [u32; 256] {
         let mut c = i as u32;
         let mut k = 0;
         while k < 8 {
-            c = if c & 1 != 0 { 0xedb8_8320 ^ (c >> 1) } else { c >> 1 };
+            c = if c & 1 != 0 {
+                0xedb8_8320 ^ (c >> 1)
+            } else {
+                c >> 1
+            };
             k += 1;
         }
         t[i] = c;
@@ -112,7 +116,9 @@ pub struct Record {
 
 impl Record {
     pub fn source_name(&self) -> Option<&str> {
-        self.event_source_name.as_deref().or(self.provider_name.as_deref())
+        self.event_source_name
+            .as_deref()
+            .or(self.provider_name.as_deref())
     }
     pub fn event_data_map(&self) -> Map<String, Value> {
         let mut m = Map::new();
@@ -135,7 +141,11 @@ pub struct EvtxFile {
 pub fn parse(data: &[u8]) -> Result<EvtxFile> {
     let sig = need(data, 0, 8)?;
     if sig != b"ElfFile\0" {
-        return Err(ParseError::BadSignature { offset: 0, expected: "ElfFile".into(), found: hex::encode(sig) });
+        return Err(ParseError::BadSignature {
+            offset: 0,
+            expected: "ElfFile".into(),
+            found: hex::encode(sig),
+        });
     }
     need(data, 0, 128)?;
     let header = FileHeader {
@@ -165,7 +175,11 @@ pub fn parse(data: &[u8]) -> Result<EvtxFile> {
         idx += 1;
         off += CHUNK_SIZE;
     }
-    Ok(EvtxFile { header, chunks, records })
+    Ok(EvtxFile {
+        header,
+        chunks,
+        records,
+    })
 }
 
 fn parse_chunk(c: &[u8], index: usize, file_off: usize) -> (ChunkInfo, Vec<Record>) {
@@ -189,14 +203,19 @@ fn parse_chunk(c: &[u8], index: usize, file_off: usize) -> (ChunkInfo, Vec<Recor
     let chunk = Chunk::new(c);
     let mut out = Vec::new();
     let mut p = 512usize;
-    let limit = if free >= 512 && free <= c.len() { free } else { c.len() };
+    let limit = if free >= 512 && free <= c.len() {
+        free
+    } else {
+        c.len()
+    };
     while p + 24 <= limit {
         if u32_at(c, p).ok() != Some(0x0000_2a2a) {
             break;
         }
         let size = u32_at(c, p + 4).unwrap_or(0) as usize;
         if size < 28 || p + size > c.len() {
-            ci.errors.push(format!("record at chunk offset {p}: bad size {size}"));
+            ci.errors
+                .push(format!("record at chunk offset {p}: bad size {size}"));
             break;
         }
         let mut r = Record {
@@ -296,7 +315,10 @@ fn leaf_texts(e: &XElem, out: &mut Vec<String>, depth: usize) {
 
 fn parse_systemtime_attr(s: &str) -> Option<i64> {
     // 2010-11-21T03:55:59.626427100Z
-    let (main, frac) = s.trim_end_matches('Z').split_once('.').unwrap_or((s.trim_end_matches('Z'), "0"));
+    let (main, frac) = s
+        .trim_end_matches('Z')
+        .split_once('.')
+        .unwrap_or((s.trim_end_matches('Z'), "0"));
     let dt = chrono::NaiveDateTime::parse_from_str(main, "%Y-%m-%dT%H:%M:%S").ok()?;
     let mut f = frac.to_string();
     f.truncate(9);
@@ -328,7 +350,9 @@ fn extract(nodes: &[XNode], r: &mut Record) {
             r.time_created = Some(t.to_string());
             r.time_created_ns = parse_systemtime_attr(t);
         }
-        r.record_id = sys.child("EventRecordID").and_then(|e| parse_num(&e.text()));
+        r.record_id = sys
+            .child("EventRecordID")
+            .and_then(|e| parse_num(&e.text()));
         if let Some(c) = sys.child("Correlation") {
             r.activity_id = c.attr("ActivityID").map(String::from);
             r.related_activity_id = c.attr("RelatedActivityID").map(String::from);
@@ -339,11 +363,18 @@ fn extract(nodes: &[XNode], r: &mut Record) {
         }
         r.channel = sys.child("Channel").map(|e| e.text());
         r.computer = sys.child("Computer").map(|e| e.text());
-        r.user_sid = sys.child("Security").and_then(|e| e.attr("UserID")).map(String::from);
+        r.user_sid = sys
+            .child("Security")
+            .and_then(|e| e.attr("UserID"))
+            .map(String::from);
     }
     if let Some(ed) = ev.child("EventData") {
         for d in ed.elems() {
-            let v = if d.has_elem_children() { elem_to_json(d, 0).to_string() } else { d.text() };
+            let v = if d.has_elem_children() {
+                elem_to_json(d, 0).to_string()
+            } else {
+                d.text()
+            };
             if d.name == "Data" {
                 match d.attr("Name") {
                     Some(n) => r.event_data.push((n.to_string(), v.clone())),
@@ -435,14 +466,25 @@ fn flatten_user_data(v: &Value, out: &mut Vec<(String, String)>, depth: usize) {
 pub fn record_event(r: &Record, sha: &str, path: &str) -> Vec<Event> {
     let eid = r.event_id.unwrap_or(0);
     let src = r.source_name().unwrap_or("").to_string();
-    let strings_repr = format!("[{}]", r.strings.iter().map(|s| format!("'{s}'")).collect::<Vec<_>>().join(", "));
+    let strings_repr = format!(
+        "[{}]",
+        r.strings
+            .iter()
+            .map(|s| format!("'{s}'"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
     let msg = format!(
         "[{eid} / 0x{eid:04x}] Source Name: {src} Strings: {strings_repr} Computer Name: {} Record Number: {} Event Level: {}",
         r.computer.clone().unwrap_or_default(),
         r.identifier,
         r.level.map(|l| l.to_string()).unwrap_or_default()
     );
-    let known = known_ids::lookup(eid, r.provider_name.as_deref().unwrap_or(""), r.channel.as_deref().unwrap_or(""));
+    let known = known_ids::lookup(
+        eid,
+        r.provider_name.as_deref().unwrap_or(""),
+        r.channel.as_deref().unwrap_or(""),
+    );
     let mut ed = Map::new();
     for (k, v) in &r.event_data {
         ed.insert(k.clone(), json!(v));
@@ -498,7 +540,13 @@ pub fn record_event(r: &Record, sha: &str, path: &str) -> Vec<Event> {
     base.host = r.computer.clone().filter(|c| !c.is_empty());
     base.source_short = "EVT".into();
     base.source_long = "WinEVTX".into();
-    let base = base.provenance(sha, path, r.identifier as i64, "evtx", crate::PARSER_VERSION);
+    let base = base.provenance(
+        sha,
+        path,
+        r.identifier as i64,
+        "evtx",
+        crate::PARSER_VERSION,
+    );
     let mut out = vec![base.clone()];
     if let (Some(tc), Some(w)) = (r.time_created_ns, r.written_ns) {
         if tc != w {
@@ -512,7 +560,10 @@ pub fn record_event(r: &Record, sha: &str, path: &str) -> Vec<Event> {
 }
 
 pub fn events(f: &EvtxFile, sha: &str, path: &str) -> Vec<Event> {
-    f.records.iter().flat_map(|r| record_event(r, sha, path)).collect()
+    f.records
+        .iter()
+        .flat_map(|r| record_event(r, sha, path))
+        .collect()
 }
 
 // ---------------------------------------------------------------- legacy .evt
@@ -541,12 +592,19 @@ pub struct EvtRecord {
 pub fn parse_evt(data: &[u8]) -> Result<Vec<EvtRecord>> {
     let sig = need(data, 4, 4)?;
     if sig != b"LfLe" || u32_at(data, 0)? != 0x30 {
-        return Err(ParseError::BadSignature { offset: 4, expected: "LfLe".into(), found: hex::encode(sig) });
+        return Err(ParseError::BadSignature {
+            offset: 4,
+            expected: "LfLe".into(),
+            found: hex::encode(sig),
+        });
     }
     let mut start = u32_at(data, 16)? as usize;
     let mut end = u32_at(data, 20)? as usize;
     // A dirty log keeps stale header offsets; the end-of-file record holds the current ones.
-    const EOF_SIG: [u8; 20] = [0x28, 0, 0, 0, 0x11, 0x11, 0x11, 0x11, 0x22, 0x22, 0x22, 0x22, 0x33, 0x33, 0x33, 0x33, 0x44, 0x44, 0x44, 0x44];
+    const EOF_SIG: [u8; 20] = [
+        0x28, 0, 0, 0, 0x11, 0x11, 0x11, 0x11, 0x22, 0x22, 0x22, 0x22, 0x33, 0x33, 0x33, 0x33,
+        0x44, 0x44, 0x44, 0x44,
+    ];
     if let Some(e) = data.windows(20).position(|w| w == EOF_SIG) {
         if let (Ok(s), Ok(en)) = (u32_at(data, e + 20), u32_at(data, e + 24)) {
             start = s as usize;
@@ -554,7 +612,11 @@ pub fn parse_evt(data: &[u8]) -> Result<Vec<EvtRecord>> {
         }
     }
     let in_window = |o: usize| -> bool {
-        if start <= end { o >= start && o < end } else { o >= start || (o < end && o >= 0x30) }
+        if start <= end {
+            o >= start && o < end
+        } else {
+            o >= start || (o < end && o >= 0x30)
+        }
     };
     let mut out = Vec::new();
     let mut p = 0x30usize;
@@ -632,9 +694,17 @@ fn parse_evt_record(rec: &[u8], p: usize) -> Result<EvtRecord> {
         event_category: u16_at(rec, 28)?,
         source_name: src,
         computer_name: comp,
-        user_sid: if sid_len > 0 { need(rec, sid_off, sid_len).ok().and_then(binxml::sid_string) } else { None },
+        user_sid: if sid_len > 0 {
+            need(rec, sid_off, sid_len)
+                .ok()
+                .and_then(binxml::sid_string)
+        } else {
+            None
+        },
         strings,
-        data_hex: need(rec, data_off, data_len).map(crate::util::hex_upper).unwrap_or_default(),
+        data_hex: need(rec, data_off, data_len)
+            .map(crate::util::hex_upper)
+            .unwrap_or_default(),
     })
 }
 
@@ -651,7 +721,10 @@ pub fn evt_events(recs: &[EvtRecord], sha: &str, path: &str) -> Vec<Event> {
             r.event_type,
             r.event_category
         );
-        for (t, d) in [(r.time_generated, desc::CREATION), (r.time_written, desc::WRITTEN)] {
+        for (t, d) in [
+            (r.time_generated, desc::CREATION),
+            (r.time_written, desc::WRITTEN),
+        ] {
             let mut e = Event::new("windows:evt:record", d, msg.clone())
                 .with_time(unix_secs_to_ns(t as i64))
                 .attr("event_identifier", r.event_identifier)
@@ -673,5 +746,8 @@ pub fn evt_events(recs: &[EvtRecord], sha: &str, path: &str) -> Vec<Event> {
 
 /// Summary for diagnostics: written times as RFC 3339.
 pub fn written_times(f: &EvtxFile) -> BTreeMap<u64, String> {
-    f.records.iter().filter_map(|r| r.written_ns.map(|t| (r.identifier, format_ns(t)))).collect()
+    f.records
+        .iter()
+        .filter_map(|r| r.written_ns.map(|t| (r.identifier, format_ns(t))))
+        .collect()
 }

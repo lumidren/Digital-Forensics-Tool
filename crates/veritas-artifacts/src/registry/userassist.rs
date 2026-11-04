@@ -13,7 +13,8 @@ use crate::regf::Hive;
 use crate::util::{u32_at, u64_at};
 use veritas_timeline::{desc, filetime_to_ns, Event};
 
-pub const USERASSIST_PATH: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\UserAssist";
+pub const USERASSIST_PATH: &str =
+    "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\UserAssist";
 
 /// ROT13 for ASCII letters; everything else unchanged.
 pub fn rot13(s: &str) -> String {
@@ -28,20 +29,50 @@ pub fn rot13(s: &str) -> String {
 
 /// Known-folder GUIDs commonly seen as UserAssist path prefixes.
 pub const KNOWN_FOLDERS: &[(&str, &str)] = &[
-    ("{0139D44E-6AFE-49F2-8690-3DAFCAE6FFB8}", "%ProgramData%\\Microsoft\\Windows\\Start Menu\\Programs"),
-    ("{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}", "%SystemRoot%\\System32"),
-    ("{374DE290-123F-4565-9164-39C4925E467B}", "%USERPROFILE%\\Downloads"),
+    (
+        "{0139D44E-6AFE-49F2-8690-3DAFCAE6FFB8}",
+        "%ProgramData%\\Microsoft\\Windows\\Start Menu\\Programs",
+    ),
+    (
+        "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}",
+        "%SystemRoot%\\System32",
+    ),
+    (
+        "{374DE290-123F-4565-9164-39C4925E467B}",
+        "%USERPROFILE%\\Downloads",
+    ),
     ("{5E6C858F-0E22-4760-9AFE-EA3317B67173}", "%USERPROFILE%"),
     ("{6D809377-6AF0-444B-8957-A3773F02200E}", "%ProgramFiles%"),
-    ("{7C5A40EF-A0FB-4BFC-874A-C0F2E0B9FA8E}", "%ProgramFiles(x86)%"),
+    (
+        "{7C5A40EF-A0FB-4BFC-874A-C0F2E0B9FA8E}",
+        "%ProgramFiles(x86)%",
+    ),
     ("{905E63B6-C1BF-494E-B29C-65B732D3D21A}", "%ProgramFiles%"),
-    ("{9E3995AB-1F9C-4F13-B827-48B24B6C7174}", "%APPDATA%\\Microsoft\\Internet Explorer\\Quick Launch\\User Pinned"),
-    ("{A77F5D77-2E2B-44C3-A6A2-ABA601054A51}", "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs"),
-    ("{B4BFCC3A-DB2C-424C-B029-7FE99A87C641}", "%USERPROFILE%\\Desktop"),
-    ("{D65231B0-B2F1-4857-A4CE-A8E7C6EA7D27}", "%SystemRoot%\\SysWOW64"),
+    (
+        "{9E3995AB-1F9C-4F13-B827-48B24B6C7174}",
+        "%APPDATA%\\Microsoft\\Internet Explorer\\Quick Launch\\User Pinned",
+    ),
+    (
+        "{A77F5D77-2E2B-44C3-A6A2-ABA601054A51}",
+        "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs",
+    ),
+    (
+        "{B4BFCC3A-DB2C-424C-B029-7FE99A87C641}",
+        "%USERPROFILE%\\Desktop",
+    ),
+    (
+        "{D65231B0-B2F1-4857-A4CE-A8E7C6EA7D27}",
+        "%SystemRoot%\\SysWOW64",
+    ),
     ("{F38BF404-1D43-42F2-9305-67DE0B28FC23}", "%SystemRoot%"),
-    ("{F7F1ED05-9F6D-47A2-AAAE-29D317C6F066}", "%ProgramFiles%\\Common Files"),
-    ("{FDD39AD0-238F-46AF-ADB4-6C85480369C7}", "%USERPROFILE%\\Documents"),
+    (
+        "{F7F1ED05-9F6D-47A2-AAAE-29D317C6F066}",
+        "%ProgramFiles%\\Common Files",
+    ),
+    (
+        "{FDD39AD0-238F-46AF-ADB4-6C85480369C7}",
+        "%USERPROFILE%\\Documents",
+    ),
 ];
 
 /// Replace a leading known-folder GUID with its environment path.
@@ -49,7 +80,10 @@ pub fn expand_known_folder(name: &str) -> String {
     if name.starts_with('{') {
         if let Some(end) = name.find('}') {
             let guid = &name[..=end];
-            if let Some((_, p)) = KNOWN_FOLDERS.iter().find(|(g, _)| g.eq_ignore_ascii_case(guid)) {
+            if let Some((_, p)) = KNOWN_FOLDERS
+                .iter()
+                .find(|(g, _)| g.eq_ignore_ascii_case(guid))
+            {
                 return format!("{p}{}", &name[end + 1..]);
             }
         }
@@ -78,9 +112,13 @@ pub struct UserAssistEntry {
 
 pub fn entries(hive: &Hive) -> Vec<UserAssistEntry> {
     let mut out = Vec::new();
-    let Some(ua) = hive.key(USERASSIST_PATH) else { return out };
+    let Some(ua) = hive.key(USERASSIST_PATH) else {
+        return out;
+    };
     for g in ua.subkeys() {
-        let Some(count_key) = g.subkey("Count") else { continue };
+        let Some(count_key) = g.subkey("Count") else {
+            continue;
+        };
         let rel = join(&join(USERASSIST_PATH, &g.name), &count_key.name);
         for (index, v) in count_key.values().into_iter().enumerate() {
             let decoded = rot13(&v.name);
@@ -125,12 +163,28 @@ pub fn events(hive: &Hive, ctx: &Ctx<'_>) -> Vec<Event> {
     entries(hive)
         .into_iter()
         .map(|e| {
-            let mut msg = format!("[{}] UserAssist entry: {} Value name: {} Count: {}", ctx.full_path(&e.key_rel_path), e.index, e.value_name, e.count);
+            let mut msg = format!(
+                "[{}] UserAssist entry: {} Value name: {} Count: {}",
+                ctx.full_path(&e.key_rel_path),
+                e.index,
+                e.value_name,
+                e.count
+            );
             if let (Some(fc), Some(fd)) = (e.focus_count, e.focus_duration_ms) {
-                msg.push_str(&format!(" Application focus count: {fc} Application focus duration: {fd}"));
+                msg.push_str(&format!(
+                    " Application focus count: {fc} Application focus duration: {fd}"
+                ));
             }
             let mut ev = ctx
-                .event("userassist", "windows:registry:userassist", desc::LAST_RUN, e.last_executed_ns, msg, &e.key_rel_path, e.key_offset)
+                .event(
+                    "userassist",
+                    "windows:registry:userassist",
+                    desc::LAST_RUN,
+                    e.last_executed_ns,
+                    msg,
+                    &e.key_rel_path,
+                    e.key_offset,
+                )
                 .attr("guid", e.guid)
                 .attr("value_name", e.value_name)
                 .attr("path", e.path)
@@ -153,7 +207,13 @@ mod tests {
     use super::*;
     #[test]
     fn registry_userassist_rot13() {
-        assert_eq!(rot13("HRZR_EHACVQY:%pfvqy2%\\ZFA.yax"), "UEME_RUNPIDL:%csidl2%\\MSN.lnk");
-        assert_eq!(expand_known_folder("{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\calc.exe"), "%SystemRoot%\\System32\\calc.exe");
+        assert_eq!(
+            rot13("HRZR_EHACVQY:%pfvqy2%\\ZFA.yax"),
+            "UEME_RUNPIDL:%csidl2%\\MSN.lnk"
+        );
+        assert_eq!(
+            expand_known_folder("{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\calc.exe"),
+            "%SystemRoot%\\System32\\calc.exe"
+        );
     }
 }

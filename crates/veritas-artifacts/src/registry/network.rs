@@ -60,18 +60,39 @@ pub struct NetworkProfile {
 }
 
 pub fn profiles(hive: &Hive) -> Vec<NetworkProfile> {
-    let mut sigs: BTreeMap<String, (Option<String>, Option<String>, Option<String>, String)> = BTreeMap::new();
+    let mut sigs: BTreeMap<String, (Option<String>, Option<String>, Option<String>, String)> =
+        BTreeMap::new();
     for kind in ["Managed", "Unmanaged"] {
         if let Some(k) = hive.key(&format!("{NETWORKLIST}\\Signatures\\{kind}")) {
             for s in k.subkeys() {
-                let Some(g) = s.value_string("ProfileGuid") else { continue };
-                let mac = s.value_bytes("DefaultGatewayMac").filter(|m| !m.is_empty()).map(|m| m.iter().map(|b| format!("{b:02X}")).collect::<Vec<_>>().join(":"));
-                sigs.insert(g.to_uppercase(), (s.value_string("DnsSuffix"), mac, s.value_string("FirstNetwork"), kind.to_string()));
+                let Some(g) = s.value_string("ProfileGuid") else {
+                    continue;
+                };
+                let mac = s
+                    .value_bytes("DefaultGatewayMac")
+                    .filter(|m| !m.is_empty())
+                    .map(|m| {
+                        m.iter()
+                            .map(|b| format!("{b:02X}"))
+                            .collect::<Vec<_>>()
+                            .join(":")
+                    });
+                sigs.insert(
+                    g.to_uppercase(),
+                    (
+                        s.value_string("DnsSuffix"),
+                        mac,
+                        s.value_string("FirstNetwork"),
+                        kind.to_string(),
+                    ),
+                );
             }
         }
     }
     let rel = format!("{NETWORKLIST}\\Profiles");
-    let Some(pk) = hive.key(&rel) else { return vec![] };
+    let Some(pk) = hive.key(&rel) else {
+        return vec![];
+    };
     pk.subkeys()
         .into_iter()
         .map(|p| {
@@ -84,8 +105,12 @@ pub fn profiles(hive: &Hive) -> Vec<NetworkProfile> {
                 description: p.value_string("Description"),
                 name_type: p.value_u32("NameType"),
                 category: p.value_u32("Category"),
-                created_ns: p.value_bytes("DateCreated").and_then(|b| systemtime_to_ns(&b)),
-                last_connected_ns: p.value_bytes("DateLastConnected").and_then(|b| systemtime_to_ns(&b)),
+                created_ns: p
+                    .value_bytes("DateCreated")
+                    .and_then(|b| systemtime_to_ns(&b)),
+                last_connected_ns: p
+                    .value_bytes("DateLastConnected")
+                    .and_then(|b| systemtime_to_ns(&b)),
                 dns_suffix: sig.as_ref().and_then(|s| s.0.clone()),
                 gateway_mac: sig.as_ref().and_then(|s| s.1.clone()),
                 first_network: sig.as_ref().and_then(|s| s.2.clone()),
@@ -114,7 +139,13 @@ pub fn profile_events(hive: &Hive, ctx: &Ctx<'_>) -> Vec<Event> {
                 .attr("ssid", p.profile_name.clone())
                 .attr("profile_guid", p.guid.clone())
                 .attr("connection_type", nt);
-            for (k, v) in [("description", &p.description), ("dns_suffix", &p.dns_suffix), ("default_gateway_mac", &p.gateway_mac), ("first_network", &p.first_network), ("signature_source", &p.signature_source)] {
+            for (k, v) in [
+                ("description", &p.description),
+                ("dns_suffix", &p.dns_suffix),
+                ("default_gateway_mac", &p.gateway_mac),
+                ("first_network", &p.first_network),
+                ("signature_source", &p.signature_source),
+            ] {
                 if let Some(v) = v {
                     e = e.attr(k, v.clone());
                 }
@@ -147,14 +178,28 @@ pub struct NetworkInterface {
 }
 
 pub const INTERFACE_VALUES: &[&str] = &[
-    "EnableDHCP", "DhcpIPAddress", "DhcpSubnetMask", "DhcpServer", "DhcpDefaultGateway", "DhcpNameServer", "DhcpDomain", "Domain",
-    "IPAddress", "SubnetMask", "DefaultGateway", "NameServer",
+    "EnableDHCP",
+    "DhcpIPAddress",
+    "DhcpSubnetMask",
+    "DhcpServer",
+    "DhcpDefaultGateway",
+    "DhcpNameServer",
+    "DhcpDomain",
+    "Domain",
+    "IPAddress",
+    "SubnetMask",
+    "DefaultGateway",
+    "NameServer",
 ];
 
 pub fn interfaces(hive: &Hive) -> Vec<NetworkInterface> {
-    let Some(ccs) = current_control_set(hive) else { return vec![] };
+    let Some(ccs) = current_control_set(hive) else {
+        return vec![];
+    };
     let rel = format!("{ccs}\\Services\\Tcpip\\Parameters\\Interfaces");
-    let Some(k) = hive.key(&rel) else { return vec![] };
+    let Some(k) = hive.key(&rel) else {
+        return vec![];
+    };
     k.subkeys()
         .into_iter()
         .map(|i| {
@@ -167,7 +212,11 @@ pub fn interfaces(hive: &Hive) -> Vec<NetworkInterface> {
                     }
                 }
             }
-            let t = |n: &str| i.value_u32(n).filter(|&v| v != 0).and_then(|v| unix_secs_to_ns(v as i64));
+            let t = |n: &str| {
+                i.value_u32(n)
+                    .filter(|&v| v != 0)
+                    .and_then(|v| unix_secs_to_ns(v as i64))
+            };
             NetworkInterface {
                 guid: i.name.clone(),
                 key_rel_path: join(&rel, &i.name),
@@ -186,7 +235,17 @@ pub fn interface_events(hive: &Hive, ctx: &Ctx<'_>) -> Vec<Event> {
     for i in interfaces(hive) {
         let summary: Vec<String> = i.values.iter().map(|(k, v)| format!("{k}: {v}")).collect();
         let mk = |d: &str, ts: Option<i64>| {
-            let mut e = ctx.event("network_interfaces", "windows:registry:network_interface", d, ts, format!("[{}] {}", ctx.full_path(&i.key_rel_path), summary.join(" ")), &i.key_rel_path, i.key_offset).attr("interface_guid", i.guid.clone());
+            let mut e = ctx
+                .event(
+                    "network_interfaces",
+                    "windows:registry:network_interface",
+                    d,
+                    ts,
+                    format!("[{}] {}", ctx.full_path(&i.key_rel_path), summary.join(" ")),
+                    &i.key_rel_path,
+                    i.key_offset,
+                )
+                .attr("interface_guid", i.guid.clone());
             for (k, v) in &i.values {
                 e = e.attr(&k.to_ascii_lowercase(), v.clone());
             }

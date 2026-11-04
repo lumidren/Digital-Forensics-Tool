@@ -44,7 +44,11 @@ fn confidence(total: u64, reused: u64) -> u8 {
 /// Recover deleted NTFS files (unnamed $DATA stream).
 pub fn recover_ntfs(fs: &Ntfs) -> Result<Vec<Recovered>> {
     let bitmap = fs.read_entry_data(6, "").unwrap_or_default();
-    let allocated = |lcn: u64| bitmap.get((lcn / 8) as usize).is_some_and(|b| b & (1 << (lcn % 8)) != 0);
+    let allocated = |lcn: u64| {
+        bitmap
+            .get((lcn / 8) as usize)
+            .is_some_and(|b| b & (1 << (lcn % 8)) != 0)
+    };
     let mut out = Vec::new();
     for e in fs.entries()? {
         if e.in_use || !e.is_base() || e.is_dir {
@@ -75,7 +79,9 @@ pub fn recover_ntfs(fs: &Ntfs) -> Result<Vec<Recovered>> {
             }
             (confidence(total, reused), total, reused, "data_runs")
         };
-        let Ok(data) = fs.read_stream(d) else { continue };
+        let Ok(data) = fs.read_stream(d) else {
+            continue;
+        };
         out.push(Recovered {
             fs_type: "NTFS".into(),
             id: e.entry,
@@ -98,12 +104,17 @@ pub fn recover_ntfs(fs: &Ntfs) -> Result<Vec<Recovered>> {
 pub fn recover_fat(fs: &FatFs) -> Result<Vec<Recovered>> {
     let mut out = Vec::new();
     for e in fs.walk(true)? {
-        if !e.deleted || e.is_dir || e.size == 0 || e.first_cluster < 2 || e.size > MAX_RECOVER_SIZE {
+        if !e.deleted || e.is_dir || e.size == 0 || e.first_cluster < 2 || e.size > MAX_RECOVER_SIZE
+        {
             continue;
         }
         let n = e.size.div_ceil(fs.cluster_size);
-        let reused = (0..n).filter(|k| fs.cluster_allocated(e.first_cluster.saturating_add(*k as u32))).count() as u64;
-        let Ok(data) = fs.read_contiguous(e.first_cluster, e.size) else { continue };
+        let reused = (0..n)
+            .filter(|k| fs.cluster_allocated(e.first_cluster.saturating_add(*k as u32)))
+            .count() as u64;
+        let Ok(data) = fs.read_contiguous(e.first_cluster, e.size) else {
+            continue;
+        };
         out.push(Recovered {
             fs_type: fs.kind.name().into(),
             id: e.dir_entry_offset,
@@ -113,7 +124,11 @@ pub fn recover_fat(fs: &FatFs) -> Result<Vec<Recovered>> {
             recovered_confidence: confidence(n, reused),
             total_clusters: n,
             reused_clusters: reused,
-            method: if e.no_fat_chain { "contiguous_nofatchain".into() } else { "contiguous_from_first_cluster".into() },
+            method: if e.no_fat_chain {
+                "contiguous_nofatchain".into()
+            } else {
+                "contiguous_from_first_cluster".into()
+            },
             sha256: veritas_hash::sha256_hex(&data),
             data,
         });
@@ -127,7 +142,11 @@ pub fn write_recovered(out_dir: &Path, items: &[Recovered]) -> Result<Vec<PathBu
     std::fs::create_dir_all(out_dir)?;
     let mut v = Vec::new();
     for r in items {
-        let p = out_dir.join(format!("{}_{}", r.id, crate::harvest::sanitize_component(&r.name)));
+        let p = out_dir.join(format!(
+            "{}_{}",
+            r.id,
+            crate::harvest::sanitize_component(&r.name)
+        ));
         std::fs::write(&p, &r.data)?;
         v.push(p);
     }

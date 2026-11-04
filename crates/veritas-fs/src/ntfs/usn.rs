@@ -61,7 +61,11 @@ const REASONS: &[(u32, &str)] = &[
 pub const DATA_CHANGE_MASK: u32 = 0x0000_0077;
 
 pub fn reason_names(r: u32) -> Vec<String> {
-    REASONS.iter().filter(|(b, _)| r & b != 0).map(|(_, n)| n.to_string()).collect()
+    REASONS
+        .iter()
+        .filter(|(b, _)| r & b != 0)
+        .map(|(_, n)| n.to_string())
+        .collect()
 }
 
 fn parse_one(d: &[u8], pos: usize, base: u64) -> Option<(UsnRecord, usize)> {

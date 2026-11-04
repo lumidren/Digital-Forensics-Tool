@@ -45,11 +45,15 @@ impl fmt::Debug for ExaminerKey {
 
 impl ExaminerKey {
     pub fn generate() -> Self {
-        Self { signing: SigningKey::generate(&mut OsRng) }
+        Self {
+            signing: SigningKey::generate(&mut OsRng),
+        }
     }
 
     pub fn from_bytes(secret: &[u8; 32]) -> Self {
-        Self { signing: SigningKey::from_bytes(secret) }
+        Self {
+            signing: SigningKey::from_bytes(secret),
+        }
     }
 
     pub fn signing_key(&self) -> &SigningKey {
@@ -77,7 +81,10 @@ impl ExaminerKey {
         let kek = derive_kek(passphrase, &salt)?;
         let cipher = XChaCha20Poly1305::new((&*kek).into());
         let ciphertext = cipher
-            .encrypt(XNonce::from_slice(&nonce), self.signing.to_bytes().as_slice())
+            .encrypt(
+                XNonce::from_slice(&nonce),
+                self.signing.to_bytes().as_slice(),
+            )
             .map_err(|_| KeyError::Decrypt)?;
         let file = EncryptedKeyFile {
             version: 1,
@@ -89,7 +96,8 @@ impl ExaminerKey {
             nonce: hex::encode(nonce),
             ciphertext: hex::encode(ciphertext),
         };
-        let json = serde_json::to_string_pretty(&file).map_err(|e| KeyError::Malformed(e.to_string()))?;
+        let json =
+            serde_json::to_string_pretty(&file).map_err(|e| KeyError::Malformed(e.to_string()))?;
         std::fs::write(path, json)?;
         Ok(())
     }
@@ -99,7 +107,10 @@ impl ExaminerKey {
         let file: EncryptedKeyFile =
             serde_json::from_str(&text).map_err(|e| KeyError::Malformed(e.to_string()))?;
         if file.version != 1 {
-            return Err(KeyError::Malformed(format!("unsupported version {}", file.version)));
+            return Err(KeyError::Malformed(format!(
+                "unsupported version {}",
+                file.version
+            )));
         }
         let salt = hex::decode(&file.salt).map_err(|e| KeyError::Malformed(e.to_string()))?;
         let nonce = hex::decode(&file.nonce).map_err(|e| KeyError::Malformed(e.to_string()))?;
@@ -107,12 +118,16 @@ impl ExaminerKey {
         let kek = derive_kek(passphrase, &salt)?;
         let cipher = XChaCha20Poly1305::new((&*kek).into());
         let pt = Zeroizing::new(
-            cipher.decrypt(XNonce::from_slice(&nonce), ct.as_slice()).map_err(|_| KeyError::Decrypt)?,
+            cipher
+                .decrypt(XNonce::from_slice(&nonce), ct.as_slice())
+                .map_err(|_| KeyError::Decrypt)?,
         );
         let secret: [u8; 32] = pt.as_slice().try_into().map_err(|_| KeyError::Decrypt)?;
         let key = Self::from_bytes(&secret);
         if key.key_id() != file.key_id {
-            return Err(KeyError::Malformed("key id does not match public key".into()));
+            return Err(KeyError::Malformed(
+                "key id does not match public key".into(),
+            ));
         }
         Ok(key)
     }
@@ -155,7 +170,10 @@ mod tests {
         assert!(!text.contains(&hex::encode(k.signing.to_bytes())));
         let loaded = ExaminerKey::load_encrypted(&path, "correct horse").unwrap();
         assert_eq!(loaded.key_id(), k.key_id());
-        assert!(matches!(ExaminerKey::load_encrypted(&path, "wrong"), Err(KeyError::Decrypt)));
+        assert!(matches!(
+            ExaminerKey::load_encrypted(&path, "wrong"),
+            Err(KeyError::Decrypt)
+        ));
     }
 
     #[test]

@@ -86,7 +86,10 @@ pub fn parse_file_header(buf: &[u8]) -> Result<u16> {
         return Err(EwfError::InvalidSignature);
     }
     if buf[8] != 1 {
-        return Err(EwfError::Corrupt(format!("unexpected fields-start byte {:#x}", buf[8])));
+        return Err(EwfError::Corrupt(format!(
+            "unexpected fields-start byte {:#x}",
+            buf[8]
+        )));
     }
     let segment = u16_le(&buf[9..11]);
     if segment == 0 {
@@ -124,11 +127,19 @@ impl SectionDescriptor {
         let stored = u32_le(&buf[72..76]);
         let calc = adler32(&buf[..72]);
         if stored != calc {
-            return Err(EwfError::Checksum { what: "section descriptor".into(), stored, calculated: calc });
+            return Err(EwfError::Checksum {
+                what: "section descriptor".into(),
+                stored,
+                calculated: calc,
+            });
         }
         let end = buf[..16].iter().position(|&b| b == 0).unwrap_or(16);
         let kind = String::from_utf8_lossy(&buf[..end]).into_owned();
-        Ok(Self { kind, next_offset: u64_le(&buf[16..24]), size: u64_le(&buf[24..32]) })
+        Ok(Self {
+            kind,
+            next_offset: u64_le(&buf[16..24]),
+            size: u64_le(&buf[24..32]),
+        })
     }
 }
 
@@ -194,19 +205,32 @@ impl VolumeInfo {
     }
 
     pub fn media_size(&self) -> u64 {
-        self.sector_count.saturating_mul(self.bytes_per_sector as u64)
+        self.sector_count
+            .saturating_mul(self.bytes_per_sector as u64)
     }
 
     /// Reject geometries that cannot describe a real image before any allocation is sized from them.
     pub fn validate(&self) -> Result<()> {
         if self.bytes_per_sector == 0 || self.bytes_per_sector > 1 << 20 {
-            return Err(EwfError::Corrupt(format!("bytes per sector {} out of range", self.bytes_per_sector)));
+            return Err(EwfError::Corrupt(format!(
+                "bytes per sector {} out of range",
+                self.bytes_per_sector
+            )));
         }
         if self.sectors_per_chunk == 0 || self.chunk_size() > MAX_CHUNK_SIZE {
-            return Err(EwfError::Corrupt(format!("sectors per chunk {} out of range", self.sectors_per_chunk)));
+            return Err(EwfError::Corrupt(format!(
+                "sectors per chunk {} out of range",
+                self.sectors_per_chunk
+            )));
         }
-        if self.sector_count.checked_mul(self.bytes_per_sector as u64).is_none() {
-            return Err(EwfError::Corrupt("sector count overflows media size".into()));
+        if self
+            .sector_count
+            .checked_mul(self.bytes_per_sector as u64)
+            .is_none()
+        {
+            return Err(EwfError::Corrupt(
+                "sector count overflows media size".into(),
+            ));
         }
         Ok(())
     }
@@ -233,7 +257,11 @@ impl VolumeInfo {
             let stored = u32_le(&buf[VOLUME_SIZE - 4..VOLUME_SIZE]);
             let calc = adler32(&buf[..VOLUME_SIZE - 4]);
             if stored != calc {
-                return Err(EwfError::Checksum { what: "volume section".into(), stored, calculated: calc });
+                return Err(EwfError::Checksum {
+                    what: "volume section".into(),
+                    stored,
+                    calculated: calc,
+                });
             }
             let mut id = [0u8; 16];
             id.copy_from_slice(&buf[64..80]);
@@ -255,7 +283,11 @@ impl VolumeInfo {
             let stored = u32_le(&buf[90..94]);
             let calc = adler32(&buf[..90]);
             if stored != calc {
-                return Err(EwfError::Checksum { what: "disk section".into(), stored, calculated: calc });
+                return Err(EwfError::Checksum {
+                    what: "disk section".into(),
+                    stored,
+                    calculated: calc,
+                });
             }
             let v = Self {
                 media_type: MediaType::Fixed,
@@ -310,7 +342,11 @@ impl TableSection {
         let stored = u32_le(&buf[20..24]);
         let calc = adler32(&buf[..20]);
         if stored != calc {
-            return Err(EwfError::Checksum { what: "table header".into(), stored, calculated: calc });
+            return Err(EwfError::Checksum {
+                what: "table header".into(),
+                stored,
+                calculated: calc,
+            });
         }
         let n = u32_le(&buf[0..4]) as usize;
         if n > 65535 {
@@ -321,15 +357,25 @@ impl TableSection {
         if buf.len() < end {
             return Err(EwfError::Truncated("table entries"));
         }
-        let entries: Vec<u32> = buf[TABLE_HEADER_SIZE..end].chunks_exact(4).map(u32_le).collect();
+        let entries: Vec<u32> = buf[TABLE_HEADER_SIZE..end]
+            .chunks_exact(4)
+            .map(u32_le)
+            .collect();
         if buf.len() >= end + 4 {
             let stored = u32_le(&buf[end..end + 4]);
             let calc = adler32(&buf[TABLE_HEADER_SIZE..end]);
             if stored != calc {
-                return Err(EwfError::Checksum { what: "table entries".into(), stored, calculated: calc });
+                return Err(EwfError::Checksum {
+                    what: "table entries".into(),
+                    stored,
+                    calculated: calc,
+                });
             }
         }
-        Ok(Self { base_offset, entries })
+        Ok(Self {
+            base_offset,
+            entries,
+        })
     }
 }
 
@@ -349,7 +395,11 @@ pub fn parse_hash_section(buf: &[u8]) -> Result<[u8; 16]> {
     let stored = u32_le(&buf[32..36]);
     let calc = adler32(&buf[..32]);
     if stored != calc {
-        return Err(EwfError::Checksum { what: "hash section".into(), stored, calculated: calc });
+        return Err(EwfError::Checksum {
+            what: "hash section".into(),
+            stored,
+            calculated: calc,
+        });
     }
     let mut md5 = [0u8; 16];
     md5.copy_from_slice(&buf[..16]);
@@ -373,7 +423,11 @@ pub fn parse_digest_section(buf: &[u8]) -> Result<([u8; 16], [u8; 20])> {
     let stored = u32_le(&buf[76..80]);
     let calc = adler32(&buf[..76]);
     if stored != calc {
-        return Err(EwfError::Checksum { what: "digest section".into(), stored, calculated: calc });
+        return Err(EwfError::Checksum {
+            what: "digest section".into(),
+            stored,
+            calculated: calc,
+        });
     }
     let mut md5 = [0u8; 16];
     md5.copy_from_slice(&buf[..16]);
@@ -397,8 +451,10 @@ pub fn encode_error2_section(ranges: &[BadSectorRange]) -> Result<Vec<u8>> {
     out[ERROR2_HEADER_SIZE - 4..].copy_from_slice(&chk.to_le_bytes());
     let start = out.len();
     for r in ranges {
-        let first = u32::try_from(r.first_sector).map_err(|_| EwfError::InvalidInput("bad sector beyond 32-bit range".into()))?;
-        let count = u32::try_from(r.sector_count).map_err(|_| EwfError::InvalidInput("bad sector run beyond 32-bit range".into()))?;
+        let first = u32::try_from(r.first_sector)
+            .map_err(|_| EwfError::InvalidInput("bad sector beyond 32-bit range".into()))?;
+        let count = u32::try_from(r.sector_count)
+            .map_err(|_| EwfError::InvalidInput("bad sector run beyond 32-bit range".into()))?;
         out.extend_from_slice(&first.to_le_bytes());
         out.extend_from_slice(&count.to_le_bytes());
     }
@@ -414,7 +470,11 @@ pub fn parse_error2_section(buf: &[u8]) -> Result<Vec<BadSectorRange>> {
     let stored = u32_le(&buf[ERROR2_HEADER_SIZE - 4..ERROR2_HEADER_SIZE]);
     let calc = adler32(&buf[..ERROR2_HEADER_SIZE - 4]);
     if stored != calc {
-        return Err(EwfError::Checksum { what: "error2 header".into(), stored, calculated: calc });
+        return Err(EwfError::Checksum {
+            what: "error2 header".into(),
+            stored,
+            calculated: calc,
+        });
     }
     let n = u32_le(&buf[..4]);
     if n > MAX_ERROR2_ENTRIES {
@@ -426,7 +486,10 @@ pub fn parse_error2_section(buf: &[u8]) -> Result<Vec<BadSectorRange>> {
     }
     Ok(buf[ERROR2_HEADER_SIZE..end]
         .chunks_exact(8)
-        .map(|e| BadSectorRange { first_sector: u32_le(&e[..4]) as u64, sector_count: u32_le(&e[4..8]) as u64 })
+        .map(|e| BadSectorRange {
+            first_sector: u32_le(&e[..4]) as u64,
+            sector_count: u32_le(&e[4..8]) as u64,
+        })
         .collect())
 }
 
@@ -500,14 +563,30 @@ pub struct EwfHeader {
 }
 
 fn sanitize(s: &str) -> String {
-    s.chars().map(|c| if c == '\t' || c == '\n' || c == '\r' { ' ' } else { c }).collect()
+    s.chars()
+        .map(|c| {
+            if c == '\t' || c == '\n' || c == '\r' {
+                ' '
+            } else {
+                c
+            }
+        })
+        .collect()
 }
 
 /// The EnCase `header` section stores local wall-clock time (libewf interprets it that way);
 /// `header2` stores POSIX seconds and is authoritative.
 fn header_date(d: &DateTime<Utc>) -> String {
     let d = d.with_timezone(&Local);
-    format!("{} {} {} {} {} {}", d.year(), d.month(), d.day(), d.hour(), d.minute(), d.second())
+    format!(
+        "{} {} {} {} {} {}",
+        d.year(),
+        d.month(),
+        d.day(),
+        d.hour(),
+        d.minute(),
+        d.second()
+    )
 }
 
 impl EwfHeader {
@@ -515,7 +594,12 @@ impl EwfHeader {
     pub fn to_header_string(&self, compression: Compression) -> String {
         let epoch = DateTime::<Utc>::UNIX_EPOCH;
         let m = header_date(self.acquiry_date.as_ref().unwrap_or(&epoch));
-        let u = header_date(self.system_date.as_ref().or(self.acquiry_date.as_ref()).unwrap_or(&epoch));
+        let u = header_date(
+            self.system_date
+                .as_ref()
+                .or(self.acquiry_date.as_ref())
+                .unwrap_or(&epoch),
+        );
         format!(
             "1\r\nmain\r\nc\tn\ta\te\tt\tav\tov\tm\tu\tp\tr\r\n{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t0\t{}\r\n\r\n",
             sanitize(&self.case_number),
@@ -534,7 +618,11 @@ impl EwfHeader {
     /// EnCase 6 style `header2` string (encoded as UTF-16LE with BOM, LF line ends).
     pub fn to_header2_string(&self) -> String {
         let m = self.acquiry_date.map(|d| d.timestamp()).unwrap_or(0);
-        let u = self.system_date.or(self.acquiry_date).map(|d| d.timestamp()).unwrap_or(0);
+        let u = self
+            .system_date
+            .or(self.acquiry_date)
+            .map(|d| d.timestamp())
+            .unwrap_or(0);
         format!(
             "3\nmain\na\tc\tn\te\tt\tmd\tsn\tav\tov\tm\tu\tp\tdc\n{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t0\t\n\n\
              srce\n0\t1\np\tn\tid\tev\ttb\tlo\tpo\tah\tgu\taq\n0\t0\n\t\t\t\t\t-1\t-1\t\t\t\n\n\
@@ -588,7 +676,9 @@ impl EwfHeader {
             }
             "p" => {}
             other => {
-                self.raw.entry(other.to_string()).or_insert_with(|| value.to_string());
+                self.raw
+                    .entry(other.to_string())
+                    .or_insert_with(|| value.to_string());
             }
         }
     }
@@ -596,9 +686,16 @@ impl EwfHeader {
     /// Parse a decoded header string (either flavour) into `self`.
     pub fn parse_into(&mut self, text: &str, is_header2: bool) -> Result<()> {
         let lines: Vec<&str> = text.split('\n').map(|l| l.trim_end_matches('\r')).collect();
-        let main = lines.iter().position(|l| *l == "main").ok_or_else(|| EwfError::Corrupt("header has no main table".into()))?;
-        let ids = lines.get(main + 1).ok_or_else(|| EwfError::Corrupt("header has no identifiers".into()))?;
-        let values = lines.get(main + 2).ok_or_else(|| EwfError::Corrupt("header has no values".into()))?;
+        let main = lines
+            .iter()
+            .position(|l| *l == "main")
+            .ok_or_else(|| EwfError::Corrupt("header has no main table".into()))?;
+        let ids = lines
+            .get(main + 1)
+            .ok_or_else(|| EwfError::Corrupt("header has no identifiers".into()))?;
+        let values = lines
+            .get(main + 2)
+            .ok_or_else(|| EwfError::Corrupt("header has no values".into()))?;
         let values: Vec<&str> = values.split('\t').collect();
         for (i, id) in ids.split('\t').enumerate() {
             self.absorb(id, values.get(i).copied().unwrap_or(""), is_header2);
@@ -623,26 +720,43 @@ pub fn parse_date(value: &str, is_header2: bool) -> Option<DateTime<Utc>> {
     if parts.len() == 6 {
         let nums: Option<Vec<u32>> = parts.iter().map(|p| p.parse::<u32>().ok()).collect();
         if let Some(n) = nums {
-            return Local.with_ymd_and_hms(n[0] as i32, n[1], n[2], n[3], n[4], n[5]).earliest().map(|d| d.with_timezone(&Utc));
+            return Local
+                .with_ymd_and_hms(n[0] as i32, n[1], n[2], n[3], n[4], n[5])
+                .earliest()
+                .map(|d| d.with_timezone(&Utc));
         }
     }
     if parts.len() == 5 {
-        let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        let month = months.iter().position(|m| m.eq_ignore_ascii_case(parts[1]))? as u32 + 1;
+        let months = [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        ];
+        let month = months
+            .iter()
+            .position(|m| m.eq_ignore_ascii_case(parts[1]))? as u32
+            + 1;
         let day = parts[2].parse::<u32>().ok()?;
         let hms: Vec<u32> = parts[3].split(':').filter_map(|x| x.parse().ok()).collect();
         let year = parts[4].parse::<i32>().ok()?;
         if hms.len() == 3 {
-            return Local.with_ymd_and_hms(year, month, day, hms[0], hms[1], hms[2]).earliest().map(|d| d.with_timezone(&Utc));
+            return Local
+                .with_ymd_and_hms(year, month, day, hms[0], hms[1], hms[2])
+                .earliest()
+                .map(|d| d.with_timezone(&Utc));
         }
     }
-    value.parse::<i64>().ok().and_then(|ts| Utc.timestamp_opt(ts, 0).single())
+    value
+        .parse::<i64>()
+        .ok()
+        .and_then(|ts| Utc.timestamp_opt(ts, 0).single())
 }
 
 /// zlib-compress a buffer at the given level.
 pub fn zlib_compress(data: &[u8], level: u32) -> Vec<u8> {
     use std::io::Write;
-    let mut enc = flate2::write::ZlibEncoder::new(Vec::with_capacity(data.len() / 2 + 64), flate2::Compression::new(level));
+    let mut enc = flate2::write::ZlibEncoder::new(
+        Vec::with_capacity(data.len() / 2 + 64),
+        flate2::Compression::new(level),
+    );
     // Writing into a Vec cannot fail; an error here would only come from the allocator.
     if enc.write_all(data).is_err() {
         return Vec::new();
@@ -654,9 +768,15 @@ pub fn zlib_compress(data: &[u8], level: u32) -> Vec<u8> {
 pub fn zlib_decompress(data: &[u8], max_out: usize) -> Result<Vec<u8>> {
     let mut dec = flate2::read::ZlibDecoder::new(data);
     let mut out = Vec::with_capacity(max_out.min(1 << 20));
-    (&mut dec).take(max_out as u64 + 1).read_to_end(&mut out).map_err(|e| EwfError::Corrupt(format!("zlib: {}", e)))?;
+    (&mut dec)
+        .take(max_out as u64 + 1)
+        .read_to_end(&mut out)
+        .map_err(|e| EwfError::Corrupt(format!("zlib: {}", e)))?;
     if out.len() > max_out {
-        return Err(EwfError::Corrupt(format!("decompressed data exceeds {} bytes", max_out)));
+        return Err(EwfError::Corrupt(format!(
+            "decompressed data exceeds {} bytes",
+            max_out
+        )));
     }
     Ok(out)
 }
@@ -684,7 +804,10 @@ pub fn decode_header_section(payload: &[u8]) -> Result<String> {
         return Ok(String::from_utf16_lossy(&units));
     }
     if raw.len() >= 2 && raw[0] == 0xfe && raw[1] == 0xff {
-        let units: Vec<u16> = raw[2..].chunks_exact(2).map(|b| u16::from_be_bytes([b[0], b[1]])).collect();
+        let units: Vec<u16> = raw[2..]
+            .chunks_exact(2)
+            .map(|b| u16::from_be_bytes([b[0], b[1]]))
+            .collect();
         return Ok(String::from_utf16_lossy(&units));
     }
     Ok(raw.iter().map(|&b| b as char).collect())
@@ -696,7 +819,11 @@ pub fn segment_extension(first_ext: &str, n: u32) -> Option<String> {
     if n == 0 {
         return None;
     }
-    let lower = first_ext.chars().next().map(|c| c.is_ascii_lowercase()).unwrap_or(false);
+    let lower = first_ext
+        .chars()
+        .next()
+        .map(|c| c.is_ascii_lowercase())
+        .unwrap_or(false);
     let first = first_ext.chars().next().unwrap_or('E').to_ascii_uppercase();
     let ext = if n <= 99 {
         format!("{}{:02}", first, n)
@@ -723,19 +850,34 @@ mod tests {
         assert_eq!(adler32(b"Wikipedia"), 0x11E6_0398);
         let big = vec![0xabu8; 100_000];
         let z = zlib_compress(&big, 1);
-        let trailer = u32::from_be_bytes([z[z.len() - 4], z[z.len() - 3], z[z.len() - 2], z[z.len() - 1]]);
+        let trailer = u32::from_be_bytes([
+            z[z.len() - 4],
+            z[z.len() - 3],
+            z[z.len() - 2],
+            z[z.len() - 1],
+        ]);
         assert_eq!(adler32(&big), trailer);
     }
 
     #[test]
     fn descriptor_roundtrip_and_checksum() {
-        let d = SectionDescriptor { kind: "sectors".into(), next_offset: 1234, size: 999 };
+        let d = SectionDescriptor {
+            kind: "sectors".into(),
+            next_offset: 1234,
+            size: 999,
+        };
         let enc = d.encode();
         assert_eq!(SectionDescriptor::parse(&enc).unwrap(), d);
         let mut bad = enc;
         bad[20] ^= 1;
-        assert!(matches!(SectionDescriptor::parse(&bad), Err(EwfError::Checksum { .. })));
-        assert!(matches!(SectionDescriptor::parse(&bad[..10]), Err(EwfError::Truncated(_))));
+        assert!(matches!(
+            SectionDescriptor::parse(&bad),
+            Err(EwfError::Checksum { .. })
+        ));
+        assert!(matches!(
+            SectionDescriptor::parse(&bad[..10]),
+            Err(EwfError::Truncated(_))
+        ));
     }
 
     #[test]
@@ -756,10 +898,25 @@ mod tests {
 
     #[test]
     fn table_and_error2_roundtrip() {
-        let t = TableSection { base_offset: 1871, entries: vec![0x8000_004c, 0x4c, 0x8000_1234] };
+        let t = TableSection {
+            base_offset: 1871,
+            entries: vec![0x8000_004c, 0x4c, 0x8000_1234],
+        };
         assert_eq!(TableSection::parse(&t.encode()).unwrap(), t);
-        let r = vec![BadSectorRange { first_sector: 10, sector_count: 2 }, BadSectorRange { first_sector: 99, sector_count: 1 }];
-        assert_eq!(parse_error2_section(&encode_error2_section(&r).unwrap()).unwrap(), r);
+        let r = vec![
+            BadSectorRange {
+                first_sector: 10,
+                sector_count: 2,
+            },
+            BadSectorRange {
+                first_sector: 99,
+                sector_count: 1,
+            },
+        ];
+        assert_eq!(
+            parse_error2_section(&encode_error2_section(&r).unwrap()).unwrap(),
+            r
+        );
     }
 
     #[test]
@@ -777,8 +934,20 @@ mod tests {
             ..Default::default()
         };
         let mut back = EwfHeader::default();
-        back.parse_into(&decode_header_section(&encode_header2_section(&h.to_header2_string(), 9)).unwrap(), true).unwrap();
-        back.parse_into(&decode_header_section(&encode_header_section(&h.to_header_string(Compression::Best), 9)).unwrap(), false).unwrap();
+        back.parse_into(
+            &decode_header_section(&encode_header2_section(&h.to_header2_string(), 9)).unwrap(),
+            true,
+        )
+        .unwrap();
+        back.parse_into(
+            &decode_header_section(&encode_header_section(
+                &h.to_header_string(Compression::Best),
+                9,
+            ))
+            .unwrap(),
+            false,
+        )
+        .unwrap();
         assert_eq!(back.case_number, "C-1");
         assert_eq!(back.evidence_number, "E 1");
         assert_eq!(back.examiner_name, "alice");
@@ -803,7 +972,10 @@ mod tests {
     fn date_formats() {
         let want = Utc.with_ymd_and_hms(2013, 12, 10, 11, 28, 38).single();
         assert_eq!(parse_date("1386674918", true), want);
-        let local = Local.with_ymd_and_hms(2013, 12, 10, 12, 28, 38).earliest().map(|d| d.with_timezone(&Utc));
+        let local = Local
+            .with_ymd_and_hms(2013, 12, 10, 12, 28, 38)
+            .earliest()
+            .map(|d| d.with_timezone(&Utc));
         assert_eq!(parse_date("2013 12 10 12 28 38", false), local);
         assert_eq!(parse_date("Tue Dec 10 12:28:38 2013", false), local);
         assert_eq!(parse_date("", false), None);

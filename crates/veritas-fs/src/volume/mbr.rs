@@ -99,8 +99,17 @@ impl Mbr {
         // code. Treat as boot sector when status bytes are not 0x00/0x80 or an OEM file-system name exists.
         let bad_status = (0..4).any(|i| !matches!(s[446 + i * 16], 0x00 | 0x80));
         let oem = &s[3..11];
-        let fs_oem = oem == b"NTFS    " || oem == b"EXFAT   " || &s[0x36..0x3B] == b"FAT12" || &s[0x36..0x3B] == b"FAT16" || &s[0x52..0x57] == b"FAT32" || oem == b"-FVE-FS-";
-        Ok(Self { entries, disk_signature: u32_at(&s, 440)?, looks_like_boot_sector: bad_status || fs_oem })
+        let fs_oem = oem == b"NTFS    "
+            || oem == b"EXFAT   "
+            || &s[0x36..0x3B] == b"FAT12"
+            || &s[0x36..0x3B] == b"FAT16"
+            || &s[0x52..0x57] == b"FAT32"
+            || oem == b"-FVE-FS-";
+        Ok(Self {
+            entries,
+            disk_signature: u32_at(&s, 440)?,
+            looks_like_boot_sector: bad_status || fs_oem,
+        })
     }
 }
 
@@ -146,8 +155,12 @@ pub fn to_volume_system(src: &dyn ReadAt, mbr: &Mbr) -> Result<VolumeSystem> {
             if !seen.insert(ebr) {
                 break; // loop in the chain
             }
-            let Some(off) = ebr.checked_mul(SECTOR) else { break };
-            let Ok(s) = read_vec(src, off, SECTOR) else { break };
+            let Some(off) = ebr.checked_mul(SECTOR) else {
+                break;
+            };
+            let Ok(s) = read_vec(src, off, SECTOR) else {
+                break;
+            };
             if u16_at(&s, 510)? != 0xAA55 {
                 break;
             }
@@ -169,5 +182,12 @@ pub fn to_volume_system(src: &dyn ReadAt, mbr: &Mbr) -> Result<VolumeSystem> {
             }
         }
     }
-    Ok(VolumeSystem { scheme: "mbr".into(), sector_size: SECTOR, partitions: parts, gpt_header_crc_ok: None, gpt_entries_crc_ok: None, disk_guid: format!("{:08x}", mbr.disk_signature) })
+    Ok(VolumeSystem {
+        scheme: "mbr".into(),
+        sector_size: SECTOR,
+        partitions: parts,
+        gpt_header_crc_ok: None,
+        gpt_entries_crc_ok: None,
+        disk_guid: format!("{:08x}", mbr.disk_signature),
+    })
 }

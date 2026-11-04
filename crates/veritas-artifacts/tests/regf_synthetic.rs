@@ -1,7 +1,9 @@
 //! REGF features that the public corpus does not exercise, on hives built in-test:
 //! big data (`db`), resident data, nested `ri` lists, cycles, depth cap, deleted-cell recovery,
 //! new-format transaction-log replay and BAM.
-use veritas_artifacts::regf::{base_block_checksum, marvin32, Hive, ValueData, ValueType, MARVIN32_REGISTRY_SEED};
+use veritas_artifacts::regf::{
+    base_block_checksum, marvin32, Hive, ValueData, ValueType, MARVIN32_REGISTRY_SEED,
+};
 use veritas_artifacts::registry::{bam, events_from_hive, HiveKind, Provenance};
 
 const FT: u64 = 132_000_000_000_000_000; // 2019-04-12
@@ -13,7 +15,9 @@ struct B {
 
 impl B {
     fn new() -> Self {
-        B { region: vec![0u8; 32] }
+        B {
+            region: vec![0u8; 32],
+        }
     }
     fn alloc(&mut self, data: &[u8]) -> u32 {
         let off = self.region.len() as u32;
@@ -119,7 +123,10 @@ impl B {
 }
 
 fn utf16z(s: &str) -> Vec<u8> {
-    s.encode_utf16().chain([0]).flat_map(|u| u.to_le_bytes()).collect()
+    s.encode_utf16()
+        .chain([0])
+        .flat_map(|u| u.to_le_bytes())
+        .collect()
 }
 
 struct Built {
@@ -160,7 +167,11 @@ fn build_main() -> Built {
     for c in [gone, gvl, gv, old] {
         b.free(c);
     }
-    Built { bytes: b.finish(root), big, a_offset: a }
+    Built {
+        bytes: b.finish(root),
+        big,
+        a_offset: a,
+    }
 }
 
 #[test]
@@ -170,7 +181,10 @@ fn regf_synthetic_values_big_data_and_ri_lists() {
     assert!(h.base_block().checksum_ok());
     let a = h.key("a").unwrap();
     assert_eq!(a.offset, built.a_offset);
-    assert_eq!(a.value("Str").unwrap().data, ValueData::String("hello".into()));
+    assert_eq!(
+        a.value("Str").unwrap().data,
+        ValueData::String("hello".into())
+    );
     let dw = a.value("dw").unwrap();
     assert!(dw.resident);
     assert_eq!(dw.data, ValueData::Dword(0x1122_3344));
@@ -179,9 +193,21 @@ fn regf_synthetic_values_big_data_and_ri_lists() {
     assert_eq!(big.raw, built.big);
     assert!(big.data_error.is_none());
     assert_eq!(a.value("Q").unwrap().data, ValueData::Qword(7));
-    assert_eq!(a.value("Multi").unwrap().data, ValueData::MultiString(vec!["one".into(), "two".into()]));
-    assert_eq!(a.value("").unwrap().as_string().as_deref(), Some("default!"));
-    let names: Vec<String> = h.key("B").unwrap().subkeys().into_iter().map(|k| k.name).collect();
+    assert_eq!(
+        a.value("Multi").unwrap().data,
+        ValueData::MultiString(vec!["one".into(), "two".into()])
+    );
+    assert_eq!(
+        a.value("").unwrap().as_string().as_deref(),
+        Some("default!")
+    );
+    let names: Vec<String> = h
+        .key("B")
+        .unwrap()
+        .subkeys()
+        .into_iter()
+        .map(|k| k.name)
+        .collect();
     assert_eq!(names, vec!["C1", "C2", "C3"]);
     let paths: Vec<String> = h.keys().into_iter().map(|(p, _)| p).collect();
     assert_eq!(paths, vec!["", "A", "B", "B\\C1", "B\\C2", "B\\C3"]);
@@ -192,18 +218,29 @@ fn regf_synthetic_values_big_data_and_ri_lists() {
 fn regf_synthetic_deleted_recovery() {
     let h = Hive::parse(&build_main().bytes).unwrap();
     let d = h.recover_deleted();
-    let gone = d.keys.iter().find(|k| k.name == "Gone").expect("deleted key");
+    let gone = d
+        .keys
+        .iter()
+        .find(|k| k.name == "Gone")
+        .expect("deleted key");
     assert_eq!(gone.parent_path.as_deref(), Some(""));
     assert!(!gone.allocated);
     assert_eq!(gone.values.len(), 1);
     assert_eq!(gone.values[0].as_string().as_deref(), Some("bye"));
-    let old = d.values.iter().find(|v| v.value.name == "OldVal").expect("deleted value");
+    let old = d
+        .values
+        .iter()
+        .find(|v| v.value.name == "OldVal")
+        .expect("deleted value");
     assert_eq!(old.value.data, ValueData::Dword(5));
     let gv = d.values.iter().find(|v| v.value.name == "GoneVal").unwrap();
     assert_eq!(gv.owner_key_offset, Some(gone.offset));
     // Generic events include the deleted key.
     let ev = events_from_hive(&h, HiveKind::Other, &Provenance::default());
-    assert!(ev.iter().any(|e| e.attrs.get("deleted") == Some(&serde_json::json!(true)) && e.message.contains("Gone")));
+    assert!(ev
+        .iter()
+        .any(|e| e.attrs.get("deleted") == Some(&serde_json::json!(true))
+            && e.message.contains("Gone")));
 }
 
 #[test]
@@ -311,7 +348,12 @@ fn regf_synthetic_transaction_log_replay() {
     let ck = base_block_checksum(&old).unwrap();
     old[508..512].copy_from_slice(&ck.to_le_bytes());
     let h = Hive::parse_with_logs(&primary, &[&old]).unwrap();
-    assert!(h.recovery.unwrap().notes.iter().any(|n| n.contains("not supported")));
+    assert!(h
+        .recovery
+        .unwrap()
+        .notes
+        .iter()
+        .any(|n| n.contains("not supported")));
 
     // Clean primary: logs are ignored.
     let h = Hive::parse_with_logs(&clean, &[&log]).unwrap();
@@ -324,7 +366,11 @@ fn registry_bam_synthetic() {
     let mut b = B::new();
     let mut data = 0x01d5_0000_0000_0000u64.to_le_bytes().to_vec();
     data.extend([0u8; 16]);
-    let v1 = b.vk("\\Device\\HarddiskVolume2\\Windows\\System32\\notepad.exe", 3, &data);
+    let v1 = b.vk(
+        "\\Device\\HarddiskVolume2\\Windows\\System32\\notepad.exe",
+        3,
+        &data,
+    );
     let v2 = b.vk("Version", 4, &1u32.to_le_bytes());
     let vl = b.vlist(&[v1, v2]);
     let sid = b.nk("S-1-5-21-1-2-3-1001", 0, u32::MAX, 2, vl);
@@ -348,8 +394,14 @@ fn registry_bam_synthetic() {
     let e = bam::entries(&h);
     assert_eq!(e.len(), 1);
     assert_eq!(e[0].sid, "S-1-5-21-1-2-3-1001");
-    assert_eq!(e[0].last_executed_ns, veritas_timeline::filetime_to_ns(0x01d5_0000_0000_0000));
+    assert_eq!(
+        e[0].last_executed_ns,
+        veritas_timeline::filetime_to_ns(0x01d5_0000_0000_0000)
+    );
     let ev = events_from_hive(&h, HiveKind::System, &Provenance::default());
-    let x = ev.iter().find(|e| e.data_type == "windows:registry:bam").unwrap();
+    let x = ev
+        .iter()
+        .find(|e| e.data_type == "windows:registry:bam")
+        .unwrap();
     assert_eq!(x.attrs["key_path"], "HKEY_LOCAL_MACHINE\\System\\ControlSet001\\Services\\bam\\State\\UserSettings\\S-1-5-21-1-2-3-1001");
 }

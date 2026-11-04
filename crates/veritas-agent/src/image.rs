@@ -166,7 +166,10 @@ fn add_bad(map: &mut Vec<BadSectorRange>, sector: u64) {
             return;
         }
     }
-    map.push(BadSectorRange { first_sector: sector, sector_count: 1 });
+    map.push(BadSectorRange {
+        first_sector: sector,
+        sector_count: 1,
+    });
 }
 
 /// Read until `buf` is full or end of data; returns bytes read.
@@ -183,10 +186,18 @@ fn read_full<R: Read>(r: &mut R, buf: &mut [u8]) -> io::Result<usize> {
     Ok(got)
 }
 
-fn read_at_with_retry<R: Read + Seek>(src: &mut R, offset: u64, buf: &mut [u8], retries: u32) -> io::Result<usize> {
+fn read_at_with_retry<R: Read + Seek>(
+    src: &mut R,
+    offset: u64,
+    buf: &mut [u8],
+    retries: u32,
+) -> io::Result<usize> {
     let mut last = None;
     for _ in 0..retries.max(1) {
-        match src.seek(SeekFrom::Start(offset)).and_then(|_| read_full(src, buf)) {
+        match src
+            .seek(SeekFrom::Start(offset))
+            .and_then(|_| read_full(src, buf))
+        {
             Ok(n) => return Ok(n),
             Err(e) => last = Some(e),
         }
@@ -196,7 +207,14 @@ fn read_at_with_retry<R: Read + Seek>(src: &mut R, offset: u64, buf: &mut [u8], 
 
 /// Read one block; unreadable sectors are zero-filled and appended to `bad`.
 /// Returns the number of bytes delivered (short only at end of data).
-fn read_block<R: Read + Seek>(src: &mut R, offset: u64, buf: &mut [u8], sector: usize, retries: u32, bad: &mut Vec<BadSectorRange>) -> usize {
+fn read_block<R: Read + Seek>(
+    src: &mut R,
+    offset: u64,
+    buf: &mut [u8],
+    sector: usize,
+    retries: u32,
+    bad: &mut Vec<BadSectorRange>,
+) -> usize {
     if let Ok(n) = read_at_with_retry(src, offset, buf, retries) {
         return n;
     }
@@ -241,14 +259,23 @@ impl RawSink {
 
     fn open_next(&mut self) -> Result<()> {
         let path = self.path_for(self.completed.len());
-        let f = OpenOptions::new().write(true).create_new(true).open(&path).map_err(|e| {
-            if e.kind() == io::ErrorKind::AlreadyExists {
-                AgentError::Invalid(format!("refusing to overwrite {}", path.display()))
-            } else {
-                e.into()
-            }
-        })?;
-        self.file = Some((BufWriter::with_capacity(1 << 20, f), path, <sha2::Sha256 as sha2::Digest>::new(), 0));
+        let f = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .map_err(|e| {
+                if e.kind() == io::ErrorKind::AlreadyExists {
+                    AgentError::Invalid(format!("refusing to overwrite {}", path.display()))
+                } else {
+                    e.into()
+                }
+            })?;
+        self.file = Some((
+            BufWriter::with_capacity(1 << 20, f),
+            path,
+            <sha2::Sha256 as sha2::Digest>::new(),
+            0,
+        ));
         Ok(())
     }
 
@@ -256,7 +283,11 @@ impl RawSink {
         if let Some((mut w, path, h, size)) = self.file.take() {
             w.flush()?;
             w.get_ref().sync_all()?;
-            self.completed.push(SegmentInfo { path, size, sha256: hex::encode(sha2::Digest::finalize(h)) });
+            self.completed.push(SegmentInfo {
+                path,
+                size,
+                sha256: hex::encode(sha2::Digest::finalize(h)),
+            });
             self.segment_start += size;
         }
         Ok(())
@@ -270,7 +301,10 @@ impl RawSink {
                 self.open_next()?;
             }
             let limit = self.segment_size.unwrap_or(u64::MAX);
-            let (w, _, h, size) = self.file.as_mut().ok_or_else(|| AgentError::Invalid("no open segment".into()))?;
+            let (w, _, h, size) = self
+                .file
+                .as_mut()
+                .ok_or_else(|| AgentError::Invalid("no open segment".into()))?;
             let room = (limit - *size).min(data.len() as u64) as usize;
             w.write_all(&data[..room])?;
             sha2::Digest::update(h, &data[..room]);
@@ -292,11 +326,19 @@ enum Sink {
 
 /// Image an already-open source. `total` is the number of bytes to read (`None`: until end of
 /// data). `progress` returns `false` to request a clean stop (state is saved for resume).
-pub fn image_reader<R: Read + Seek>(src: &mut R, source_label: &str, total: Option<u64>, opts: &ImageOptions, progress: &mut dyn FnMut(&Progress) -> bool) -> Result<ImageResult> {
+pub fn image_reader<R: Read + Seek>(
+    src: &mut R,
+    source_label: &str,
+    total: Option<u64>,
+    opts: &ImageOptions,
+    progress: &mut dyn FnMut(&Progress) -> bool,
+) -> Result<ImageResult> {
     let started_at = Utc::now();
     let sector = opts.sector_size as usize;
     if sector == 0 || !sector.is_power_of_two() || sector > 65536 {
-        return Err(AgentError::Invalid("sector size must be a power of two up to 65536".into()));
+        return Err(AgentError::Invalid(
+            "sector size must be a power of two up to 65536".into(),
+        ));
     }
     let block = sector * opts.block_sectors.max(1) as usize;
     let mut hasher = MultiHasher::new();
@@ -316,8 +358,17 @@ pub fn image_reader<R: Read + Seek>(src: &mut R, source_label: &str, total: Opti
                     let _ = std::fs::remove_file(&seg.path);
                 }
             }
-            let mut eo = EwfOptions { compression: opts.compression, physical: opts.physical, bytes_per_sector: opts.sector_size, ..Default::default() };
-            eo.media_type = if opts.physical { MediaType::Fixed } else { MediaType::Removable };
+            let mut eo = EwfOptions {
+                compression: opts.compression,
+                physical: opts.physical,
+                bytes_per_sector: opts.sector_size,
+                ..Default::default()
+            };
+            eo.media_type = if opts.physical {
+                MediaType::Fixed
+            } else {
+                MediaType::Removable
+            };
             if let Some(s) = opts.segment_size {
                 eo.segment_size = s;
             }
@@ -327,16 +378,34 @@ pub fn image_reader<R: Read + Seek>(src: &mut R, source_label: &str, total: Opti
             eo.header.case_number = opts.case_number.clone();
             eo.header.evidence_number = opts.evidence_number.clone();
             eo.header.examiner_name = opts.examiner.clone();
-            eo.header.description = if opts.description.is_empty() { source_label.to_string() } else { opts.description.clone() };
+            eo.header.description = if opts.description.is_empty() {
+                source_label.to_string()
+            } else {
+                opts.description.clone()
+            };
             eo.header.notes = opts.notes.clone();
-            eo.header.acquiry_software_version = format!("{} {}", crate::AGENT_NAME, crate::AGENT_VERSION);
+            eo.header.acquiry_software_version =
+                format!("{} {}", crate::AGENT_NAME, crate::AGENT_VERSION);
             Sink::Ewf(Box::new(EwfWriter::create(&opts.out_base, eo)?))
         }
         OutputFormat::Raw => {
-            let mut raw = RawSink { base: opts.out_base.clone(), segment_size: opts.segment_size, file: None, completed: Vec::new(), segment_start: 0 };
+            let mut raw = RawSink {
+                base: opts.out_base.clone(),
+                segment_size: opts.segment_size,
+                file: None,
+                completed: Vec::new(),
+                segment_start: 0,
+            };
             if let Some(st) = previous.filter(|s| !s.complete) {
-                if st.source != source_label || st.format != OutputFormat::Raw || st.out_base != opts.out_base || st.segment_size != opts.segment_size || st.sector_size != opts.sector_size {
-                    return Err(AgentError::Invalid("state file does not match this acquisition".into()));
+                if st.source != source_label
+                    || st.format != OutputFormat::Raw
+                    || st.out_base != opts.out_base
+                    || st.segment_size != opts.segment_size
+                    || st.sector_size != opts.sector_size
+                {
+                    return Err(AgentError::Invalid(
+                        "state file does not match this acquisition".into(),
+                    ));
                 }
                 // Re-hash completed segments from disk; their bytes are the source bytes already read.
                 for seg in &st.completed_segments {
@@ -353,7 +422,12 @@ pub fn image_reader<R: Read + Seek>(src: &mut R, source_label: &str, total: Opti
                     }
                     let got = hex::encode(sha2::Digest::finalize(sha));
                     if got != seg.sha256 {
-                        return Err(AgentError::Integrity(format!("{} changed since it was written (sha256 {} != {})", seg.path.display(), got, seg.sha256)));
+                        return Err(AgentError::Integrity(format!(
+                            "{} changed since it was written (sha256 {} != {})",
+                            seg.path.display(),
+                            got,
+                            seg.sha256
+                        )));
                     }
                 }
                 let partial = raw.path_for(st.completed_segments.len());
@@ -363,35 +437,52 @@ pub fn image_reader<R: Read + Seek>(src: &mut R, source_label: &str, total: Opti
                 raw.completed = st.completed_segments.clone();
                 raw.segment_start = st.current_segment_start;
                 offset = st.current_segment_start;
-                bad = st.bad_sectors.into_iter().filter(|b| b.first_sector * (sector as u64) < offset).collect();
+                bad = st
+                    .bad_sectors
+                    .into_iter()
+                    .filter(|b| b.first_sector * (sector as u64) < offset)
+                    .collect();
                 resumed_from = Some(offset);
             }
             Sink::Raw(raw)
         }
     };
 
-    let save_state = |sink: &Sink, bad: &[BadSectorRange], done: u64, complete: bool| -> Result<()> {
-        let Some(path) = &opts.state_file else { return Ok(()) };
-        let (completed, start) = match sink {
-            Sink::Raw(r) => (r.completed.clone(), r.segment_start),
-            Sink::Ewf(w) => (w.segments().iter().map(|p| SegmentInfo { path: p.clone(), size: 0, sha256: String::new() }).collect(), 0),
+    let save_state =
+        |sink: &Sink, bad: &[BadSectorRange], done: u64, complete: bool| -> Result<()> {
+            let Some(path) = &opts.state_file else {
+                return Ok(());
+            };
+            let (completed, start) = match sink {
+                Sink::Raw(r) => (r.completed.clone(), r.segment_start),
+                Sink::Ewf(w) => (
+                    w.segments()
+                        .iter()
+                        .map(|p| SegmentInfo {
+                            path: p.clone(),
+                            size: 0,
+                            sha256: String::new(),
+                        })
+                        .collect(),
+                    0,
+                ),
+            };
+            ImageState {
+                source: source_label.to_string(),
+                format: opts.format,
+                out_base: opts.out_base.clone(),
+                segment_size: opts.segment_size,
+                sector_size: opts.sector_size,
+                total,
+                completed_segments: completed,
+                current_segment_start: start,
+                bytes_done: done,
+                bad_sectors: bad.to_vec(),
+                complete,
+                updated_at: Utc::now(),
+            }
+            .save(path)
         };
-        ImageState {
-            source: source_label.to_string(),
-            format: opts.format,
-            out_base: opts.out_base.clone(),
-            segment_size: opts.segment_size,
-            sector_size: opts.sector_size,
-            total,
-            completed_segments: completed,
-            current_segment_start: start,
-            bytes_done: done,
-            bad_sectors: bad.to_vec(),
-            complete,
-            updated_at: Utc::now(),
-        }
-        .save(path)
-    };
 
     let mut buf = vec![0u8; block];
     let mut last_saved = offset;
@@ -401,7 +492,14 @@ pub fn image_reader<R: Read + Seek>(src: &mut R, source_label: &str, total: Opti
             Some(t) => (t - offset).min(block as u64) as usize,
             None => block,
         };
-        let got = read_block(src, offset, &mut buf[..want], sector, opts.retries, &mut bad);
+        let got = read_block(
+            src,
+            offset,
+            &mut buf[..want],
+            sector,
+            opts.retries,
+            &mut bad,
+        );
         if got == 0 {
             break;
         }
@@ -424,7 +522,12 @@ pub fn image_reader<R: Read + Seek>(src: &mut R, source_label: &str, total: Opti
             Sink::Raw(r) => r.completed.len() + 1,
         };
         let bad_count = bad.iter().map(|b| b.sector_count).sum();
-        if !progress(&Progress { bytes_done: offset, total, bad_sectors: bad_count, segment }) {
+        if !progress(&Progress {
+            bytes_done: offset,
+            total,
+            bad_sectors: bad_count,
+            segment,
+        }) {
             if let Sink::Raw(r) = &mut sink {
                 if let Some((w, _, _, _)) = r.file.as_mut() {
                     w.flush()?;
@@ -446,7 +549,11 @@ pub fn image_reader<R: Read + Seek>(src: &mut R, source_label: &str, total: Opti
             let summary = w.finish()?;
             let mut segs = Vec::new();
             for p in &summary.segments {
-                segs.push(SegmentInfo { path: p.clone(), size: std::fs::metadata(p)?.len(), sha256: crate::sha256_file(p)? });
+                segs.push(SegmentInfo {
+                    path: p.clone(),
+                    size: std::fs::metadata(p)?.len(),
+                    sha256: crate::sha256_file(p)?,
+                });
             }
             (segs, Some(summary))
         }
@@ -484,7 +591,11 @@ pub fn image_reader<R: Read + Seek>(src: &mut R, source_label: &str, total: Opti
 /// Size of a Windows physical drive via `Get-Disk` (no IOCTL, so no unsafe code).
 fn windows_disk_size(path: &str) -> Option<u64> {
     let n = crate::writeblock::physical_drive_number(path)?;
-    let out = cmd::powershell(&format!("(Get-Disk -Number {}).Size", n), std::time::Duration::from_secs(60)).ok()?;
+    let out = cmd::powershell(
+        &format!("(Get-Disk -Number {}).Size", n),
+        std::time::Duration::from_secs(60),
+    )
+    .ok()?;
     out.stdout_lossy().trim().parse().ok()
 }
 
@@ -514,7 +625,11 @@ pub fn source_size(file: &mut File, path: &Path) -> Option<u64> {
 }
 
 /// Open a file or device read-only and image it.
-pub fn image_path(source: &Path, opts: &ImageOptions, progress: &mut dyn FnMut(&Progress) -> bool) -> Result<ImageResult> {
+pub fn image_path(
+    source: &Path,
+    opts: &ImageOptions,
+    progress: &mut dyn FnMut(&Progress) -> bool,
+) -> Result<ImageResult> {
     let mut f = File::open(source)?;
     let total = opts.size.or_else(|| source_size(&mut f, source));
     image_reader(&mut f, &source.display().to_string(), total, opts, progress)
@@ -530,7 +645,19 @@ mod tests {
         add_bad(&mut v, 5);
         add_bad(&mut v, 6);
         add_bad(&mut v, 9);
-        assert_eq!(v, vec![BadSectorRange { first_sector: 5, sector_count: 2 }, BadSectorRange { first_sector: 9, sector_count: 1 }]);
+        assert_eq!(
+            v,
+            vec![
+                BadSectorRange {
+                    first_sector: 5,
+                    sector_count: 2
+                },
+                BadSectorRange {
+                    first_sector: 9,
+                    sector_count: 1
+                }
+            ]
+        );
     }
 
     #[test]

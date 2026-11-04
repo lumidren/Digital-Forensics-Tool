@@ -14,7 +14,10 @@
 //! the padding is hashed (it is part of the media as any EWF reader presents it) and reported in
 //! [`EwfSummary::padding_bytes`].
 
-use crate::format::{self, BadSectorRange, Compression, EwfHeader, MediaType, SectionDescriptor, TableSection, VolumeInfo};
+use crate::format::{
+    self, BadSectorRange, Compression, EwfHeader, MediaType, SectionDescriptor, TableSection,
+    VolumeInfo,
+};
 use crate::{EwfError, Result};
 use digest::Digest;
 use serde::{Deserialize, Serialize};
@@ -124,18 +127,33 @@ impl EwfWriter {
     pub fn create(path_base: impl AsRef<Path>, mut opts: EwfOptions) -> Result<Self> {
         let raw = path_base.as_ref().to_string_lossy().into_owned();
         let (base, first_ext) = match raw.rsplit_once('.') {
-            Some((b, e)) if e.eq_ignore_ascii_case("e01") && !b.is_empty() => (b.to_string(), e.to_string()),
+            Some((b, e)) if e.eq_ignore_ascii_case("e01") && !b.is_empty() => {
+                (b.to_string(), e.to_string())
+            }
             _ => (raw.clone(), "E01".to_string()),
         };
         if opts.segment_size < MIN_SEGMENT_SIZE {
-            return Err(EwfError::InvalidInput(format!("segment size must be at least {} bytes", MIN_SEGMENT_SIZE)));
+            return Err(EwfError::InvalidInput(format!(
+                "segment size must be at least {} bytes",
+                MIN_SEGMENT_SIZE
+            )));
         }
-        if opts.bytes_per_sector == 0 || !opts.bytes_per_sector.is_power_of_two() || opts.bytes_per_sector > 65536 {
-            return Err(EwfError::InvalidInput("bytes per sector must be a power of two up to 65536".into()));
+        if opts.bytes_per_sector == 0
+            || !opts.bytes_per_sector.is_power_of_two()
+            || opts.bytes_per_sector > 65536
+        {
+            return Err(EwfError::InvalidInput(
+                "bytes per sector must be a power of two up to 65536".into(),
+            ));
         }
         let chunk_size = opts.sectors_per_chunk as u64 * opts.bytes_per_sector as u64;
-        if opts.sectors_per_chunk == 0 || chunk_size > format::MAX_CHUNK_SIZE || chunk_size > opts.segment_size / 2 {
-            return Err(EwfError::InvalidInput("chunk size out of range for the segment size".into()));
+        if opts.sectors_per_chunk == 0
+            || chunk_size > format::MAX_CHUNK_SIZE
+            || chunk_size > opts.segment_size / 2
+        {
+            return Err(EwfError::InvalidInput(
+                "chunk size out of range for the segment size".into(),
+            ));
         }
         let now = chrono::Utc::now();
         if opts.header.acquiry_date.is_none() {
@@ -145,7 +163,8 @@ impl EwfWriter {
             opts.header.system_date = Some(now);
         }
         if opts.header.acquiry_software_version.is_empty() {
-            opts.header.acquiry_software_version = format!("veritas-ewf {}", env!("CARGO_PKG_VERSION"));
+            opts.header.acquiry_software_version =
+                format!("veritas-ewf {}", env!("CARGO_PKG_VERSION"));
         }
         if opts.header.acquiry_operating_system.is_empty() {
             opts.header.acquiry_operating_system = std::env::consts::OS.to_string();
@@ -175,8 +194,12 @@ impl EwfWriter {
 
     /// Path of segment `n` (1-based).
     pub fn segment_path(&self, n: u32) -> Result<PathBuf> {
-        let ext = format::segment_extension(&self.first_ext, n)
-            .ok_or_else(|| EwfError::InvalidInput(format!("segment number {} exceeds the EWF naming scheme", n)))?;
+        let ext = format::segment_extension(&self.first_ext, n).ok_or_else(|| {
+            EwfError::InvalidInput(format!(
+                "segment number {} exceeds the EWF naming scheme",
+                n
+            ))
+        })?;
         Ok(PathBuf::from(format!("{}.{}", self.base, ext)))
     }
 
@@ -204,7 +227,10 @@ impl EwfWriter {
                 return;
             }
         }
-        self.bad_sectors.push(BadSectorRange { first_sector, sector_count });
+        self.bad_sectors.push(BadSectorRange {
+            first_sector,
+            sector_count,
+        });
     }
 
     /// Append media bytes.
@@ -240,7 +266,8 @@ impl EwfWriter {
     /// Bytes that must remain available in a segment to close it as the last segment.
     fn tail_reserve(&self, entries: usize) -> u64 {
         let tables = 2 * table_section_bytes(entries);
-        let errors = format::SECTION_DESCRIPTOR_SIZE + (format::ERROR2_HEADER_SIZE + 8 * (self.bad_sectors.len() + 1) + 4) as u64;
+        let errors = format::SECTION_DESCRIPTOR_SIZE
+            + (format::ERROR2_HEADER_SIZE + 8 * (self.bad_sectors.len() + 1) + 4) as u64;
         let last = (format::SECTION_DESCRIPTOR_SIZE + format::VOLUME_SIZE as u64)
             + errors
             + (format::SECTION_DESCRIPTOR_SIZE + format::DIGEST_SIZE as u64)
@@ -252,9 +279,14 @@ impl EwfWriter {
     fn emit_chunk(&mut self, data: &[u8]) -> Result<()> {
         let (stored, compressed) = self.encode_chunk(data);
         // Close the current chunk group if its table is full or offsets would overflow 31 bits.
-        let must_close_group = match self.cur.as_ref().and_then(|s| s.group.as_ref().map(|g| (s.pos, g))) {
+        let must_close_group = match self
+            .cur
+            .as_ref()
+            .and_then(|s| s.group.as_ref().map(|g| (s.pos, g)))
+        {
             Some((pos, g)) => {
-                g.entries.len() >= format::MAX_TABLE_ENTRIES || pos + stored.len() as u64 - g.sectors_offset > format::MAX_TABLE_OFFSET
+                g.entries.len() >= format::MAX_TABLE_ENTRIES
+                    || pos + stored.len() as u64 - g.sectors_offset > format::MAX_TABLE_OFFSET
             }
             None => false,
         };
@@ -263,27 +295,54 @@ impl EwfWriter {
         }
         // Start a new segment if this chunk would not fit.
         let (pos, chunks, entries, group_open) = {
-            let s = self.cur.as_ref().ok_or_else(|| EwfError::InvalidInput("writer is closed".into()))?;
+            let s = self
+                .cur
+                .as_ref()
+                .ok_or_else(|| EwfError::InvalidInput("writer is closed".into()))?;
             let entries = s.group.as_ref().map(|g| g.entries.len()).unwrap_or(0);
             (s.pos, s.chunks, entries, s.group.is_some())
         };
-        let projected = pos + if group_open { 0 } else { format::SECTION_DESCRIPTOR_SIZE } + stored.len() as u64 + self.tail_reserve(entries + 1);
+        let projected =
+            pos + if group_open {
+                0
+            } else {
+                format::SECTION_DESCRIPTOR_SIZE
+            } + stored.len() as u64
+                + self.tail_reserve(entries + 1);
         if projected > self.opts.segment_size && chunks > 0 {
             self.close_segment(None)?;
             self.open_segment()?;
         }
-        let seg = self.cur.as_mut().ok_or_else(|| EwfError::InvalidInput("writer is closed".into()))?;
+        let seg = self
+            .cur
+            .as_mut()
+            .ok_or_else(|| EwfError::InvalidInput("writer is closed".into()))?;
         if seg.group.is_none() {
             seg.file.write_all(&[0u8; 76])?;
-            seg.group = Some(Group { sectors_offset: seg.pos, entries: Vec::new() });
+            seg.group = Some(Group {
+                sectors_offset: seg.pos,
+                entries: Vec::new(),
+            });
             seg.pos += format::SECTION_DESCRIPTOR_SIZE;
         }
-        let group = seg.group.as_mut().ok_or_else(|| EwfError::InvalidInput("no chunk group".into()))?;
+        let group = seg
+            .group
+            .as_mut()
+            .ok_or_else(|| EwfError::InvalidInput("no chunk group".into()))?;
         let rel = seg.pos - group.sectors_offset;
         if rel > format::MAX_TABLE_OFFSET {
-            return Err(EwfError::InvalidInput("chunk offset exceeds 31-bit table range".into()));
+            return Err(EwfError::InvalidInput(
+                "chunk offset exceeds 31-bit table range".into(),
+            ));
         }
-        group.entries.push(rel as u32 | if compressed { format::COMPRESSED_FLAG } else { 0 });
+        group.entries.push(
+            rel as u32
+                | if compressed {
+                    format::COMPRESSED_FLAG
+                } else {
+                    0
+                },
+        );
         seg.file.write_all(&stored)?;
         seg.pos += stored.len() as u64;
         seg.chunks += 1;
@@ -293,7 +352,11 @@ impl EwfWriter {
 
     fn write_section(seg: &mut Segment, kind: &str, payload: &[u8]) -> Result<u64> {
         let size = format::SECTION_DESCRIPTOR_SIZE + payload.len() as u64;
-        let d = SectionDescriptor { kind: kind.to_string(), next_offset: seg.pos + size, size };
+        let d = SectionDescriptor {
+            kind: kind.to_string(),
+            next_offset: seg.pos + size,
+            size,
+        };
         seg.file.write_all(&d.encode())?;
         seg.file.write_all(payload)?;
         let payload_offset = seg.pos + format::SECTION_DESCRIPTOR_SIZE;
@@ -302,7 +365,11 @@ impl EwfWriter {
     }
 
     fn write_terminator(seg: &mut Segment, kind: &str) -> Result<()> {
-        let d = SectionDescriptor { kind: kind.to_string(), next_offset: seg.pos, size: 0 };
+        let d = SectionDescriptor {
+            kind: kind.to_string(),
+            next_offset: seg.pos,
+            size: 0,
+        };
         seg.file.write_all(&d.encode())?;
         seg.pos += format::SECTION_DESCRIPTOR_SIZE;
         Ok(())
@@ -315,7 +382,12 @@ impl EwfWriter {
             sectors_per_chunk: self.opts.sectors_per_chunk,
             bytes_per_sector: self.opts.bytes_per_sector,
             sector_count: (self.input_bytes + self.padding) / self.opts.bytes_per_sector as u64,
-            media_flags: format::MEDIA_FLAG_IMAGE | if self.opts.physical { format::MEDIA_FLAG_PHYSICAL } else { 0 },
+            media_flags: format::MEDIA_FLAG_IMAGE
+                | if self.opts.physical {
+                    format::MEDIA_FLAG_PHYSICAL
+                } else {
+                    0
+                },
             compression_level: self.opts.compression.to_level_byte(),
             error_granularity: self.opts.sectors_per_chunk,
             set_identifier: self.set_identifier,
@@ -324,23 +396,37 @@ impl EwfWriter {
 
     fn open_segment(&mut self) -> Result<()> {
         let number = self.segments.len() as u32 + 1;
-        let number16 = u16::try_from(number).map_err(|_| EwfError::InvalidInput("too many segments".into()))?;
+        let number16 = u16::try_from(number)
+            .map_err(|_| EwfError::InvalidInput("too many segments".into()))?;
         let path = self.segment_path(number)?;
-        let file = OpenOptions::new().write(true).create_new(true).open(&path).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::AlreadyExists {
-                EwfError::Exists(path.display().to_string())
-            } else {
-                EwfError::Io(e)
-            }
-        })?;
-        let mut seg = Segment { file: BufWriter::with_capacity(1 << 20, file), number: number16, pos: 0, chunks: 0, group: None };
+        let file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .map_err(|e| {
+                if e.kind() == std::io::ErrorKind::AlreadyExists {
+                    EwfError::Exists(path.display().to_string())
+                } else {
+                    EwfError::Io(e)
+                }
+            })?;
+        let mut seg = Segment {
+            file: BufWriter::with_capacity(1 << 20, file),
+            number: number16,
+            pos: 0,
+            chunks: 0,
+            group: None,
+        };
         seg.file.write_all(&format::encode_file_header(number16))?;
         seg.pos = format::FILE_HEADER_SIZE;
         let vol = self.provisional_volume().encode();
         if number == 1 {
             let level = self.opts.compression.zlib_level();
             let h2 = format::encode_header2_section(&self.opts.header.to_header2_string(), level);
-            let h1 = format::encode_header_section(&self.opts.header.to_header_string(self.opts.compression), level);
+            let h1 = format::encode_header_section(
+                &self.opts.header.to_header_string(self.opts.compression),
+                level,
+            );
             Self::write_section(&mut seg, "header2", &h2)?;
             Self::write_section(&mut seg, "header2", &h2)?;
             Self::write_section(&mut seg, "header", &h1)?;
@@ -364,11 +450,19 @@ impl EwfWriter {
             Some(g) => g,
             None => return Ok(()),
         };
-        let sectors = SectionDescriptor { kind: "sectors".into(), next_offset: seg.pos, size: seg.pos - group.sectors_offset };
+        let sectors = SectionDescriptor {
+            kind: "sectors".into(),
+            next_offset: seg.pos,
+            size: seg.pos - group.sectors_offset,
+        };
         seg.file.seek(SeekFrom::Start(group.sectors_offset))?;
         seg.file.write_all(&sectors.encode())?;
         seg.file.seek(SeekFrom::Start(seg.pos))?;
-        let table = TableSection { base_offset: group.sectors_offset, entries: group.entries }.encode();
+        let table = TableSection {
+            base_offset: group.sectors_offset,
+            entries: group.entries,
+        }
+        .encode();
         Self::write_section(seg, "table", &table)?;
         Self::write_section(seg, "table2", &table)?;
         Ok(())
@@ -377,8 +471,15 @@ impl EwfWriter {
     fn close_segment(&mut self, digests: Option<([u8; 16], [u8; 20])>) -> Result<()> {
         self.close_group()?;
         let vol = self.provisional_volume().encode();
-        let errors = if digests.is_some() && !self.bad_sectors.is_empty() { Some(format::encode_error2_section(&self.bad_sectors)?) } else { None };
-        let mut seg = self.cur.take().ok_or_else(|| EwfError::InvalidInput("writer is closed".into()))?;
+        let errors = if digests.is_some() && !self.bad_sectors.is_empty() {
+            Some(format::encode_error2_section(&self.bad_sectors)?)
+        } else {
+            None
+        };
+        let mut seg = self
+            .cur
+            .take()
+            .ok_or_else(|| EwfError::InvalidInput("writer is closed".into()))?;
         if let Some((md5, sha1)) = digests {
             if seg.number == 1 {
                 let off = Self::write_section(&mut seg, "data", &vol)?;
@@ -388,7 +489,11 @@ impl EwfWriter {
             if let Some(e) = errors {
                 Self::write_section(&mut seg, "error2", &e)?;
             }
-            Self::write_section(&mut seg, "digest", &format::encode_digest_section(&md5, &sha1))?;
+            Self::write_section(
+                &mut seg,
+                "digest",
+                &format::encode_digest_section(&md5, &sha1),
+            )?;
             Self::write_section(&mut seg, "hash", &format::encode_hash_section(&md5))?;
             Self::write_terminator(&mut seg, "done")?;
         } else {
@@ -417,14 +522,21 @@ impl EwfWriter {
             self.emit_chunk(&chunk)?;
         }
         let hashes = std::mem::take(&mut self.hasher).finalize();
-        let sha1: [u8; 20] = std::mem::replace(&mut self.sha1, sha1::Sha1::new()).finalize().into();
-        let md5_vec = hex::decode(&hashes.md5).map_err(|e| EwfError::InvalidInput(e.to_string()))?;
-        let md5: [u8; 16] = md5_vec.as_slice().try_into().map_err(|_| EwfError::InvalidInput("md5 length".into()))?;
+        let sha1: [u8; 20] = std::mem::replace(&mut self.sha1, sha1::Sha1::new())
+            .finalize()
+            .into();
+        let md5_vec =
+            hex::decode(&hashes.md5).map_err(|e| EwfError::InvalidInput(e.to_string()))?;
+        let md5: [u8; 16] = md5_vec
+            .as_slice()
+            .try_into()
+            .map_err(|_| EwfError::InvalidInput("md5 length".into()))?;
         self.close_segment(Some((md5, sha1)))?;
 
         let media_size = self.input_bytes + padding;
         let mut volume = self.provisional_volume();
-        volume.chunk_count = u32::try_from(self.chunk_count).map_err(|_| EwfError::InvalidInput("more than 2^32 chunks".into()))?;
+        volume.chunk_count = u32::try_from(self.chunk_count)
+            .map_err(|_| EwfError::InvalidInput("more than 2^32 chunks".into()))?;
         volume.sector_count = media_size / bps;
         let encoded = volume.encode();
         for (path, off) in &self.volume_patches {

@@ -34,7 +34,14 @@ impl MemoryTool {
     /// File names searched for in the configured directory, the agent's directory and `PATH`.
     pub fn candidates(self) -> &'static [&'static str] {
         match self {
-            Self::WinPmem => &["winpmem_mini_x64_rc2.exe", "winpmem_mini_x64.exe", "winpmem_mini_x86.exe", "winpmem.exe", "go-winpmem.exe", "go-winpmem_amd64.exe"],
+            Self::WinPmem => &[
+                "winpmem_mini_x64_rc2.exe",
+                "winpmem_mini_x64.exe",
+                "winpmem_mini_x86.exe",
+                "winpmem.exe",
+                "go-winpmem.exe",
+                "go-winpmem_amd64.exe",
+            ],
             Self::Lime => &["lime.ko"],
             Self::OsxPmem => &["osxpmem", "osxpmem.app/osxpmem"],
         }
@@ -68,8 +75,15 @@ pub struct SystemRunner;
 
 impl CommandRunner for SystemRunner {
     fn run(&self, program: &Path, args: &[OsString]) -> std::io::Result<RunOutput> {
-        let out = std::process::Command::new(program).args(args).stdin(std::process::Stdio::null()).output()?;
-        Ok(RunOutput { exit_code: out.status.code(), stdout: out.stdout, stderr: out.stderr })
+        let out = std::process::Command::new(program)
+            .args(args)
+            .stdin(std::process::Stdio::null())
+            .output()?;
+        Ok(RunOutput {
+            exit_code: out.status.code(),
+            stdout: out.stdout,
+            stderr: out.stderr,
+        })
     }
 }
 
@@ -105,7 +119,11 @@ pub struct MemoryCapture {
 /// Locate the tool: explicit path, then the agent's directory, then each `PATH` entry.
 pub fn locate_binary(tool: MemoryTool, configured: Option<&Path>) -> Result<PathBuf> {
     if let Some(p) = configured {
-        return if p.is_file() { Ok(p.to_path_buf()) } else { Err(AgentError::ToolNotFound(p.display().to_string())) };
+        return if p.is_file() {
+            Ok(p.to_path_buf())
+        } else {
+            Err(AgentError::ToolNotFound(p.display().to_string()))
+        };
     }
     let mut dirs: Vec<PathBuf> = Vec::new();
     if let Ok(exe) = std::env::current_exe() {
@@ -129,7 +147,11 @@ pub fn locate_binary(tool: MemoryTool, configured: Option<&Path>) -> Result<Path
             }
         }
     }
-    Err(AgentError::ToolNotFound(format!("{:?}: none of {:?} found in the agent directory or PATH", tool, tool.candidates())))
+    Err(AgentError::ToolNotFound(format!(
+        "{:?}: none of {:?} found in the agent directory or PATH",
+        tool,
+        tool.candidates()
+    )))
 }
 
 fn tail(bytes: &[u8]) -> String {
@@ -150,7 +172,10 @@ fn render(program: &Path, args: &[OsString]) -> String {
 /// Capture memory with the configured tool and hash the result. The output file must not exist.
 pub fn capture(cfg: &MemoryConfig, runner: &dyn CommandRunner) -> Result<MemoryCapture> {
     if cfg.output.exists() {
-        return Err(AgentError::Invalid(format!("refusing to overwrite {}", cfg.output.display())));
+        return Err(AgentError::Invalid(format!(
+            "refusing to overwrite {}",
+            cfg.output.display()
+        )));
     }
     let binary = locate_binary(cfg.tool, cfg.binary.as_deref())?;
     let binary_sha256 = crate::sha256_file(&binary)?;
@@ -161,7 +186,10 @@ pub fn capture(cfg: &MemoryConfig, runner: &dyn CommandRunner) -> Result<MemoryC
     let (exit_code, stderr) = match cfg.tool {
         MemoryTool::WinPmem => {
             // winpmem_mini: `winpmem_mini_x64.exe <output>`; go-winpmem: `go-winpmem acquire <output>`.
-            let go = binary.file_name().map(|n| n.to_string_lossy().starts_with("go-winpmem")).unwrap_or(false);
+            let go = binary
+                .file_name()
+                .map(|n| n.to_string_lossy().starts_with("go-winpmem"))
+                .unwrap_or(false);
             let mut args = Vec::new();
             if go {
                 args.push(OsString::from("acquire"));
@@ -173,7 +201,12 @@ pub fn capture(cfg: &MemoryConfig, runner: &dyn CommandRunner) -> Result<MemoryC
             (o.exit_code, o.stderr)
         }
         MemoryTool::OsxPmem => {
-            let mut args = vec![OsString::from("--format"), OsString::from("raw"), OsString::from("-o"), out_s.clone()];
+            let mut args = vec![
+                OsString::from("--format"),
+                OsString::from("raw"),
+                OsString::from("-o"),
+                out_s.clone(),
+            ];
             args.extend(extra);
             command_lines.push(render(&binary, &args));
             let o = runner.run(&binary, &args)?;
@@ -200,11 +233,25 @@ pub fn capture(cfg: &MemoryConfig, runner: &dyn CommandRunner) -> Result<MemoryC
         }
     };
     if exit_code != Some(0) {
-        return Err(AgentError::ToolFailed(format!("{} exited with {:?}: {}", command_lines[0], exit_code, tail(&stderr))));
+        return Err(AgentError::ToolFailed(format!(
+            "{} exited with {:?}: {}",
+            command_lines[0],
+            exit_code,
+            tail(&stderr)
+        )));
     }
-    let meta = std::fs::metadata(&cfg.output).map_err(|e| AgentError::ToolFailed(format!("no capture written to {}: {}", cfg.output.display(), e)))?;
+    let meta = std::fs::metadata(&cfg.output).map_err(|e| {
+        AgentError::ToolFailed(format!(
+            "no capture written to {}: {}",
+            cfg.output.display(),
+            e
+        ))
+    })?;
     if meta.len() == 0 {
-        return Err(AgentError::ToolFailed(format!("capture {} is empty", cfg.output.display())));
+        return Err(AgentError::ToolFailed(format!(
+            "capture {} is empty",
+            cfg.output.display()
+        )));
     }
     let hashes = veritas_hash::hash_reader(std::fs::File::open(&cfg.output)?, |_| {})?;
     Ok(MemoryCapture {
@@ -240,16 +287,27 @@ mod tests {
         fn run(&self, program: &Path, args: &[OsString]) -> std::io::Result<RunOutput> {
             self.calls.borrow_mut().push(render(program, args));
             if self.fail {
-                return Ok(RunOutput { exit_code: Some(1), stdout: vec![], stderr: b"driver load failed".to_vec() });
+                return Ok(RunOutput {
+                    exit_code: Some(1),
+                    stdout: vec![],
+                    stderr: b"driver load failed".to_vec(),
+                });
             }
             for a in args {
                 let s = a.to_string_lossy();
-                let path = s.strip_prefix("path=").map(|p| p.trim_end_matches(" format=lime").to_string()).unwrap_or_else(|| s.to_string());
+                let path = s
+                    .strip_prefix("path=")
+                    .map(|p| p.trim_end_matches(" format=lime").to_string())
+                    .unwrap_or_else(|| s.to_string());
                 if path.ends_with(".raw") || path.ends_with(".lime") {
                     std::fs::write(&path, vec![0x5au8; 1 << 16])?;
                 }
             }
-            Ok(RunOutput { exit_code: Some(0), stdout: vec![], stderr: vec![] })
+            Ok(RunOutput {
+                exit_code: Some(0),
+                stdout: vec![],
+                stderr: vec![],
+            })
         }
     }
 
@@ -259,8 +317,16 @@ mod tests {
         let bin = dir.path().join("winpmem_mini_x64_rc2.exe");
         std::fs::write(&bin, b"fake winpmem").unwrap();
         let out = dir.path().join("mem.raw");
-        let mock = Mock { calls: RefCell::new(vec![]), fail: false };
-        let cfg = MemoryConfig { tool: MemoryTool::WinPmem, binary: Some(bin.clone()), output: out.clone(), extra_args: vec![] };
+        let mock = Mock {
+            calls: RefCell::new(vec![]),
+            fail: false,
+        };
+        let cfg = MemoryConfig {
+            tool: MemoryTool::WinPmem,
+            binary: Some(bin.clone()),
+            output: out.clone(),
+            extra_args: vec![],
+        };
         let cap = capture(&cfg, &mock).unwrap();
         assert_eq!(cap.hashes, veritas_hash::hash_bytes(&vec![0x5au8; 1 << 16]));
         assert_eq!(cap.binary_sha256, veritas_hash::sha256_hex(b"fake winpmem"));
@@ -277,8 +343,16 @@ mod tests {
         let ko = dir.path().join("lime.ko");
         std::fs::write(&ko, b"fake module").unwrap();
         let out = dir.path().join("mem.lime");
-        let mock = Mock { calls: RefCell::new(vec![]), fail: false };
-        let cfg = MemoryConfig { tool: MemoryTool::Lime, binary: Some(ko), output: out, extra_args: vec![] };
+        let mock = Mock {
+            calls: RefCell::new(vec![]),
+            fail: false,
+        };
+        let cfg = MemoryConfig {
+            tool: MemoryTool::Lime,
+            binary: Some(ko),
+            output: out,
+            extra_args: vec![],
+        };
         let cap = capture(&cfg, &mock).unwrap();
         let calls = mock.calls.borrow();
         assert!(calls[0].starts_with("insmod"));
@@ -292,10 +366,29 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let bin = dir.path().join("osxpmem");
         std::fs::write(&bin, b"x").unwrap();
-        let mock = Mock { calls: RefCell::new(vec![]), fail: true };
-        let cfg = MemoryConfig { tool: MemoryTool::OsxPmem, binary: Some(bin), output: dir.path().join("m.raw"), extra_args: vec![] };
-        assert!(matches!(capture(&cfg, &mock), Err(AgentError::ToolFailed(_))));
-        let cfg = MemoryConfig { tool: MemoryTool::OsxPmem, binary: Some(dir.path().join("absent")), output: dir.path().join("n.raw"), extra_args: vec![] };
-        assert!(matches!(capture(&cfg, &mock), Err(AgentError::ToolNotFound(_))));
+        let mock = Mock {
+            calls: RefCell::new(vec![]),
+            fail: true,
+        };
+        let cfg = MemoryConfig {
+            tool: MemoryTool::OsxPmem,
+            binary: Some(bin),
+            output: dir.path().join("m.raw"),
+            extra_args: vec![],
+        };
+        assert!(matches!(
+            capture(&cfg, &mock),
+            Err(AgentError::ToolFailed(_))
+        ));
+        let cfg = MemoryConfig {
+            tool: MemoryTool::OsxPmem,
+            binary: Some(dir.path().join("absent")),
+            output: dir.path().join("n.raw"),
+            extra_args: vec![],
+        };
+        assert!(matches!(
+            capture(&cfg, &mock),
+            Err(AgentError::ToolNotFound(_))
+        ));
     }
 }

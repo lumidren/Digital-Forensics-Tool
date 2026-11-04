@@ -84,10 +84,21 @@ impl RawSegmented {
         for p in paths {
             let file = File::open(p)?;
             let len = file.metadata()?.len();
-            parts.push(Part { path: p.clone(), file, start, len });
-            start = start.checked_add(len).ok_or_else(|| EwfError::Corrupt("total size overflow".into()))?;
+            parts.push(Part {
+                path: p.clone(),
+                file,
+                start,
+                len,
+            });
+            start = start
+                .checked_add(len)
+                .ok_or_else(|| EwfError::Corrupt("total size overflow".into()))?;
         }
-        Ok(Self { parts, size: start, position: 0 })
+        Ok(Self {
+            parts,
+            size: start,
+            position: 0,
+        })
     }
 
     pub fn media_size(&self) -> u64 {
@@ -103,7 +114,11 @@ impl RawSegmented {
         let mut done = 0usize;
         let mut pos = offset;
         while done < buf.len() && pos < self.size {
-            let i = match self.parts.iter().position(|p| pos >= p.start && pos < p.start + p.len) {
+            let i = match self
+                .parts
+                .iter()
+                .position(|p| pos >= p.start && pos < p.start + p.len)
+            {
                 Some(i) => i,
                 None => break,
             };
@@ -135,7 +150,10 @@ impl Seek for RawSegmented {
             SeekFrom::Current(d) => self.position as i128 + d as i128,
         };
         if target < 0 || target > u64::MAX as i128 {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "seek out of range"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "seek out of range",
+            ));
         }
         self.position = target as u64;
         Ok(self.position)

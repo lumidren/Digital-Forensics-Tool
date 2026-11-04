@@ -117,7 +117,9 @@ pub fn decode_runs(d: &[u8], start_vcn: u64) -> Result<Vec<Run>> {
             if bits < 64 && (off >> (bits - 1)) & 1 == 1 {
                 off -= 1i64 << bits;
             }
-            lcn = lcn.checked_add(off).ok_or_else(|| FsError::invalid(pos as u64, "LCN overflow"))?;
+            lcn = lcn
+                .checked_add(off)
+                .ok_or_else(|| FsError::invalid(pos as u64, "LCN overflow"))?;
             if lcn < 0 {
                 return Err(FsError::invalid(pos as u64, "negative LCN"));
             }
@@ -126,11 +128,17 @@ pub fn decode_runs(d: &[u8], start_vcn: u64) -> Result<Vec<Run>> {
         if length == 0 {
             return Err(FsError::invalid(pos as u64, "zero-length run"));
         }
-        runs.push(Run { vcn, length, lcn: run_lcn });
+        runs.push(Run {
+            vcn,
+            length,
+            lcn: run_lcn,
+        });
         if runs.len() > MAX_RUNS {
             return Err(FsError::Limit("too many data runs".into()));
         }
-        vcn = vcn.checked_add(length).ok_or_else(|| FsError::invalid(pos as u64, "VCN overflow"))?;
+        vcn = vcn
+            .checked_add(length)
+            .ok_or_else(|| FsError::invalid(pos as u64, "VCN overflow"))?;
         pos += 1 + len_size + off_size;
     }
     Ok(runs)
@@ -157,9 +165,15 @@ pub struct Attribute {
 }
 
 impl Attribute {
-    pub fn is_compressed(&self) -> bool { self.flags & 0x0001 != 0 }
-    pub fn is_encrypted(&self) -> bool { self.flags & 0x4000 != 0 }
-    pub fn is_sparse(&self) -> bool { self.flags & 0x8000 != 0 }
+    pub fn is_compressed(&self) -> bool {
+        self.flags & 0x0001 != 0
+    }
+    pub fn is_encrypted(&self) -> bool {
+        self.flags & 0x4000 != 0
+    }
+    pub fn is_sparse(&self) -> bool {
+        self.flags & 0x8000 != 0
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -179,9 +193,15 @@ pub struct MftRecord {
 }
 
 impl MftRecord {
-    pub fn in_use(&self) -> bool { self.flags & 0x0001 != 0 }
-    pub fn is_dir(&self) -> bool { self.flags & 0x0002 != 0 }
-    pub fn base_entry(&self) -> u64 { split_ref(self.base_ref).0 }
+    pub fn in_use(&self) -> bool {
+        self.flags & 0x0001 != 0
+    }
+    pub fn is_dir(&self) -> bool {
+        self.flags & 0x0002 != 0
+    }
+    pub fn base_entry(&self) -> u64 {
+        split_ref(self.base_ref).0
+    }
 
     /// Parse a FILE record. `fallback_entry` is used when the header does not carry its own number.
     pub fn parse(raw: &[u8], fallback_entry: u64) -> Result<Self> {
@@ -194,9 +214,17 @@ impl MftRecord {
         let usa_off = u16_at(&buf, 4)?;
         let attr_off = u16_at(&buf, 0x14)? as usize;
         let used = (u32_at(&buf, 0x18)? as usize).min(buf.len());
-        let entry = if usa_off >= 0x30 { u32_at(&buf, 0x2C)? as u64 } else { fallback_entry };
+        let entry = if usa_off >= 0x30 {
+            u32_at(&buf, 0x2C)? as u64
+        } else {
+            fallback_entry
+        };
         let mut rec = MftRecord {
-            entry: if entry == 0 && fallback_entry != 0 { fallback_entry } else { entry },
+            entry: if entry == 0 && fallback_entry != 0 {
+                fallback_entry
+            } else {
+                entry
+            },
             sequence: u16_at(&buf, 0x10)?,
             link_count: u16_at(&buf, 0x12)?,
             flags: u16_at(&buf, 0x16)?,
@@ -243,20 +271,42 @@ pub fn parse_attribute(a: &[u8], record: u64) -> Result<Attribute> {
     let non_res = u8_at(a, 8)? != 0;
     let name_len = u8_at(a, 9)? as usize;
     let name_off = u16_at(a, 0x0A)? as usize;
-    let name = if name_len > 0 { utf16le(need(a, name_off, name_len * 2)?, false) } else { String::new() };
+    let name = if name_len > 0 {
+        utf16le(need(a, name_off, name_len * 2)?, false)
+    } else {
+        String::new()
+    };
     let flags = u16_at(a, 0x0C)?;
     let id = u16_at(a, 0x0E)?;
     if !non_res {
         let vlen = u32_at(a, 0x10)? as usize;
         let voff = u16_at(a, 0x14)? as usize;
         let data = need(a, voff, vlen)?.to_vec();
-        Ok(Attribute { type_code, name, id, flags, record, resident: true, data_size: vlen as u64, alloc_size: vlen as u64, init_size: vlen as u64, data, start_vcn: 0, last_vcn: 0, runs: Vec::new(), compression_unit: 0 })
+        Ok(Attribute {
+            type_code,
+            name,
+            id,
+            flags,
+            record,
+            resident: true,
+            data_size: vlen as u64,
+            alloc_size: vlen as u64,
+            init_size: vlen as u64,
+            data,
+            start_vcn: 0,
+            last_vcn: 0,
+            runs: Vec::new(),
+            compression_unit: 0,
+        })
     } else {
         let start_vcn = u64_at(a, 0x10)?;
         let last_vcn = u64_at(a, 0x18)?;
         let run_off = u16_at(a, 0x20)? as usize;
         let cu = u16_at(a, 0x22)?;
-        let runs = decode_runs(need(a, run_off, a.len().saturating_sub(run_off))?, start_vcn)?;
+        let runs = decode_runs(
+            need(a, run_off, a.len().saturating_sub(run_off))?,
+            start_vcn,
+        )?;
         Ok(Attribute {
             type_code,
             name,
@@ -290,7 +340,14 @@ pub struct StdInfo {
 
 impl StdInfo {
     pub fn parse(d: &[u8]) -> Result<Self> {
-        let mut s = StdInfo { crtime: u64_at(d, 0)?, mtime: u64_at(d, 8)?, ctime: u64_at(d, 0x10)?, atime: u64_at(d, 0x18)?, flags: u32_at(d, 0x20)?, ..Default::default() };
+        let mut s = StdInfo {
+            crtime: u64_at(d, 0)?,
+            mtime: u64_at(d, 8)?,
+            ctime: u64_at(d, 0x10)?,
+            atime: u64_at(d, 0x18)?,
+            flags: u32_at(d, 0x20)?,
+            ..Default::default()
+        };
         if d.len() >= 0x48 {
             s.owner_id = Some(u32_at(d, 0x30)?);
             s.security_id = Some(u32_at(d, 0x34)?);
@@ -348,8 +405,19 @@ pub struct ObjectId {
 
 impl ObjectId {
     pub fn parse(d: &[u8]) -> Result<Self> {
-        let opt = |o: usize| if d.len() >= o + 16 { guid_le(&d[o..o + 16]).ok() } else { None };
-        Ok(ObjectId { object_id: guid_le(need(d, 0, 16)?)?, birth_volume_id: opt(16), birth_object_id: opt(32), domain_id: opt(48) })
+        let opt = |o: usize| {
+            if d.len() >= o + 16 {
+                guid_le(&d[o..o + 16]).ok()
+            } else {
+                None
+            }
+        };
+        Ok(ObjectId {
+            object_id: guid_le(need(d, 0, 16)?)?,
+            birth_volume_id: opt(16),
+            birth_object_id: opt(32),
+            domain_id: opt(48),
+        })
     }
 }
 
@@ -389,7 +457,12 @@ impl ReparsePoint {
             subst = need(body, bo + so, sl).ok().map(|b| utf16le(b, false));
             print = need(body, bo + po, pl).ok().map(|b| utf16le(b, false));
         }
-        Ok(ReparsePoint { tag, tag_name, substitute_name: subst, print_name: print })
+        Ok(ReparsePoint {
+            tag,
+            tag_name,
+            substitute_name: subst,
+            print_name: print,
+        })
     }
 }
 
@@ -417,13 +490,26 @@ pub fn parse_attribute_list(d: &[u8]) -> Result<Vec<AttrListEntry>> {
         }
         let nlen = u8_at(d, pos + 6)? as usize;
         let noff = u8_at(d, pos + 7)? as usize;
-        let name = if nlen > 0 { utf16le(need(d, pos + noff, nlen * 2)?, false) } else { String::new() };
+        let name = if nlen > 0 {
+            utf16le(need(d, pos + noff, nlen * 2)?, false)
+        } else {
+            String::new()
+        };
         let (rec, seq) = split_ref(u64_at(d, pos + 0x10)?);
-        v.push(AttrListEntry { type_code: t, name, start_vcn: u64_at(d, pos + 8)?, record: rec, record_sequence: seq, id: u16_at(d, pos + 0x18)? });
+        v.push(AttrListEntry {
+            type_code: t,
+            name,
+            start_vcn: u64_at(d, pos + 8)?,
+            record: rec,
+            record_sequence: seq,
+            id: u16_at(d, pos + 0x18)?,
+        });
         pos += len;
     }
     Ok(v)
 }
 
 /// FILETIME helper retained for callers that need signed arithmetic.
-pub fn ft_i64(d: &[u8], o: usize) -> Result<i64> { i64_at(d, o) }
+pub fn ft_i64(d: &[u8], o: usize) -> Result<i64> {
+    i64_at(d, o)
+}

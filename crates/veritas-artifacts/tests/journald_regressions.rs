@@ -4,7 +4,8 @@
 use std::path::PathBuf;
 
 fn sample() -> Option<Vec<u8>> {
-    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/corpus/plaso/systemd/journal/system.journal");
+    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../testdata/corpus/plaso/systemd/journal/system.journal");
     std::fs::read(p).ok()
 }
 
@@ -16,7 +17,15 @@ fn with_u64(mut d: Vec<u8>, at: usize, v: u64) -> Vec<u8> {
 #[test]
 fn hostile_entry_array_offsets_do_not_panic() {
     let Some(base) = sample() else { return };
-    for v in [u64::MAX, u64::MAX - 4, u64::MAX - 15, (usize::MAX as u64).wrapping_sub(7), base.len() as u64, base.len() as u64 - 1, 1 << 62] {
+    for v in [
+        u64::MAX,
+        u64::MAX - 4,
+        u64::MAX - 15,
+        (usize::MAX as u64).wrapping_sub(7),
+        base.len() as u64,
+        base.len() as u64 - 1,
+        1 << 62,
+    ] {
         let d = with_u64(base.clone(), 176, v); // header.entry_array_offset
         let j = veritas_artifacts::journald::parse(&d).expect("header still valid");
         assert!(j.entries.is_empty());

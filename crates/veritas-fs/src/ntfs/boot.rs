@@ -28,7 +28,10 @@ fn size_from_clusters(v: u8, cluster: u64) -> Result<u32> {
         (s as u64).saturating_mul(cluster)
     };
     if !(256..=65536).contains(&bytes) || !bytes.is_power_of_two() {
-        return Err(FsError::invalid(0x40, format!("implausible record size {bytes}")));
+        return Err(FsError::invalid(
+            0x40,
+            format!("implausible record size {bytes}"),
+        ));
     }
     Ok(bytes as u32)
 }

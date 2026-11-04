@@ -34,18 +34,29 @@ impl CmdOutput {
         let err = self.stderr_lossy();
         let err = err.trim();
         let out = self.stdout_lossy();
-        let detail = if err.is_empty() { out.trim().chars().take(400).collect::<String>() } else { err.chars().take(400).collect() };
+        let detail = if err.is_empty() {
+            out.trim().chars().take(400).collect::<String>()
+        } else {
+            err.chars().take(400).collect()
+        };
         if self.timed_out {
             format!("{} timed out", self.program)
         } else {
-            format!("{} exited with {:?}: {}", self.program, self.exit_code, detail)
+            format!(
+                "{} exited with {:?}: {}",
+                self.program, self.exit_code, detail
+            )
         }
     }
 }
 
 /// Run `program args...`, wait at most `timeout`, capture stdout and stderr. A command that
 /// cannot be started yields `Err` with the spawn error text.
-pub fn run<S: AsRef<OsStr>>(program: &str, args: &[S], timeout: Duration) -> Result<CmdOutput, String> {
+pub fn run<S: AsRef<OsStr>>(
+    program: &str,
+    args: &[S],
+    timeout: Duration,
+) -> Result<CmdOutput, String> {
     let mut child = Command::new(program)
         .args(args)
         .stdin(Stdio::null())
@@ -90,7 +101,10 @@ pub fn run<S: AsRef<OsStr>>(program: &str, args: &[S], timeout: Duration) -> Res
     let stderr = err_thread.join().unwrap_or_default();
     Ok(CmdOutput {
         program: program.to_string(),
-        args: args.iter().map(|a| a.as_ref().to_string_lossy().into_owned()).collect(),
+        args: args
+            .iter()
+            .map(|a| a.as_ref().to_string_lossy().into_owned())
+            .collect(),
         exit_code: status.and_then(|s| s.code()),
         stdout,
         stderr,
@@ -100,7 +114,18 @@ pub fn run<S: AsRef<OsStr>>(program: &str, args: &[S], timeout: Duration) -> Res
 
 /// Run a Windows PowerShell script block non-interactively.
 pub fn powershell(script: &str, timeout: Duration) -> Result<CmdOutput, String> {
-    run("powershell.exe", &["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script], timeout)
+    run(
+        "powershell.exe",
+        &[
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            script,
+        ],
+        timeout,
+    )
 }
 
 #[cfg(test)]
@@ -109,7 +134,12 @@ mod tests {
 
     #[test]
     fn missing_program_is_an_error_not_a_panic() {
-        assert!(run("definitely-not-a-real-program-xyz", &["a"], Duration::from_secs(5)).is_err());
+        assert!(run(
+            "definitely-not-a-real-program-xyz",
+            &["a"],
+            Duration::from_secs(5)
+        )
+        .is_err());
     }
 
     #[test]

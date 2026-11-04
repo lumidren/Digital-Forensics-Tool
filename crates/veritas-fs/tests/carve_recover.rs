@@ -74,7 +74,10 @@ fn carve_synthetic_stream() {
     let straddle = CHUNK_SIZE as usize - 3;
     place(straddle, &png(false));
     let hits = carve::carve(MemSource::source(buf.clone()).as_ref()).unwrap();
-    let got: Vec<(u64, &str, u64, bool)> = hits.iter().map(|h| (h.offset, h.file_type.as_str(), h.size, h.validated)).collect();
+    let got: Vec<(u64, &str, u64, bool)> = hits
+        .iter()
+        .map(|h| (h.offset, h.file_type.as_str(), h.size, h.validated))
+        .collect();
     assert_eq!(
         got,
         vec![
@@ -91,7 +94,10 @@ fn carve_synthetic_stream() {
             (straddle as u64, "png", png(false).len() as u64, true),
         ]
     );
-    assert_eq!(carve::extract(MemSource::source(buf).as_ref(), &hits[9]).unwrap(), png(false));
+    assert_eq!(
+        carve::extract(MemSource::source(buf).as_ref(), &hits[9]).unwrap(),
+        png(false)
+    );
 }
 
 #[test]
@@ -102,7 +108,16 @@ fn recover_ntfs_resident_file() {
     let fs = Ntfs::open(MemSource::source(d)).unwrap();
     let r = recover::recover_ntfs(&fs).unwrap();
     assert_eq!(r.len(), 1);
-    assert_eq!((r[0].id, r[0].name.as_str(), r[0].size, r[0].recovered_confidence, r[0].method.as_str()), (66, "passwords.txt", 116, recover::CONF_RESIDENT, "resident"));
+    assert_eq!(
+        (
+            r[0].id,
+            r[0].name.as_str(),
+            r[0].size,
+            r[0].recovered_confidence,
+            r[0].method.as_str()
+        ),
+        (66, "passwords.txt", 116, recover::CONF_RESIDENT, "resident")
+    );
     let dir = tempfile::tempdir().unwrap();
     let written = recover::write_recovered(dir.path(), &r).unwrap();
     assert_eq!(std::fs::read(&written[0]).unwrap().len(), 116);
@@ -136,7 +151,7 @@ fn recover_fat_deleted_entry() {
     assert_eq!(r.len(), 1);
     assert_eq!(r[0].size, 116);
     assert_eq!(r[0].recovered_confidence, recover::CONF_REUSED_FLOOR); // cluster still allocated in the FAT
-    // Free the cluster (FAT12 entry 5 is the high 12 bits at FAT+7) -> full confidence.
+                                                                       // Free the cluster (FAT12 entry 5 is the high 12 bits at FAT+7) -> full confidence.
     let fat = fs.fat_offset as usize;
     let v = u16::from_le_bytes([d[fat + 7], d[fat + 8]]) & 0x000F;
     d[fat + 7..fat + 9].copy_from_slice(&v.to_le_bytes());

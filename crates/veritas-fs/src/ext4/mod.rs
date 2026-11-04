@@ -68,7 +68,11 @@ impl Superblock {
         }
         let rev = u32_at(b, 0x4C)?;
         let incompat = u32_at(b, 0x60)?;
-        let hi = if incompat & INCOMPAT_64BIT != 0 { u32_at(b, 0x150)? as u64 } else { 0 };
+        let hi = if incompat & INCOMPAT_64BIT != 0 {
+            u32_at(b, 0x150)? as u64
+        } else {
+            0
+        };
         Ok(Superblock {
             inodes_count: u32_at(b, 0)?,
             blocks_count: (hi << 32) | u32_at(b, 4)? as u64,
@@ -127,9 +131,15 @@ pub struct Inode {
 }
 
 impl Inode {
-    pub fn is_dir(&self) -> bool { self.mode & 0xF000 == 0x4000 }
-    pub fn is_reg(&self) -> bool { self.mode & 0xF000 == 0x8000 }
-    pub fn is_symlink(&self) -> bool { self.mode & 0xF000 == 0xA000 }
+    pub fn is_dir(&self) -> bool {
+        self.mode & 0xF000 == 0x4000
+    }
+    pub fn is_reg(&self) -> bool {
+        self.mode & 0xF000 == 0x8000
+    }
+    pub fn is_symlink(&self) -> bool {
+        self.mode & 0xF000 == 0xA000
+    }
     pub fn kind(&self) -> &'static str {
         match self.mode & 0xF000 {
             0x1000 => "fifo",
@@ -210,23 +220,41 @@ impl Ext4 {
     pub fn open(src: Source) -> Result<Self> {
         let sbb = read_vec(src.as_ref(), 1024, 1024)?;
         let sb = Superblock::parse(&sbb)?;
-        if sb.blocks_per_group == 0 || sb.inodes_per_group == 0 || sb.inode_size < 128 || sb.inode_size as u64 > sb.block_size {
+        if sb.blocks_per_group == 0
+            || sb.inodes_per_group == 0
+            || sb.inode_size < 128
+            || sb.inode_size as u64 > sb.block_size
+        {
             return Err(FsError::invalid(1024, "ext superblock geometry"));
         }
-        let ngroups = (sb.blocks_count.saturating_sub(sb.first_data_block as u64)).div_ceil(sb.blocks_per_group as u64);
+        let ngroups = (sb.blocks_count.saturating_sub(sb.first_data_block as u64))
+            .div_ceil(sb.blocks_per_group as u64);
         if ngroups == 0 || ngroups > MAX_GROUPS {
             return Err(FsError::invalid(1024, "group count"));
         }
         if sb.inodes_count as u64 != ngroups * sb.inodes_per_group as u64 {
-            return Err(FsError::invalid(1024, "inodes_count != groups * inodes_per_group"));
+            return Err(FsError::invalid(
+                1024,
+                "inodes_count != groups * inodes_per_group",
+            ));
         }
-        let ds = if sb.feature_incompat & INCOMPAT_64BIT != 0 && sb.desc_size >= 64 { sb.desc_size as u64 } else { 32 };
+        let ds = if sb.feature_incompat & INCOMPAT_64BIT != 0 && sb.desc_size >= 64 {
+            sb.desc_size as u64
+        } else {
+            32
+        };
         let gdt_off = (sb.first_data_block as u64 + 1) * sb.block_size;
         let gdt = read_vec_padded(src.as_ref(), gdt_off, ngroups * ds)?;
         let mut groups = Vec::with_capacity(ngroups as usize);
         for g in 0..ngroups as usize {
             let o = g * ds as usize;
-            let hi = |off: usize| -> Result<u64> { if ds >= 64 { Ok(u32_at(&gdt, o + off)? as u64) } else { Ok(0) } };
+            let hi = |off: usize| -> Result<u64> {
+                if ds >= 64 {
+                    Ok(u32_at(&gdt, o + off)? as u64)
+                } else {
+                    Ok(0)
+                }
+            };
             groups.push(GroupDesc {
                 block_bitmap: (hi(0x20)? << 32) | u32_at(&gdt, o)? as u64,
                 inode_bitmap: (hi(0x24)? << 32) | u32_at(&gdt, o + 4)? as u64,
@@ -237,10 +265,14 @@ impl Ext4 {
         Ok(Ext4 { src, sb, groups })
     }
 
-    pub fn block_size(&self) -> u64 { self.sb.block_size }
+    pub fn block_size(&self) -> u64 {
+        self.sb.block_size
+    }
 
     fn read_block(&self, b: u64) -> Result<Vec<u8>> {
-        let off = b.checked_mul(self.sb.block_size).ok_or_else(|| FsError::invalid(b, "block overflow"))?;
+        let off = b
+            .checked_mul(self.sb.block_size)
+            .ok_or_else(|| FsError::invalid(b, "block overflow"))?;
         read_vec_padded(self.src.as_ref(), off, self.sb.block_size)
     }
 
@@ -250,12 +282,16 @@ impl Ext4 {
         }
         let g = ((ino - 1) / self.sb.inodes_per_group as u64) as usize;
         let idx = (ino - 1) % self.sb.inodes_per_group as u64;
-        let Some(gd) = self.groups.get(g) else { return false };
+        let Some(gd) = self.groups.get(g) else {
+            return false;
+        };
         if gd.flags & 0x1 != 0 {
             return false; // INODE_UNINIT
         }
         match self.read_block(gd.inode_bitmap) {
-            Ok(bm) => bm.get((idx / 8) as usize).is_some_and(|b| b & (1 << (idx % 8)) != 0),
+            Ok(bm) => bm
+                .get((idx / 8) as usize)
+                .is_some_and(|b| b & (1 << (idx % 8)) != 0),
             Err(_) => false,
         }
     }
@@ -267,14 +303,25 @@ impl Ext4 {
         let ipg = self.sb.inodes_per_group as u64;
         let g = ((ino - 1) / ipg) as usize;
         let idx = (ino - 1) % ipg;
-        let gd = self.groups.get(g).ok_or_else(|| FsError::NotFound(format!("group of inode {ino}")))?;
+        let gd = self
+            .groups
+            .get(g)
+            .ok_or_else(|| FsError::NotFound(format!("group of inode {ino}")))?;
         let isz = self.sb.inode_size as u64;
-        let off = gd.inode_table.checked_mul(self.sb.block_size).and_then(|v| v.checked_add(idx * isz)).ok_or_else(|| FsError::invalid(ino, "inode offset overflow"))?;
+        let off = gd
+            .inode_table
+            .checked_mul(self.sb.block_size)
+            .and_then(|v| v.checked_add(idx * isz))
+            .ok_or_else(|| FsError::invalid(ino, "inode offset overflow"))?;
         let d = read_vec(self.src.as_ref(), off, isz)?;
         let extra_isize = if isz > 128 { u16_at(&d, 0x80)? } else { 0 };
         let has = |end: usize| isz > 128 && (128 + extra_isize as usize) >= end && end <= d.len();
         let extra = |o: usize| if has(o + 4) { u32_at(&d, o).ok() } else { None };
-        let crtime = if has(0x98) { ext_time(u32_at(&d, 0x90)?, extra(0x94)) } else { None };
+        let crtime = if has(0x98) {
+            ext_time(u32_at(&d, 0x90)?, extra(0x94))
+        } else {
+            None
+        };
         let mode = u16_at(&d, 0)?;
         let size_hi = u32_at(&d, 0x6C)? as u64;
         Ok(Inode {
@@ -310,14 +357,23 @@ impl Ext4 {
             self.walk_extents(&ino.block, 0, &mut out, &mut nodes)?;
         } else {
             let nblocks = ino.size.div_ceil(self.sb.block_size);
-            let ptrs: Vec<u32> = ino.block.chunks_exact(4).map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]])).collect();
+            let ptrs: Vec<u32> = ino
+                .block
+                .chunks_exact(4)
+                .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+                .collect();
             let mut logical = 0u64;
             for &p in ptrs.iter().take(12) {
                 if logical >= nblocks {
                     break;
                 }
                 if p != 0 {
-                    out.push(Extent { logical, physical: p as u64, length: 1, uninit: false });
+                    out.push(Extent {
+                        logical,
+                        physical: p as u64,
+                        length: 1,
+                        uninit: false,
+                    });
                 }
                 logical += 1;
             }
@@ -338,7 +394,10 @@ impl Ext4 {
         let mut merged: Vec<Extent> = Vec::new();
         for e in out {
             if let Some(l) = merged.last_mut() {
-                if l.logical + l.length == e.logical && l.physical + l.length == e.physical && l.uninit == e.uninit {
+                if l.logical + l.length == e.logical
+                    && l.physical + l.length == e.physical
+                    && l.uninit == e.uninit
+                {
                     l.length += e.length;
                     continue;
                 }
@@ -348,7 +407,15 @@ impl Ext4 {
         Ok(merged)
     }
 
-    fn walk_indirect(&self, blk: u64, level: usize, base: u64, nblocks: u64, out: &mut Vec<Extent>, nodes: &mut usize) -> Result<()> {
+    fn walk_indirect(
+        &self,
+        blk: u64,
+        level: usize,
+        base: u64,
+        nblocks: u64,
+        out: &mut Vec<Extent>,
+        nodes: &mut usize,
+    ) -> Result<()> {
         *nodes += 1;
         if *nodes > MAX_MAP_NODES || level > 2 {
             return Err(FsError::Limit("block map too large".into()));
@@ -366,7 +433,12 @@ impl Ext4 {
                 continue;
             }
             if level == 0 {
-                out.push(Extent { logical, physical: p, length: 1, uninit: false });
+                out.push(Extent {
+                    logical,
+                    physical: p,
+                    length: 1,
+                    uninit: false,
+                });
             } else {
                 self.walk_indirect(p, level - 1, logical, nblocks, out, nodes)?;
             }
@@ -374,7 +446,13 @@ impl Ext4 {
         Ok(())
     }
 
-    fn walk_extents(&self, node: &[u8], depth: usize, out: &mut Vec<Extent>, nodes: &mut usize) -> Result<()> {
+    fn walk_extents(
+        &self,
+        node: &[u8],
+        depth: usize,
+        out: &mut Vec<Extent>,
+        nodes: &mut usize,
+    ) -> Result<()> {
         *nodes += 1;
         if depth > MAX_EXTENT_DEPTH || *nodes > MAX_MAP_NODES {
             return Err(FsError::Limit("extent tree too deep or large".into()));
@@ -394,7 +472,12 @@ impl Ext4 {
                     len -= 32768;
                 }
                 let start = ((u16_at(node, o + 6)? as u64) << 32) | u32_at(node, o + 8)? as u64;
-                out.push(Extent { logical: lb, physical: start, length: len, uninit });
+                out.push(Extent {
+                    logical: lb,
+                    physical: start,
+                    length: len,
+                    uninit,
+                });
             } else {
                 let leaf = ((u16_at(node, o + 8)? as u64) << 32) | u32_at(node, o + 4)? as u64;
                 let child = self.read_block(leaf)?;
@@ -410,7 +493,16 @@ impl Ext4 {
             return Err(FsError::Limit("file too large".into()));
         }
         let size = ino.size as usize;
-        if ino.flags & FL_INLINE_DATA != 0 || (ino.is_symlink() && ino.size < 60 && ino.flags & FL_EXTENTS == 0 && ino.blocks.saturating_sub(if ino.file_acl != 0 { self.sb.block_size / 512 } else { 0 }) == 0) {
+        if ino.flags & FL_INLINE_DATA != 0
+            || (ino.is_symlink()
+                && ino.size < 60
+                && ino.flags & FL_EXTENTS == 0
+                && ino.blocks.saturating_sub(if ino.file_acl != 0 {
+                    self.sb.block_size / 512
+                } else {
+                    0
+                }) == 0)
+        {
             let mut d = ino.block.clone();
             d.truncate(size.min(60));
             return Ok(d);
@@ -459,21 +551,41 @@ impl Ext4 {
             let mut pos = if inline { 4 } else { 0 }; // inline dirs start with the parent inode number
             if inline {
                 if let Ok(p) = u32_at(blk, 0) {
-                    out.push(DirEntry { inode: p as u64, name: "..".into(), file_type: 2, deleted: false, offset: base });
+                    out.push(DirEntry {
+                        inode: p as u64,
+                        name: "..".into(),
+                        file_type: 2,
+                        deleted: false,
+                        offset: base,
+                    });
                 }
             }
-            let dx_node = htree && (bi == 0 || (u32_at(blk, 0).unwrap_or(1) == 0 && u16_at(blk, 4).unwrap_or(0) as usize == bs));
+            let dx_node = htree
+                && (bi == 0
+                    || (u32_at(blk, 0).unwrap_or(1) == 0
+                        && u16_at(blk, 4).unwrap_or(0) as usize == bs));
             while pos + 8 <= blk.len() {
                 let ino_n = u32_at(blk, pos)? as u64;
                 let rec_len = u16_at(blk, pos + 4)? as usize;
-                let name_len = if filetype { u8_at(blk, pos + 6)? as usize } else { u16_at(blk, pos + 6)? as usize & 0xFF };
+                let name_len = if filetype {
+                    u8_at(blk, pos + 6)? as usize
+                } else {
+                    u16_at(blk, pos + 6)? as usize & 0xFF
+                };
                 let ftype = if filetype { u8_at(blk, pos + 7)? } else { 0 };
                 if rec_len < 8 || pos + rec_len > blk.len() {
                     break;
                 }
                 if ino_n != 0 && name_len > 0 && pos + 8 + name_len <= blk.len() {
-                    let name = String::from_utf8_lossy(&blk[pos + 8..pos + 8 + name_len]).into_owned();
-                    out.push(DirEntry { inode: ino_n, name, file_type: ftype, deleted: false, offset: base + pos as u64 });
+                    let name =
+                        String::from_utf8_lossy(&blk[pos + 8..pos + 8 + name_len]).into_owned();
+                    out.push(DirEntry {
+                        inode: ino_n,
+                        name,
+                        file_type: ftype,
+                        deleted: false,
+                        offset: base + pos as u64,
+                    });
                 }
                 // Slack after the live record may hold unlinked entries.
                 let used = (8 + name_len + 3) & !3;
@@ -483,10 +595,21 @@ impl Ext4 {
                         let cand_ino = u32_at(blk, p)? as u64;
                         let cl = u8_at(blk, p + 6)? as usize;
                         let crl = u16_at(blk, p + 4)? as usize;
-                        if cand_ino != 0 && cand_ino <= max_ino && cl > 0 && p + 8 + cl <= pos + rec_len && crl >= 8 + cl {
+                        if cand_ino != 0
+                            && cand_ino <= max_ino
+                            && cl > 0
+                            && p + 8 + cl <= pos + rec_len
+                            && crl >= 8 + cl
+                        {
                             let nb = &blk[p + 8..p + 8 + cl];
                             if nb.iter().all(|&c| c >= 0x20 && c != b'/' && c != 0x7F) {
-                                out.push(DirEntry { inode: cand_ino, name: String::from_utf8_lossy(nb).into_owned(), file_type: if filetype { blk[p + 7] } else { 0 }, deleted: true, offset: base + p as u64 });
+                                out.push(DirEntry {
+                                    inode: cand_ino,
+                                    name: String::from_utf8_lossy(nb).into_owned(),
+                                    file_type: if filetype { blk[p + 7] } else { 0 },
+                                    deleted: true,
+                                    offset: base + p as u64,
+                                });
                                 p += (8 + cl + 3) & !3;
                                 continue;
                             }
@@ -500,9 +623,20 @@ impl Ext4 {
         Ok(out)
     }
 
-    fn make_entry(&self, path: String, name: String, ino: u64, parent: u64, deleted_name: bool) -> Option<ExtEntry> {
+    fn make_entry(
+        &self,
+        path: String,
+        name: String,
+        ino: u64,
+        parent: u64,
+        deleted_name: bool,
+    ) -> Option<ExtEntry> {
         let i = self.inode(ino).ok()?;
-        let symlink_target = if i.is_symlink() { self.symlink_target(&i).ok() } else { None };
+        let symlink_target = if i.is_symlink() {
+            self.symlink_target(&i).ok()
+        } else {
+            None
+        };
         Some(ExtEntry {
             path,
             name,
@@ -532,7 +666,9 @@ impl Ext4 {
         let mut visited: BTreeSet<u64> = BTreeSet::new();
         visited.insert(2);
         while let Some((dir, prefix, depth)) = stack.pop() {
-            let Ok(list) = self.list_dir(dir) else { continue };
+            let Ok(list) = self.list_dir(dir) else {
+                continue;
+            };
             for de in list {
                 if de.name == "." || de.name == ".." || (de.deleted && !include_deleted) {
                     continue;
@@ -541,15 +677,23 @@ impl Ext4 {
                     break;
                 }
                 let path = format!("{}/{}", prefix, de.name);
-                if let Some(e) = self.make_entry(path.clone(), de.name.clone(), de.inode, dir, de.deleted) {
-                    if e.kind == "dir" && !de.deleted && depth < MAX_DIR_DEPTH && visited.insert(de.inode) {
+                if let Some(e) =
+                    self.make_entry(path.clone(), de.name.clone(), de.inode, dir, de.deleted)
+                {
+                    if e.kind == "dir"
+                        && !de.deleted
+                        && depth < MAX_DIR_DEPTH
+                        && visited.insert(de.inode)
+                    {
                         stack.push((de.inode, path, depth + 1));
                     }
                     out.push(e);
                 }
             }
         }
-        out.sort_by(|a, b| (&a.path, a.inode, a.deleted_name).cmp(&(&b.path, b.inode, b.deleted_name)));
+        out.sort_by(|a, b| {
+            (&a.path, a.inode, a.deleted_name).cmp(&(&b.path, b.inode, b.deleted_name))
+        });
         Ok(out)
     }
 
@@ -557,7 +701,11 @@ impl Ext4 {
         let mut cur = 2u64;
         for comp in path.split('/').filter(|c| !c.is_empty()) {
             let list = self.list_dir(cur)?;
-            cur = list.iter().find(|d| !d.deleted && d.name == comp).map(|d| d.inode).ok_or_else(|| FsError::NotFound(path.to_string()))?;
+            cur = list
+                .iter()
+                .find(|d| !d.deleted && d.name == comp)
+                .map(|d| d.inode)
+                .ok_or_else(|| FsError::NotFound(path.to_string()))?;
         }
         Ok(cur)
     }
@@ -588,7 +736,10 @@ impl Ext4 {
                 bitmaps.clear();
                 bitmaps.insert(g, self.read_block(gd.inode_bitmap)?);
             }
-            let alloc = bitmaps.get(&g).and_then(|bm| bm.get((idx / 8) as usize)).is_some_and(|b| b & (1 << (idx % 8)) != 0);
+            let alloc = bitmaps
+                .get(&g)
+                .and_then(|bm| bm.get((idx / 8) as usize))
+                .is_some_and(|b| b & (1 << (idx % 8)) != 0);
             if alloc {
                 continue;
             }
@@ -612,4 +763,6 @@ impl Ext4 {
 }
 
 /// True when `src` carries an ext superblock.
-pub fn probe(sb: &[u8]) -> bool { sb.len() >= 0x3A && sb[0x38] == 0x53 && sb[0x39] == 0xEF }
+pub fn probe(sb: &[u8]) -> bool {
+    sb.len() >= 0x3A && sb[0x38] == 0x53 && sb[0x39] == 0xEF
+}

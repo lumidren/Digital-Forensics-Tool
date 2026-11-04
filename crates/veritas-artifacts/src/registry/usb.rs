@@ -46,12 +46,21 @@ pub struct UsbDevice {
 /// `\??\Volume{...}` / `\DosDevices\X:` entries; data decoded as UTF-16 when it looks like a
 /// device path, otherwise hex (MBR signature + offset, GPT GUID).
 pub fn mounted_devices(hive: &Hive) -> Vec<MountedDevice> {
-    let Some(k) = hive.key("MountedDevices") else { return vec![] };
+    let Some(k) = hive.key("MountedDevices") else {
+        return vec![];
+    };
     k.values()
         .into_iter()
         .map(|v| {
-            let s = if v.raw.len() > 24 && v.raw.len() % 2 == 0 && v.raw.get(1) == Some(&0) { utf16le(&v.raw, true) } else { hex::encode(&v.raw) };
-            MountedDevice { name: v.name, data: s }
+            let s = if v.raw.len() > 24 && v.raw.len() % 2 == 0 && v.raw.get(1) == Some(&0) {
+                utf16le(&v.raw, true)
+            } else {
+                hex::encode(&v.raw)
+            };
+            MountedDevice {
+                name: v.name,
+                data: s,
+            }
         })
         .collect()
 }
@@ -89,11 +98,18 @@ fn parse_usbstor_class(name: &str) -> (String, Option<String>, Option<String>, O
 
 pub fn devices(hive: &Hive) -> Vec<UsbDevice> {
     let mut out = Vec::new();
-    let Some(ccs) = current_control_set(hive) else { return out };
+    let Some(ccs) = current_control_set(hive) else {
+        return out;
+    };
     let mounted = mounted_devices(hive);
-    for (sub, data_type) in [("USBSTOR", "windows:registry:usbstor"), ("USB", "windows:registry:usb")] {
+    for (sub, data_type) in [
+        ("USBSTOR", "windows:registry:usbstor"),
+        ("USB", "windows:registry:usb"),
+    ] {
         let rel = format!("{ccs}\\Enum\\{sub}");
-        let Some(enum_key) = hive.key(&rel) else { continue };
+        let Some(enum_key) = hive.key(&rel) else {
+            continue;
+        };
         for dev in enum_key.subkeys() {
             let (class, ven, prod, rev) = if sub == "USBSTOR" {
                 parse_usbstor_class(&dev.name)
@@ -112,7 +128,11 @@ pub fn devices(hive: &Hive) -> Vec<UsbDevice> {
             for inst in dev.subkeys() {
                 let serial_lc = inst.name.split('&').next().unwrap_or("").to_lowercase();
                 let m: Vec<MountedDevice> = if serial_lc.len() >= 4 {
-                    mounted.iter().filter(|m| m.data.to_lowercase().contains(&format!("#{serial_lc}"))).cloned().collect()
+                    mounted
+                        .iter()
+                        .filter(|m| m.data.to_lowercase().contains(&format!("#{serial_lc}")))
+                        .cloned()
+                        .collect()
                 } else {
                     vec![]
                 };
@@ -143,17 +163,50 @@ pub fn devices(hive: &Hive) -> Vec<UsbDevice> {
 pub fn system_events(hive: &Hive, ctx: &Ctx<'_>) -> Vec<Event> {
     let mut out = Vec::new();
     for d in devices(hive) {
-        let label = d.friendly_name.clone().or(d.device_desc.clone()).unwrap_or_else(|| d.device_class.clone());
+        let label = d
+            .friendly_name
+            .clone()
+            .or(d.device_desc.clone())
+            .unwrap_or_else(|| d.device_class.clone());
         let mk = |td: &str, ts: Option<i64>| {
-            let letters: Vec<String> = d.mounted.iter().filter(|m| m.name.starts_with("\\DosDevices\\")).map(|m| m.name.trim_start_matches("\\DosDevices\\").to_string()).collect();
-            let vols: Vec<String> = d.mounted.iter().filter(|m| m.name.starts_with("\\??\\Volume")).map(|m| m.name.trim_start_matches("\\??\\Volume").to_string()).collect();
+            let letters: Vec<String> = d
+                .mounted
+                .iter()
+                .filter(|m| m.name.starts_with("\\DosDevices\\"))
+                .map(|m| m.name.trim_start_matches("\\DosDevices\\").to_string())
+                .collect();
+            let vols: Vec<String> = d
+                .mounted
+                .iter()
+                .filter(|m| m.name.starts_with("\\??\\Volume"))
+                .map(|m| m.name.trim_start_matches("\\??\\Volume").to_string())
+                .collect();
             let mut e = ctx
-                .event("usb", d.data_type, td, ts, format!("[{}] {} serial: {}", ctx.full_path(&d.key_rel_path), label, d.serial), &d.key_rel_path, d.key_offset)
+                .event(
+                    "usb",
+                    d.data_type,
+                    td,
+                    ts,
+                    format!(
+                        "[{}] {} serial: {}",
+                        ctx.full_path(&d.key_rel_path),
+                        label,
+                        d.serial
+                    ),
+                    &d.key_rel_path,
+                    d.key_offset,
+                )
                 .attr("device_class", d.device_class.clone())
                 .attr("serial", d.serial.clone())
                 .attr("drive_letters", json!(letters))
                 .attr("volume_guids", json!(vols));
-            for (k, v) in [("vendor", &d.vendor), ("product", &d.product), ("revision", &d.revision), ("friendly_name", &d.friendly_name), ("device_description", &d.device_desc)] {
+            for (k, v) in [
+                ("vendor", &d.vendor),
+                ("product", &d.product),
+                ("revision", &d.revision),
+                ("friendly_name", &d.friendly_name),
+                ("device_description", &d.device_desc),
+            ] {
                 if let Some(v) = v {
                     e = e.attr(k, v.clone());
                 }
@@ -180,17 +233,27 @@ pub fn system_events(hive: &Hive, ctx: &Ctx<'_>) -> Vec<Event> {
 /// SOFTWARE: Windows Portable Devices.
 pub fn software_events(hive: &Hive, ctx: &Ctx<'_>) -> Vec<Event> {
     let rel = "Microsoft\\Windows Portable Devices\\Devices";
-    let Some(k) = hive.key(rel) else { return vec![] };
+    let Some(k) = hive.key(rel) else {
+        return vec![];
+    };
     k.subkeys()
         .into_iter()
         .map(|d| {
             let fname = d.value_string("FriendlyName").unwrap_or_default();
             let serial = d.name.split('#').rev().nth(1).unwrap_or("").to_string();
             let r = join(rel, &d.name);
-            ctx.event("usb", "windows:registry:windows_portable_devices", desc::WRITTEN, d.last_written_ns, format!("[{}] Friendly name: {fname}", ctx.full_path(&r)), &r, d.offset)
-                .attr("device_id", d.name.clone())
-                .attr("friendly_name", fname)
-                .attr("serial", serial)
+            ctx.event(
+                "usb",
+                "windows:registry:windows_portable_devices",
+                desc::WRITTEN,
+                d.last_written_ns,
+                format!("[{}] Friendly name: {fname}", ctx.full_path(&r)),
+                &r,
+                d.offset,
+            )
+            .attr("device_id", d.name.clone())
+            .attr("friendly_name", fname)
+            .attr("serial", serial)
         })
         .collect()
 }
@@ -198,7 +261,9 @@ pub fn software_events(hive: &Hive, ctx: &Ctx<'_>) -> Vec<Event> {
 /// NTUSER: MountPoints2 subkeys (volume GUIDs, drive letters, network shares used by the user).
 pub fn ntuser_events(hive: &Hive, ctx: &Ctx<'_>) -> Vec<Event> {
     let rel = "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\MountPoints2";
-    let Some(k) = hive.key(rel) else { return vec![] };
+    let Some(k) = hive.key(rel) else {
+        return vec![];
+    };
     k.subkeys()
         .into_iter()
         .map(|m| {
@@ -210,10 +275,18 @@ pub fn ntuser_events(hive: &Hive, ctx: &Ctx<'_>) -> Vec<Event> {
             } else {
                 ("drive", "drive_letter", m.name.clone())
             };
-            ctx.event("mountpoints2", "windows:registry:mount_points2", desc::WRITTEN, m.last_written_ns, format!("[{}] Type: {kind} {val}", ctx.full_path(&r)), &r, m.offset)
-                .attr("type", kind)
-                .attr(attr_key, val)
-                .attr("label", m.value_string("_LabelFromReg").unwrap_or_default())
+            ctx.event(
+                "mountpoints2",
+                "windows:registry:mount_points2",
+                desc::WRITTEN,
+                m.last_written_ns,
+                format!("[{}] Type: {kind} {val}", ctx.full_path(&r)),
+                &r,
+                m.offset,
+            )
+            .attr("type", kind)
+            .attr(attr_key, val)
+            .attr("label", m.value_string("_LabelFromReg").unwrap_or_default())
         })
         .collect()
 }

@@ -55,7 +55,13 @@ struct Cursor<'a> {
 }
 
 impl<'a> Cursor<'a> {
-    fn new(src: &'a dyn ReadAt) -> Self { Self { src, base: 0, buf: Vec::new() } }
+    fn new(src: &'a dyn ReadAt) -> Self {
+        Self {
+            src,
+            base: 0,
+            buf: Vec::new(),
+        }
+    }
     /// Byte at absolute offset, `None` past the end of the source.
     fn byte(&mut self, off: u64) -> Option<u8> {
         if off < self.base || off >= self.base + self.buf.len() as u64 {
@@ -74,10 +80,22 @@ impl<'a> Cursor<'a> {
         }
         Some(v)
     }
-    fn u16be(&mut self, off: u64) -> Option<u16> { let b = self.bytes(off, 2)?; Some(u16::from_be_bytes([b[0], b[1]])) }
-    fn u32be(&mut self, off: u64) -> Option<u32> { let b = self.bytes(off, 4)?; Some(u32::from_be_bytes([b[0], b[1], b[2], b[3]])) }
-    fn u16le(&mut self, off: u64) -> Option<u16> { let b = self.bytes(off, 2)?; Some(u16::from_le_bytes([b[0], b[1]])) }
-    fn u32le(&mut self, off: u64) -> Option<u32> { let b = self.bytes(off, 4)?; Some(u32::from_le_bytes([b[0], b[1], b[2], b[3]])) }
+    fn u16be(&mut self, off: u64) -> Option<u16> {
+        let b = self.bytes(off, 2)?;
+        Some(u16::from_be_bytes([b[0], b[1]]))
+    }
+    fn u32be(&mut self, off: u64) -> Option<u32> {
+        let b = self.bytes(off, 4)?;
+        Some(u32::from_be_bytes([b[0], b[1], b[2], b[3]]))
+    }
+    fn u16le(&mut self, off: u64) -> Option<u16> {
+        let b = self.bytes(off, 2)?;
+        Some(u16::from_le_bytes([b[0], b[1]]))
+    }
+    fn u32le(&mut self, off: u64) -> Option<u32> {
+        let b = self.bytes(off, 4)?;
+        Some(u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+    }
     /// Find `pat` in `[from, from+limit)`.
     fn find(&mut self, pat: &[u8], from: u64, limit: u64) -> Option<u64> {
         let end = from.saturating_add(limit).min(self.src.size());
@@ -161,10 +179,18 @@ fn v_png(c: &mut Cursor, o: u64) -> V {
             return None;
         }
         first = false;
-        let data = if len <= 64 << 20 { read_vec_padded(c.src, p + 4, 4 + len).ok()? } else { return None };
+        let data = if len <= 64 << 20 {
+            read_vec_padded(c.src, p + 4, 4 + len).ok()?
+        } else {
+            return None;
+        };
         let crc = c.u32be(p + 8 + len)?;
         if crate::volume::gpt::crc32(&data) != crc {
-            return Some((p + 12 + len - o, false, format!("CRC mismatch in {} chunk", String::from_utf8_lossy(&typ))));
+            return Some((
+                p + 12 + len - o,
+                false,
+                format!("CRC mismatch in {} chunk", String::from_utf8_lossy(&typ)),
+            ));
         }
         p += 12 + len;
         if typ == b"IEND" {
@@ -181,7 +207,9 @@ fn v_pdf(c: &mut Cursor, o: u64) -> V {
     let mut last = None;
     let mut from = o + 5;
     for _ in 0..1024 {
-        let Some(e) = c.find(b"%%EOF", from, MAX_PDF.saturating_sub(from - o)) else { break };
+        let Some(e) = c.find(b"%%EOF", from, MAX_PDF.saturating_sub(from - o)) else {
+            break;
+        };
         let next_hdr = c.find(b"%PDF-", from, e - from);
         if next_hdr.is_some() {
             break;
@@ -216,7 +244,16 @@ fn v_zip(c: &mut Cursor, o: u64) -> V {
         let cd = read_vec_padded(c.src, o + cd_off, cd_size.min(16 << 20)).ok()?;
         let s = String::from_utf8_lossy(&cd);
         if s.contains("[Content_Types].xml") {
-            kind = if s.contains("word/") { "docx" } else if s.contains("xl/") { "xlsx" } else if s.contains("ppt/") { "pptx" } else { "ooxml" }.into();
+            kind = if s.contains("word/") {
+                "docx"
+            } else if s.contains("xl/") {
+                "xlsx"
+            } else if s.contains("ppt/") {
+                "pptx"
+            } else {
+                "ooxml"
+            }
+            .into();
         }
     }
     Some((size, ok, kind))
@@ -310,7 +347,11 @@ fn v_sqlite(c: &mut Cursor, o: u64) -> V {
             _ => break,
         }
     }
-    Some((ps * pages, false, format!("legacy header; size estimated from {pages} pages of {ps}")))
+    Some((
+        ps * pages,
+        false,
+        format!("legacy header; size estimated from {pages} pages of {ps}"),
+    ))
 }
 
 fn v_evtx(c: &mut Cursor, o: u64) -> V {
@@ -319,12 +360,18 @@ fn v_evtx(c: &mut Cursor, o: u64) -> V {
     let crc = u32::from_le_bytes([hdr[124], hdr[125], hdr[126], hdr[127]]);
     // The header chunk count can lag behind the chunks present; count ElfChnk signatures instead.
     let mut chunks = 0u64;
-    while 4096 + (chunks + 1) * 65536 <= MAX_EVTX && c.bytes(o + 4096 + chunks * 65536, 8).as_deref() == Some(&b"ElfChnk\0"[..]) {
+    while 4096 + (chunks + 1) * 65536 <= MAX_EVTX
+        && c.bytes(o + 4096 + chunks * 65536, 8).as_deref() == Some(&b"ElfChnk\0"[..])
+    {
         chunks += 1;
     }
     let size = 4096 + chunks * 65536;
     let ok = crate::volume::gpt::crc32(&hdr[..120]) == crc && chunks >= header_chunks;
-    Some((size, ok, format!("{chunks} chunks (header: {header_chunks})")))
+    Some((
+        size,
+        ok,
+        format!("{chunks} chunks (header: {header_chunks})"),
+    ))
 }
 
 fn validate(c: &mut Cursor, kind: &str, o: u64) -> V {
@@ -369,15 +416,29 @@ pub fn carve(src: &dyn ReadAt) -> Result<Vec<CarveHit>> {
                 i = (skip_until - start).min(limit as u64) as usize;
                 continue;
             }
-            if !matches!(buf[i], 0xFF | 0x89 | b'%' | b'P' | b'G' | b'M' | b'S' | b'E') {
+            if !matches!(
+                buf[i],
+                0xFF | 0x89 | b'%' | b'P' | b'G' | b'M' | b'S' | b'E'
+            ) {
                 i += 1;
                 continue;
             }
             for (sig, kind) in SIGS {
                 if buf[i..].starts_with(sig) {
                     if let Some((sz, ok, detail)) = validate(&mut c, kind, abs) {
-                        let file_type = if *kind == "zip" { detail.clone() } else { kind.to_string() };
-                        hits.push(CarveHit { offset: abs, size: sz, extension: extension(kind, &detail), file_type, validated: ok, detail });
+                        let file_type = if *kind == "zip" {
+                            detail.clone()
+                        } else {
+                            kind.to_string()
+                        };
+                        hits.push(CarveHit {
+                            offset: abs,
+                            size: sz,
+                            extension: extension(kind, &detail),
+                            file_type,
+                            validated: ok,
+                            detail,
+                        });
                         if ok {
                             skip_until = abs + sz.max(1);
                         }
@@ -395,5 +456,9 @@ pub fn carve(src: &dyn ReadAt) -> Result<Vec<CarveHit>> {
 
 /// Read the bytes of a hit (capped by the per-type maximum used during validation).
 pub fn extract(src: &dyn ReadAt, hit: &CarveHit) -> Result<Vec<u8>> {
-    read_vec_padded(src, hit.offset, hit.size.min(src.size().saturating_sub(hit.offset)))
+    read_vec_padded(
+        src,
+        hit.offset,
+        hit.size.min(src.size().saturating_sub(hit.offset)),
+    )
 }

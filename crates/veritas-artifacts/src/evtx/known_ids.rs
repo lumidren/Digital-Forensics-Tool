@@ -13,8 +13,20 @@ pub struct KnownId {
     pub category: &'static str,
 }
 
-const fn k(id: u32, source: &'static str, name: &'static str, description: &'static str, category: &'static str) -> KnownId {
-    KnownId { id, source, name, description, category }
+const fn k(
+    id: u32,
+    source: &'static str,
+    name: &'static str,
+    description: &'static str,
+    category: &'static str,
+) -> KnownId {
+    KnownId {
+        id,
+        source,
+        name,
+        description,
+        category,
+    }
 }
 
 const SEC: &str = "Security";
@@ -230,8 +242,22 @@ pub static KNOWN_IDS: &[KnownId] = &[
 
 /// SMB client/server operational IDs 1001-1020 share one description per provider.
 pub static KNOWN_RANGES: &[(u32, u32, &str, &str, &str, &str)] = &[
-    (1001, 1020, SMBC, "smb_client_event", "SMB client connectivity/authentication event", "smb"),
-    (1001, 1020, SMBS, "smb_server_event", "SMB server connectivity/authentication event", "smb"),
+    (
+        1001,
+        1020,
+        SMBC,
+        "smb_client_event",
+        "SMB client connectivity/authentication event",
+        "smb",
+    ),
+    (
+        1001,
+        1020,
+        SMBS,
+        "smb_server_event",
+        "SMB server connectivity/authentication event",
+        "smb",
+    ),
 ];
 
 /// Look up enrichment for an event.
@@ -239,16 +265,32 @@ pub fn lookup(event_id: u32, provider: &str, channel: &str) -> Option<KnownId> {
     let eq = |a: &str, b: &str| a.eq_ignore_ascii_case(b);
     let chan_base = channel.split('/').next().unwrap_or(channel);
     // 1. provider match
-    if let Some(k) = KNOWN_IDS.iter().find(|k| k.id == event_id && (eq(k.source, provider) || (k.source.len() > 12 && provider.to_ascii_lowercase().starts_with(&k.source.to_ascii_lowercase())))) {
+    if let Some(k) = KNOWN_IDS.iter().find(|k| {
+        k.id == event_id
+            && (eq(k.source, provider)
+                || (k.source.len() > 12
+                    && provider
+                        .to_ascii_lowercase()
+                        .starts_with(&k.source.to_ascii_lowercase())))
+    }) {
         return Some(*k);
     }
     for (lo, hi, src, name, desc, cat) in KNOWN_RANGES {
         if (*lo..=*hi).contains(&event_id) && (eq(src, provider) || eq(src, chan_base)) {
-            return Some(KnownId { id: event_id, source: src, name, description: desc, category: cat });
+            return Some(KnownId {
+                id: event_id,
+                source: src,
+                name,
+                description: desc,
+                category: cat,
+            });
         }
     }
     // 2. channel match (full channel, then the part before '/')
-    KNOWN_IDS.iter().find(|k| k.id == event_id && (eq(k.source, channel) || eq(k.source, chan_base))).copied()
+    KNOWN_IDS
+        .iter()
+        .find(|k| k.id == event_id && (eq(k.source, channel) || eq(k.source, chan_base)))
+        .copied()
 }
 
 #[cfg(test)]
@@ -258,11 +300,44 @@ mod tests {
     #[test]
     fn table_size_and_lookups() {
         assert!(KNOWN_IDS.len() >= 120, "{}", KNOWN_IDS.len());
-        assert_eq!(lookup(4624, "Microsoft-Windows-Security-Auditing", "Security").unwrap().category, "logon");
-        assert_eq!(lookup(1, "Microsoft-Windows-Sysmon", "Microsoft-Windows-Sysmon/Operational").unwrap().name, "sysmon_process_create");
-        assert_eq!(lookup(1, "Microsoft-Windows-Kernel-General", "System").unwrap().name, "system_time_changed");
-        assert_eq!(lookup(7045, "Service Control Manager", "System").unwrap().category, "service");
-        assert_eq!(lookup(1010, "Microsoft-Windows-SmbClient", "Microsoft-Windows-SmbClient/Connectivity").unwrap().category, "smb");
+        assert_eq!(
+            lookup(4624, "Microsoft-Windows-Security-Auditing", "Security")
+                .unwrap()
+                .category,
+            "logon"
+        );
+        assert_eq!(
+            lookup(
+                1,
+                "Microsoft-Windows-Sysmon",
+                "Microsoft-Windows-Sysmon/Operational"
+            )
+            .unwrap()
+            .name,
+            "sysmon_process_create"
+        );
+        assert_eq!(
+            lookup(1, "Microsoft-Windows-Kernel-General", "System")
+                .unwrap()
+                .name,
+            "system_time_changed"
+        );
+        assert_eq!(
+            lookup(7045, "Service Control Manager", "System")
+                .unwrap()
+                .category,
+            "service"
+        );
+        assert_eq!(
+            lookup(
+                1010,
+                "Microsoft-Windows-SmbClient",
+                "Microsoft-Windows-SmbClient/Connectivity"
+            )
+            .unwrap()
+            .category,
+            "smb"
+        );
         assert!(lookup(99999, "x", "y").is_none());
     }
 }

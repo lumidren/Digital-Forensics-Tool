@@ -81,7 +81,9 @@ pub fn resolve_segments(first: &Path) -> Result<Vec<PathBuf>> {
     }
     let mut out = vec![first.to_path_buf()];
     for n in 2u32.. {
-        let Some(e) = format::segment_extension(ext, n) else { break };
+        let Some(e) = format::segment_extension(ext, n) else {
+            break;
+        };
         let p = first.with_extension(e);
         if p.is_file() {
             out.push(p);
@@ -121,7 +123,11 @@ impl EwfReader {
         for p in paths {
             let file = File::open(p)?;
             let len = file.metadata()?.len();
-            segments.push(SegmentFile { path: p.clone(), file, len });
+            segments.push(SegmentFile {
+                path: p.clone(),
+                file,
+                len,
+            });
         }
         let mut header = EwfHeader::default();
         let mut have_header2 = false;
@@ -140,29 +146,47 @@ impl EwfReader {
                 break;
             }
             let seg_len = segments[idx].len;
-            let fh = read_exact_at(&mut segments[idx].file, 0, format::FILE_HEADER_SIZE).map_err(|_| EwfError::Truncated("segment file header"))?;
+            let fh = read_exact_at(&mut segments[idx].file, 0, format::FILE_HEADER_SIZE)
+                .map_err(|_| EwfError::Truncated("segment file header"))?;
             let number = format::parse_file_header(&fh)?;
             if number as usize != idx + 1 {
-                return Err(EwfError::Corrupt(format!("{} has segment number {}, expected {}", segments[idx].path.display(), number, idx + 1)));
+                return Err(EwfError::Corrupt(format!(
+                    "{} has segment number {}, expected {}",
+                    segments[idx].path.display(),
+                    number,
+                    idx + 1
+                )));
             }
             let mut off = format::FILE_HEADER_SIZE;
             let mut last_sectors: Option<(u64, u64)> = None;
             let mut table_ok_in_group = false;
             let mut ended = false;
             for _ in 0..MAX_SECTIONS_PER_SEGMENT {
-                if off.checked_add(format::SECTION_DESCRIPTOR_SIZE).map(|e| e > seg_len).unwrap_or(true) {
+                if off
+                    .checked_add(format::SECTION_DESCRIPTOR_SIZE)
+                    .map(|e| e > seg_len)
+                    .unwrap_or(true)
+                {
                     return Err(EwfError::Truncated("section descriptor"));
                 }
-                let raw = read_exact_at(&mut segments[idx].file, off, format::SECTION_DESCRIPTOR_SIZE)?;
+                let raw = read_exact_at(
+                    &mut segments[idx].file,
+                    off,
+                    format::SECTION_DESCRIPTOR_SIZE,
+                )?;
                 let desc = SectionDescriptor::parse(&raw)?;
                 let terminal = desc.kind == "done" || desc.kind == "next";
                 let section_end = if terminal {
                     off + format::SECTION_DESCRIPTOR_SIZE
                 } else {
                     if desc.size < format::SECTION_DESCRIPTOR_SIZE {
-                        return Err(EwfError::Corrupt(format!("section {} at {} has size {}", desc.kind, off, desc.size)));
+                        return Err(EwfError::Corrupt(format!(
+                            "section {} at {} has size {}",
+                            desc.kind, off, desc.size
+                        )));
                     }
-                    off.checked_add(desc.size).ok_or_else(|| EwfError::Corrupt("section size overflow".into()))?
+                    off.checked_add(desc.size)
+                        .ok_or_else(|| EwfError::Corrupt("section size overflow".into()))?
                 };
                 if section_end > seg_len {
                     return Err(EwfError::Truncated("section"));
@@ -171,7 +195,10 @@ impl EwfReader {
                 let payload_len = section_end - payload_off;
                 let payload = |segs: &mut Vec<SegmentFile>| -> Result<Vec<u8>> {
                     if payload_len > MAX_METADATA_SECTION {
-                        return Err(EwfError::Corrupt(format!("{} section of {} bytes is too large", desc.kind, payload_len)));
+                        return Err(EwfError::Corrupt(format!(
+                            "{} section of {} bytes is too large",
+                            desc.kind, payload_len
+                        )));
                     }
                     read_exact_at(&mut segs[idx].file, payload_off, payload_len)
                 };
@@ -215,7 +242,9 @@ impl EwfReader {
                         }
                         if desc.kind == "table2" {
                             if !table_ok_in_group {
-                                return Err(EwfError::Corrupt("table and table2 both unusable".into()));
+                                return Err(EwfError::Corrupt(
+                                    "table and table2 both unusable".into(),
+                                ));
                             }
                             // The next group starts fresh.
                             table_ok_in_group = true;
@@ -241,7 +270,10 @@ impl EwfReader {
                     break;
                 }
                 if desc.next_offset <= off {
-                    return Err(EwfError::Corrupt(format!("section chain does not advance at offset {}", off)));
+                    return Err(EwfError::Corrupt(format!(
+                        "section chain does not advance at offset {}",
+                        off
+                    )));
                 }
                 off = desc.next_offset;
             }
@@ -250,17 +282,33 @@ impl EwfReader {
             }
         }
         if !done {
-            return Err(EwfError::MissingSegment("segment set ends without a done section".into()));
+            return Err(EwfError::MissingSegment(
+                "segment set ends without a done section".into(),
+            ));
         }
         let volume = volume.ok_or_else(|| EwfError::Corrupt("no volume section".into()))?;
         let chunk_size = volume.chunk_size();
         let media_size = volume.media_size();
         let needed = media_size.div_ceil(chunk_size);
         if (chunks.len() as u64) < needed {
-            return Err(EwfError::Corrupt(format!("image has {} chunks, media size needs {}", chunks.len(), needed)));
+            return Err(EwfError::Corrupt(format!(
+                "image has {} chunks, media size needs {}",
+                chunks.len(),
+                needed
+            )));
         }
         chunks.truncate(needed as usize);
-        Ok(Self { segments, volume, header, chunks, md5, sha1, errors, position: 0, cache: None })
+        Ok(Self {
+            segments,
+            volume,
+            header,
+            chunks,
+            md5,
+            sha1,
+            errors,
+            position: 0,
+            cache: None,
+        })
     }
 
     pub fn media_size(&self) -> u64 {
@@ -311,7 +359,10 @@ impl EwfReader {
 
     /// Decode chunk `idx` into exactly its media length.
     pub fn read_chunk(&mut self, idx: usize) -> Result<Vec<u8>> {
-        let loc = *self.chunks.get(idx).ok_or_else(|| EwfError::InvalidInput(format!("chunk {} out of range", idx)))?;
+        let loc = *self
+            .chunks
+            .get(idx)
+            .ok_or_else(|| EwfError::InvalidInput(format!("chunk {} out of range", idx)))?;
         let expected = self.expected_len(idx) as usize;
         let chunk_size = self.volume.chunk_size() as usize;
         let stored = read_exact_at(&mut self.segments[loc.segment].file, loc.offset, loc.size)?;
@@ -322,14 +373,23 @@ impl EwfReader {
             let stored_chk = format::u32_le(chk);
             let calc = format::adler32(d);
             if stored_chk != calc {
-                return Err(EwfError::Checksum { what: format!("chunk {}", idx), stored: stored_chk, calculated: calc });
+                return Err(EwfError::Checksum {
+                    what: format!("chunk {}", idx),
+                    stored: stored_chk,
+                    calculated: calc,
+                });
             }
             d.to_vec()
         } else {
             stored
         };
         if data.len() < expected {
-            return Err(EwfError::Corrupt(format!("chunk {} holds {} bytes, expected {}", idx, data.len(), expected)));
+            return Err(EwfError::Corrupt(format!(
+                "chunk {} holds {} bytes, expected {}",
+                idx,
+                data.len(),
+                expected
+            )));
         }
         data.truncate(expected);
         Ok(data)
@@ -356,7 +416,10 @@ impl EwfReader {
                 None => return Err(EwfError::Corrupt("chunk cache empty".into())),
             };
             if within >= data.len() {
-                return Err(EwfError::Corrupt(format!("offset {} outside chunk {}", pos, idx)));
+                return Err(EwfError::Corrupt(format!(
+                    "offset {} outside chunk {}",
+                    pos, idx
+                )));
             }
             let n = (data.len() - within).min(buf.len() - done);
             buf[done..done + n].copy_from_slice(&data[within..within + n]);
@@ -382,17 +445,35 @@ impl EwfReader {
         let md5_match = stored_md5.as_ref().map(|m| *m == computed.md5);
         let sha1_match = stored_sha1.as_ref().map(|s| *s == computed_sha1);
         let verified = md5_match == Some(true) && sha1_match != Some(false);
-        Ok(VerifyReport { media_size: self.media_size(), computed, computed_sha1, stored_md5, stored_sha1, md5_match, sha1_match, verified })
+        Ok(VerifyReport {
+            media_size: self.media_size(),
+            computed,
+            computed_sha1,
+            stored_md5,
+            stored_sha1,
+            md5_match,
+            sha1_match,
+            verified,
+        })
     }
 }
 
-fn add_table_chunks(chunks: &mut Vec<ChunkLoc>, segment: usize, t: &TableSection, sectors_end: u64, seg_len: u64) -> Result<()> {
+fn add_table_chunks(
+    chunks: &mut Vec<ChunkLoc>,
+    segment: usize,
+    t: &TableSection,
+    sectors_end: u64,
+    seg_len: u64,
+) -> Result<()> {
     let offsets: Vec<(u64, bool)> = t
         .entries
         .iter()
         .map(|e| {
             let rel = (*e & !format::COMPRESSED_FLAG) as u64;
-            (t.base_offset.saturating_add(rel), *e & format::COMPRESSED_FLAG != 0)
+            (
+                t.base_offset.saturating_add(rel),
+                *e & format::COMPRESSED_FLAG != 0,
+            )
         })
         .collect();
     for (i, &(start, compressed)) in offsets.iter().enumerate() {
@@ -401,13 +482,24 @@ fn add_table_chunks(chunks: &mut Vec<ChunkLoc>, segment: usize, t: &TableSection
             None => sectors_end,
         };
         if end <= start || end > seg_len {
-            return Err(EwfError::Corrupt(format!("chunk at offset {} has invalid extent ending at {}", start, end)));
+            return Err(EwfError::Corrupt(format!(
+                "chunk at offset {} has invalid extent ending at {}",
+                start, end
+            )));
         }
         let size = end - start;
         if size > format::MAX_CHUNK_SIZE * 2 {
-            return Err(EwfError::Corrupt(format!("chunk at offset {} is {} bytes", start, size)));
+            return Err(EwfError::Corrupt(format!(
+                "chunk at offset {} is {} bytes",
+                start, size
+            )));
         }
-        chunks.push(ChunkLoc { segment, offset: start, size, compressed });
+        chunks.push(ChunkLoc {
+            segment,
+            offset: start,
+            size,
+            compressed,
+        });
     }
     Ok(())
 }
@@ -429,7 +521,10 @@ impl Seek for EwfReader {
             SeekFrom::Current(d) => self.position as i128 + d as i128,
         };
         if target < 0 || target > u64::MAX as i128 {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "seek out of range"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "seek out of range",
+            ));
         }
         self.position = target as u64;
         Ok(self.position)

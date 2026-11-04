@@ -86,7 +86,10 @@ impl XElem {
         })
     }
     pub fn attr(&self, name: &str) -> Option<&str> {
-        self.attrs.iter().find(|(k, _)| k == name).map(|(_, v)| v.as_str())
+        self.attrs
+            .iter()
+            .find(|(k, _)| k == name)
+            .map(|(_, v)| v.as_str())
     }
     /// Concatenated text content (direct text children only).
     pub fn text(&self) -> String {
@@ -113,7 +116,11 @@ pub struct Chunk<'a> {
 
 impl<'a> Chunk<'a> {
     pub fn new(data: &'a [u8]) -> Self {
-        Chunk { data, templates: RefCell::new(BTreeMap::new()), tokens: RefCell::new(0) }
+        Chunk {
+            data,
+            templates: RefCell::new(BTreeMap::new()),
+            tokens: RefCell::new(0),
+        }
     }
 
     pub fn template_count(&self) -> usize {
@@ -145,9 +152,16 @@ impl<'a> Chunk<'a> {
     }
 
     /// Parse a fragment (sequence of top-level tokens) starting at chunk offset `p`.
-    pub fn parse_fragment(&self, mut p: usize, end: usize, depth: usize) -> Result<(Vec<Node>, usize)> {
+    pub fn parse_fragment(
+        &self,
+        mut p: usize,
+        end: usize,
+        depth: usize,
+    ) -> Result<(Vec<Node>, usize)> {
         if depth > MAX_TEMPLATE_DEPTH {
-            return Err(ParseError::Limit("binary XML template nesting exceeds 64".into()));
+            return Err(ParseError::Limit(
+                "binary XML template nesting exceeds 64".into(),
+            ));
         }
         let d = self.data;
         let mut out = Vec::new();
@@ -175,13 +189,22 @@ impl<'a> Chunk<'a> {
                     out.push(n);
                     p = np;
                 }
-                t => return Err(ParseError::Invalid { offset: p, reason: format!("unexpected binary XML token 0x{t:02x} in fragment") }),
+                t => {
+                    return Err(ParseError::Invalid {
+                        offset: p,
+                        reason: format!("unexpected binary XML token 0x{t:02x} in fragment"),
+                    })
+                }
             }
         }
         Ok((out, p))
     }
 
-    fn parse_template_instance(&self, mut p: usize, depth: usize) -> Result<(TemplateInstance, usize)> {
+    fn parse_template_instance(
+        &self,
+        mut p: usize,
+        depth: usize,
+    ) -> Result<(TemplateInstance, usize)> {
         let d = self.data;
         p += 2; // token + unknown byte
         let _template_id = u32_at(d, p)?;
@@ -221,7 +244,11 @@ impl<'a> Chunk<'a> {
             let size = u16::from_le_bytes([desc[i * 4], desc[i * 4 + 1]]) as usize;
             let vtype = desc[i * 4 + 2];
             need(d, p, size)?;
-            values.push(BinValue { vtype, offset: p, size });
+            values.push(BinValue {
+                vtype,
+                offset: p,
+                size,
+            });
             p += size;
         }
         Ok((TemplateInstance { def, values }, p))
@@ -229,7 +256,9 @@ impl<'a> Chunk<'a> {
 
     fn parse_element(&self, mut p: usize, depth: usize, edepth: usize) -> Result<(Element, usize)> {
         if edepth > MAX_ELEMENT_DEPTH {
-            return Err(ParseError::Limit("binary XML element nesting too deep".into()));
+            return Err(ParseError::Limit(
+                "binary XML element nesting too deep".into(),
+            ));
         }
         let d = self.data;
         let tok = u8_at(d, p)?;
@@ -242,7 +271,11 @@ impl<'a> Chunk<'a> {
         if has_attrs {
             p += 4; // attribute list size (follows an inline name)
         }
-        let mut el = Element { name, attrs: Vec::new(), children: Vec::new() };
+        let mut el = Element {
+            name,
+            attrs: Vec::new(),
+            children: Vec::new(),
+        };
         if has_attrs {
             loop {
                 self.tick()?;
@@ -257,7 +290,10 @@ impl<'a> Chunk<'a> {
                 let mut val = Vec::new();
                 loop {
                     let vt = u8_at(d, p)?;
-                    if !matches!(vt, 0x05 | 0x45 | 0x0d | 0x0e | 0x08 | 0x48 | 0x09 | 0x49 | 0x07 | 0x47) {
+                    if !matches!(
+                        vt,
+                        0x05 | 0x45 | 0x0d | 0x0e | 0x08 | 0x48 | 0x09 | 0x49 | 0x07 | 0x47
+                    ) {
                         break;
                     }
                     let (n, np) = self.parse_content_token(p, depth)?;
@@ -272,7 +308,12 @@ impl<'a> Chunk<'a> {
         match close {
             0x03 => return Ok((el, p)),
             0x02 => {}
-            t => return Err(ParseError::Invalid { offset: p - 1, reason: format!("expected close start element, got 0x{t:02x}") }),
+            t => {
+                return Err(ParseError::Invalid {
+                    offset: p - 1,
+                    reason: format!("expected close start element, got 0x{t:02x}"),
+                })
+            }
         }
         loop {
             self.tick()?;
@@ -297,7 +338,12 @@ impl<'a> Chunk<'a> {
                     el.children.push(n);
                     p = np;
                 }
-                t => return Err(ParseError::Invalid { offset: p, reason: format!("unexpected token 0x{t:02x} in element content") }),
+                t => {
+                    return Err(ParseError::Invalid {
+                        offset: p,
+                        reason: format!("unexpected token 0x{t:02x} in element content"),
+                    })
+                }
             }
         }
         Ok((el, p))
@@ -324,14 +370,22 @@ impl<'a> Chunk<'a> {
                         p += 2 + n;
                         Node::Text(s)
                     }
-                    v => return Err(ParseError::Unsupported(format!("value text type 0x{v:02x}"))),
+                    v => {
+                        return Err(ParseError::Unsupported(format!(
+                            "value text type 0x{v:02x}"
+                        )))
+                    }
                 }
             }
             0x0d | 0x0e => {
                 let id = u16_at(d, p)?;
                 let vtype = u8_at(d, p + 2)?;
                 p += 3;
-                Node::Subst { id, vtype, optional: t == 0x0e }
+                Node::Subst {
+                    id,
+                    vtype,
+                    optional: t == 0x0e,
+                }
             }
             0x07 => {
                 let n = u16_at(d, p)? as usize;
@@ -361,7 +415,12 @@ impl<'a> Chunk<'a> {
                 }
                 Node::Pi(target, data)
             }
-            _ => return Err(ParseError::Invalid { offset: p - 1, reason: format!("token 0x{t:02x} is not content") }),
+            _ => {
+                return Err(ParseError::Invalid {
+                    offset: p - 1,
+                    reason: format!("token 0x{t:02x} is not content"),
+                })
+            }
         };
         Ok((n, p))
     }
@@ -371,7 +430,9 @@ impl<'a> Chunk<'a> {
     /// Resolve parsed nodes into an XML tree, applying template substitutions.
     pub fn resolve(&self, nodes: &[Node], values: &[BinValue], depth: usize) -> Result<Vec<XNode>> {
         if depth > MAX_TEMPLATE_DEPTH {
-            return Err(ParseError::Limit("binary XML template nesting exceeds 64".into()));
+            return Err(ParseError::Limit(
+                "binary XML template nesting exceeds 64".into(),
+            ));
         }
         let mut out: Vec<XNode> = Vec::new();
         for n in nodes {
@@ -384,7 +445,15 @@ impl<'a> Chunk<'a> {
                         if let Some(v) = values.get(*id as usize) {
                             if v.vtype & 0x80 != 0 && v.size > 0 {
                                 for item in array_items(self.data, v) {
-                                    if let Some(mut x) = self.resolve_element(&Element { name: e.name.clone(), attrs: e.attrs.clone(), children: vec![] }, values, depth)? {
+                                    if let Some(mut x) = self.resolve_element(
+                                        &Element {
+                                            name: e.name.clone(),
+                                            attrs: e.attrs.clone(),
+                                            children: vec![],
+                                        },
+                                        values,
+                                        depth,
+                                    )? {
                                         if !is_blank_lines(&item) {
                                             x.children.push(XNode::Text(item));
                                         }
@@ -417,7 +486,11 @@ impl<'a> Chunk<'a> {
         Ok(match n {
             Node::Text(s) => vec![XNode::Text(s.clone())],
             Node::CData(s) => vec![XNode::CData(s.clone())],
-            Node::CharRef(c) => vec![XNode::Text(char::from_u32(*c as u32).map(|c| c.to_string()).unwrap_or_default())],
+            Node::CharRef(c) => vec![XNode::Text(
+                char::from_u32(*c as u32)
+                    .map(|c| c.to_string())
+                    .unwrap_or_default(),
+            )],
             Node::EntityRef(name) => vec![XNode::Text(match name.as_str() {
                 "amp" => "&".into(),
                 "lt" => "<".into(),
@@ -428,7 +501,9 @@ impl<'a> Chunk<'a> {
             })],
             Node::Pi(t, d) => vec![XNode::Pi(t.clone(), d.clone())],
             Node::Subst { id, .. } => {
-                let Some(v) = values.get(*id as usize) else { return Ok(vec![]) };
+                let Some(v) = values.get(*id as usize) else {
+                    return Ok(vec![]);
+                };
                 if v.vtype == 0x21 {
                     if v.size == 0 {
                         return Ok(vec![]);
@@ -461,15 +536,31 @@ impl<'a> Chunk<'a> {
         }
     }
 
-    fn resolve_element(&self, e: &Element, values: &[BinValue], depth: usize) -> Result<Option<XElem>> {
+    fn resolve_element(
+        &self,
+        e: &Element,
+        values: &[BinValue],
+        depth: usize,
+    ) -> Result<Option<XElem>> {
         // An element whose only content is optional substitutions that are all empty is dropped.
-        let only_optional = !e.children.is_empty() && e.children.iter().all(|c| matches!(c, Node::Subst { optional: true, .. }));
+        let only_optional = !e.children.is_empty()
+            && e.children
+                .iter()
+                .all(|c| matches!(c, Node::Subst { optional: true, .. }));
         if only_optional && e.children.iter().all(|c| self.is_empty_value(c, values)) {
             return Ok(None);
         }
-        let mut x = XElem { name: e.name.clone(), attrs: Vec::new(), children: Vec::new() };
+        let mut x = XElem {
+            name: e.name.clone(),
+            attrs: Vec::new(),
+            children: Vec::new(),
+        };
         for (an, av) in &e.attrs {
-            let all_opt_empty = !av.is_empty() && av.iter().all(|c| matches!(c, Node::Subst { optional: true, .. }) && self.is_empty_value(c, values));
+            let all_opt_empty = !av.is_empty()
+                && av.iter().all(|c| {
+                    matches!(c, Node::Subst { optional: true, .. })
+                        && self.is_empty_value(c, values)
+                });
             if all_opt_empty {
                 continue;
             }
@@ -515,7 +606,13 @@ fn fmt_filetime(ft: u64) -> String {
                 None => format!("0x{ft:016x}"),
             }
         }
-        None => if ft == 0 { "1601-01-01T00:00:00.000000000Z".into() } else { format!("0x{ft:016x}") },
+        None => {
+            if ft == 0 {
+                "1601-01-01T00:00:00.000000000Z".into()
+            } else {
+                format!("0x{ft:016x}")
+            }
+        }
     }
 }
 
@@ -532,17 +629,27 @@ pub fn sid_string(b: &[u8]) -> Option<String> {
     let mut s = format!("S-{rev}-{auth}");
     for i in 0..n {
         let o = 8 + i * 4;
-        s.push_str(&format!("-{}", u32::from_le_bytes([b[o], b[o + 1], b[o + 2], b[o + 3]])));
+        s.push_str(&format!(
+            "-{}",
+            u32::from_le_bytes([b[o], b[o + 1], b[o + 2], b[o + 3]])
+        ));
     }
     Some(s)
 }
 
 fn guid_upper(b: &[u8]) -> String {
-    crate::shellitems::guid_string(b).map(|g| format!("{{{}}}", g.to_ascii_uppercase())).unwrap_or_default()
+    crate::shellitems::guid_string(b)
+        .map(|g| format!("{{{}}}", g.to_ascii_uppercase()))
+        .unwrap_or_default()
 }
 
 fn scalar(vtype: u8, b: &[u8]) -> String {
-    let u = |n: usize| -> u64 { b.iter().take(n).enumerate().fold(0u64, |a, (i, &x)| a | ((x as u64) << (8 * i))) };
+    let u = |n: usize| -> u64 {
+        b.iter()
+            .take(n)
+            .enumerate()
+            .fold(0u64, |a, (i, &x)| a | ((x as u64) << (8 * i)))
+    };
     match vtype {
         0x01 => utf16le(b, true),
         0x02 => decode_ansi(&b[..b.iter().position(|&c| c == 0).unwrap_or(b.len())]),
@@ -562,17 +669,38 @@ fn scalar(vtype: u8, b: &[u8]) -> String {
             let f = f64::from_bits(u(8));
             format!("{f}")
         }
-        0x0d => if u(4) != 0 { "true".into() } else { "false".into() },
+        0x0d => {
+            if u(4) != 0 {
+                "true".into()
+            } else {
+                "false".into()
+            }
+        }
         0x0e => crate::util::hex_upper(b),
         0x0f => guid_upper(b),
-        0x10 => if b.len() >= 8 { format!("0x{:016x}", u(8)) } else { format!("0x{:08x}", u(4)) },
+        0x10 => {
+            if b.len() >= 8 {
+                format!("0x{:016x}", u(8))
+            } else {
+                format!("0x{:08x}", u(4))
+            }
+        }
         0x11 => fmt_filetime(u(8)),
         0x12 => {
             if b.len() < 16 {
                 return String::new();
             }
             let w = |i: usize| u16::from_le_bytes([b[i * 2], b[i * 2 + 1]]);
-            format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:09}Z", w(0), w(1), w(3), w(4), w(5), w(6), w(7) as u32 * 1_000_000)
+            format!(
+                "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:09}Z",
+                w(0),
+                w(1),
+                w(3),
+                w(4),
+                w(5),
+                w(6),
+                w(7) as u32 * 1_000_000
+            )
         }
         0x13 => sid_string(b).unwrap_or_default(),
         0x14 => format!("0x{:08x}", u(4)),
@@ -602,7 +730,11 @@ pub fn value_to_string(chunk: &[u8], v: &BinValue) -> String {
         Err(_) => return String::new(),
     };
     if v.vtype == 0x10 {
-        return if v.size >= 8 { format!("0x{:016x}", u64_at(b, 0).unwrap_or(0)) } else { format!("0x{:08x}", u32_at(b, 0).unwrap_or(0)) };
+        return if v.size >= 8 {
+            format!("0x{:016x}", u64_at(b, 0).unwrap_or(0))
+        } else {
+            format!("0x{:08x}", u32_at(b, 0).unwrap_or(0))
+        };
     }
     scalar(v.vtype, b)
 }
@@ -624,7 +756,11 @@ pub fn array_items(chunk: &[u8], v: &BinValue) -> Vec<String> {
                 }
                 v
             }
-            0x02 => b.split(|&c| c == 0).filter(|s| !s.is_empty()).map(decode_ansi).collect(),
+            0x02 => b
+                .split(|&c| c == 0)
+                .filter(|s| !s.is_empty())
+                .map(decode_ansi)
+                .collect(),
             0x13 => {
                 let mut out = Vec::new();
                 let mut o = 0;
@@ -700,10 +836,15 @@ fn render_node(n: &XNode, depth: usize, out: &mut String) {
                 esc_attr(v, out);
                 out.push('"');
             }
-            let has_content = e.children.iter().any(|c| !matches!(c, XNode::Text(t) if t.is_empty()));
+            let has_content = e
+                .children
+                .iter()
+                .any(|c| !matches!(c, XNode::Text(t) if t.is_empty()));
             if !has_content {
                 out.push_str("/>\n");
-            } else if !e.has_elem_children() && !e.children.iter().any(|c| matches!(c, XNode::Pi(..))) {
+            } else if !e.has_elem_children()
+                && !e.children.iter().any(|c| matches!(c, XNode::Pi(..)))
+            {
                 out.push('>');
                 for c in &e.children {
                     match c {

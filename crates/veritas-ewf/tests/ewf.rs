@@ -5,7 +5,9 @@ use std::path::{Path, PathBuf};
 use veritas_ewf::{Compression, EwfError, EwfOptions, EwfReader, EwfWriter, RawSegmented};
 
 fn corpus(rel: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata/corpus").join(rel)
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../testdata/corpus")
+        .join(rel)
 }
 
 fn random_data(len: usize, seed: u64, compressible: bool) -> Vec<u8> {
@@ -13,7 +15,11 @@ fn random_data(len: usize, seed: u64, compressible: bool) -> Vec<u8> {
     let mut v = vec![0u8; len];
     if compressible {
         for (i, b) in v.iter_mut().enumerate() {
-            *b = if (i / 4096) % 3 == 0 { 0 } else { (i % 97) as u8 ^ rng.gen::<u8>() & 0x3 };
+            *b = if (i / 4096) % 3 == 0 {
+                0
+            } else {
+                (i % 97) as u8 ^ rng.gen::<u8>() & 0x3
+            };
         }
     } else {
         rng.fill_bytes(&mut v);
@@ -21,7 +27,13 @@ fn random_data(len: usize, seed: u64, compressible: bool) -> Vec<u8> {
     v
 }
 
-fn write_e01(dir: &Path, name: &str, data: &[u8], opts: EwfOptions, write_size: usize) -> veritas_ewf::EwfSummary {
+fn write_e01(
+    dir: &Path,
+    name: &str,
+    data: &[u8],
+    opts: EwfOptions,
+    write_size: usize,
+) -> veritas_ewf::EwfSummary {
     let mut w = EwfWriter::create(dir.join(name), opts).unwrap();
     if write_size == 0 {
         w.write(data).unwrap();
@@ -45,16 +57,28 @@ fn roundtrip_various_sizes_and_compressions() {
     let dir = tempfile::tempdir().unwrap();
     let sizes = [0usize, 512, 32768, 32768 * 3 + 512, 1_000_448, 777 * 512];
     for (i, &size) in sizes.iter().enumerate() {
-        for (j, comp) in [Compression::None, Compression::Fast, Compression::Best].iter().enumerate() {
+        for (j, comp) in [Compression::None, Compression::Fast, Compression::Best]
+            .iter()
+            .enumerate()
+        {
             let data = random_data(size, i as u64 * 7 + j as u64, j % 2 == 0);
-            let opts = EwfOptions { compression: *comp, ..Default::default() };
+            let opts = EwfOptions {
+                compression: *comp,
+                ..Default::default()
+            };
             let name = format!("img_{}_{}", i, j);
             let summary = write_e01(dir.path(), &name, &data, opts, 10_007);
             assert_eq!(summary.media_size, size as u64);
             assert_eq!(summary.hashes, veritas_hash::hash_bytes(&data));
             let mut r = EwfReader::open(dir.path().join(format!("{}.E01", name))).unwrap();
             assert_eq!(r.media_size(), size as u64);
-            assert_eq!(read_all(&mut r), data, "size {} compression {:?}", size, comp);
+            assert_eq!(
+                read_all(&mut r),
+                data,
+                "size {} compression {:?}",
+                size,
+                comp
+            );
             let rep = r.verify().unwrap();
             assert!(rep.verified, "{:?}", rep);
             assert_eq!(rep.computed_sha1, summary.sha1);
@@ -80,11 +104,19 @@ fn unaligned_input_is_zero_padded_to_sector() {
 fn multi_segment_with_tiny_segment_size() {
     let dir = tempfile::tempdir().unwrap();
     let data = random_data(3 * 1024 * 1024 + 4096, 11, false);
-    let opts = EwfOptions { segment_size: 256 * 1024, compression: Compression::Fast, ..Default::default() };
+    let opts = EwfOptions {
+        segment_size: 256 * 1024,
+        compression: Compression::Fast,
+        ..Default::default()
+    };
     let s = write_e01(dir.path(), "multi", &data, opts, 65_536);
     assert!(s.segments.len() >= 12, "segments: {}", s.segments.len());
     for p in &s.segments {
-        assert!(std::fs::metadata(p).unwrap().len() <= 256 * 1024, "{} too large", p.display());
+        assert!(
+            std::fs::metadata(p).unwrap().len() <= 256 * 1024,
+            "{} too large",
+            p.display()
+        );
     }
     let mut r = EwfReader::open(&s.segments[0]).unwrap();
     assert_eq!(r.segment_paths().len(), s.segments.len());
@@ -101,7 +133,12 @@ fn multi_segment_with_tiny_segment_size() {
 fn more_than_one_hundred_segments_use_letter_extensions() {
     let dir = tempfile::tempdir().unwrap();
     let data = random_data(7 * 1024 * 1024, 5, false);
-    let opts = EwfOptions { segment_size: 64 * 1024, compression: Compression::None, sectors_per_chunk: 8, ..Default::default() };
+    let opts = EwfOptions {
+        segment_size: 64 * 1024,
+        compression: Compression::None,
+        sectors_per_chunk: 8,
+        ..Default::default()
+    };
     let s = write_e01(dir.path(), "many", &data, opts, 0);
     assert!(s.segments.len() > 100);
     assert!(s.segments.iter().any(|p| p.extension().unwrap() == "EAA"));
@@ -149,7 +186,10 @@ fn header_values_roundtrip() {
 fn refuses_to_overwrite() {
     let dir = tempfile::tempdir().unwrap();
     write_e01(dir.path(), "x", b"", EwfOptions::default(), 0);
-    assert!(matches!(EwfWriter::create(dir.path().join("x"), EwfOptions::default()), Err(EwfError::Exists(_))));
+    assert!(matches!(
+        EwfWriter::create(dir.path().join("x"), EwfOptions::default()),
+        Err(EwfError::Exists(_))
+    ));
 }
 
 #[test]
@@ -207,11 +247,30 @@ fn truncated_and_corrupted_inputs_fail_cleanly() {
     let dir = tempfile::tempdir().unwrap();
     let src = std::fs::read(corpus("dfvfs/ext2.E01")).unwrap();
     // Truncations at many points: open or full read must return Err, never panic.
-    for cut in [0usize, 5, 13, 50, 100, 600, 800, 1900, 5000, 9600, 10300, 11000, 12000, src.len() - 1] {
+    for cut in [
+        0usize,
+        5,
+        13,
+        50,
+        100,
+        600,
+        800,
+        1900,
+        5000,
+        9600,
+        10300,
+        11000,
+        12000,
+        src.len() - 1,
+    ] {
         let p = dir.path().join(format!("t{}.E01", cut));
         std::fs::write(&p, &src[..cut]).unwrap();
         let ok = EwfReader::open(&p).and_then(|mut r| r.verify().map(|v| v.verified));
-        assert!(!matches!(ok, Ok(true)), "truncated at {} still verified", cut);
+        assert!(
+            !matches!(ok, Ok(true)),
+            "truncated at {} still verified",
+            cut
+        );
     }
     // Flip a byte inside chunk data: verify must not pass.
     let mut bad = src.clone();
@@ -223,7 +282,10 @@ fn truncated_and_corrupted_inputs_fail_cleanly() {
     // Missing second segment of a split set.
     let p1 = dir.path().join("split.E01");
     std::fs::copy(corpus("dfvfs/ext2.split.E01"), &p1).unwrap();
-    assert!(matches!(EwfReader::open(&p1), Err(EwfError::MissingSegment(_))));
+    assert!(matches!(
+        EwfReader::open(&p1),
+        Err(EwfError::MissingSegment(_))
+    ));
     // Not an EWF file.
     let p = dir.path().join("plain.E01");
     std::fs::write(&p, b"definitely not ewf").unwrap();
@@ -234,7 +296,16 @@ fn truncated_and_corrupted_inputs_fail_cleanly() {
 fn uncompressed_chunk_checksum_detects_corruption() {
     let dir = tempfile::tempdir().unwrap();
     let data = random_data(65536, 9, false);
-    let s = write_e01(dir.path(), "u", &data, EwfOptions { compression: Compression::None, ..Default::default() }, 0);
+    let s = write_e01(
+        dir.path(),
+        "u",
+        &data,
+        EwfOptions {
+            compression: Compression::None,
+            ..Default::default()
+        },
+        0,
+    );
     let mut bytes = std::fs::read(&s.segments[0]).unwrap();
     let i = bytes.windows(8).position(|w| w == &data[100..108]).unwrap();
     bytes[i] ^= 1;
@@ -248,7 +319,13 @@ fn small_image() -> Vec<u8> {
     let dir = tempfile::tempdir().unwrap();
     let mut opts = EwfOptions::default();
     opts.header.case_number = "p".into();
-    let s = write_e01(dir.path(), "m", &random_data(3 * 32768 + 1024, 2, true), opts, 0);
+    let s = write_e01(
+        dir.path(),
+        "m",
+        &random_data(3 * 32768 + 1024, 2, true),
+        opts,
+        0,
+    );
     std::fs::read(&s.segments[0]).unwrap()
 }
 

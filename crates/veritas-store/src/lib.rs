@@ -25,7 +25,11 @@ pub enum StoreError {
     #[error("object {0} not found")]
     NotFound(String),
     #[error("object {address} is corrupt: stored hash {stored} differs from recomputed {actual}")]
-    Corrupt { address: String, stored: String, actual: String },
+    Corrupt {
+        address: String,
+        stored: String,
+        actual: String,
+    },
     #[error("refusing to overwrite committed object {0}")]
     WriteOnce(String),
     #[error("crypto: {0}")]
@@ -47,7 +51,12 @@ pub struct ObjectMeta {
 
 pub trait ContentStore {
     /// Store the bytes of `reader`; returns metadata including the address.
-    fn put(&self, case_id: &str, reader: &mut dyn Read, original_name: Option<&str>) -> Result<ObjectMeta, StoreError>;
+    fn put(
+        &self,
+        case_id: &str,
+        reader: &mut dyn Read,
+        original_name: Option<&str>,
+    ) -> Result<ObjectMeta, StoreError>;
     /// Open an object for reading (plaintext).
     fn get(&self, address: &str) -> Result<Box<dyn Read>, StoreError>;
     fn meta(&self, address: &str) -> Result<ObjectMeta, StoreError>;
@@ -66,7 +75,10 @@ impl LocalStore {
         fs::create_dir_all(root.join("objects"))?;
         fs::create_dir_all(root.join("meta"))?;
         fs::create_dir_all(root.join("tmp"))?;
-        Ok(Self { root: root.to_path_buf(), keyring: None })
+        Ok(Self {
+            root: root.to_path_buf(),
+            keyring: None,
+        })
     }
 
     /// Enable encryption at rest with a keyring that derives one key per case. THREAT:T4.1
@@ -76,7 +88,11 @@ impl LocalStore {
     }
 
     fn object_path(&self, address: &str) -> PathBuf {
-        self.root.join("objects").join(&address[..2]).join(&address[2..4]).join(address)
+        self.root
+            .join("objects")
+            .join(&address[..2])
+            .join(&address[2..4])
+            .join(address)
     }
 
     fn meta_path(&self, address: &str) -> PathBuf {
@@ -108,7 +124,11 @@ impl LocalStore {
             if actual == meta.hashes {
                 out.push(Ok(address));
             } else {
-                out.push(Err(StoreError::Corrupt { address, stored: meta.hashes.sha256, actual: actual.sha256 }));
+                out.push(Err(StoreError::Corrupt {
+                    address,
+                    stored: meta.hashes.sha256,
+                    actual: actual.sha256,
+                }));
             }
         }
         Ok(out)
@@ -116,9 +136,17 @@ impl LocalStore {
 }
 
 impl ContentStore for LocalStore {
-    fn put(&self, case_id: &str, reader: &mut dyn Read, original_name: Option<&str>) -> Result<ObjectMeta, StoreError> {
+    fn put(
+        &self,
+        case_id: &str,
+        reader: &mut dyn Read,
+        original_name: Option<&str>,
+    ) -> Result<ObjectMeta, StoreError> {
         // Stream to a temp file while hashing the plaintext; encrypt per 1 MiB frame if enabled.
-        let tmp = self.root.join("tmp").join(format!("{}-{}", std::process::id(), rand::random::<u64>()));
+        let tmp =
+            self.root
+                .join("tmp")
+                .join(format!("{}-{}", std::process::id(), rand::random::<u64>()));
         let mut hasher = MultiHasher::new();
         let encryptor = match &self.keyring {
             Some(k) => Some(k.encryptor(case_id)?),
@@ -174,7 +202,10 @@ impl ContentStore for LocalStore {
             content_type: None,
         };
         let meta_path = self.meta_path(&address);
-        let mut mf = OpenOptions::new().write(true).create_new(true).open(&meta_path)?;
+        let mut mf = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&meta_path)?;
         mf.write_all(serde_json::to_string_pretty(&meta)?.as_bytes())?;
         mf.sync_all()?;
         Self::set_readonly(&meta_path)?;
@@ -183,18 +214,26 @@ impl ContentStore for LocalStore {
 
     fn get(&self, address: &str) -> Result<Box<dyn Read>, StoreError> {
         let meta = self.meta(address)?;
-        let file = File::open(self.object_path(address)).map_err(|_| StoreError::NotFound(address.to_string()))?;
+        let file = File::open(self.object_path(address))
+            .map_err(|_| StoreError::NotFound(address.to_string()))?;
         if meta.encrypted {
-            let keyring = self.keyring.as_ref().ok_or(crypto::CryptoError::NoKeyring)?;
+            let keyring = self
+                .keyring
+                .as_ref()
+                .ok_or(crypto::CryptoError::NoKeyring)?;
             let dec = keyring.encryptor(&meta.case_id)?;
-            Ok(Box::new(crypto::DecryptingReader::new(BufReader::new(file), dec)))
+            Ok(Box::new(crypto::DecryptingReader::new(
+                BufReader::new(file),
+                dec,
+            )))
         } else {
             Ok(Box::new(BufReader::new(file)))
         }
     }
 
     fn meta(&self, address: &str) -> Result<ObjectMeta, StoreError> {
-        let text = fs::read_to_string(self.meta_path(address)).map_err(|_| StoreError::NotFound(address.to_string()))?;
+        let text = fs::read_to_string(self.meta_path(address))
+            .map_err(|_| StoreError::NotFound(address.to_string()))?;
         Ok(serde_json::from_str(&text)?)
     }
 
@@ -243,7 +282,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = LocalStore::open(dir.path()).unwrap();
         let data = b"hello evidence".to_vec();
-        let meta = store.put("CASE-1", &mut &data[..], Some("hello.txt")).unwrap();
+        let meta = store
+            .put("CASE-1", &mut &data[..], Some("hello.txt"))
+            .unwrap();
         assert_eq!(meta.address, veritas_hash::hash_bytes(&data).sha256);
         assert!(store.exists(&meta.address));
         assert_eq!(read_all(store.get(&meta.address).unwrap()), data);
@@ -269,8 +310,12 @@ mod tests {
     fn encrypted_roundtrip_and_cross_case_isolation() {
         let dir = tempfile::tempdir().unwrap();
         let master = crypto::MasterKey::generate();
-        let store = LocalStore::open(dir.path()).unwrap().with_keyring(crypto::CaseKeyring::new(master.clone()));
-        let data: Vec<u8> = (0..(3 * crypto::FRAME_SIZE + 123)).map(|i| (i % 253) as u8).collect();
+        let store = LocalStore::open(dir.path())
+            .unwrap()
+            .with_keyring(crypto::CaseKeyring::new(master.clone()));
+        let data: Vec<u8> = (0..(3 * crypto::FRAME_SIZE + 123))
+            .map(|i| (i % 253) as u8)
+            .collect();
         let meta = store.put("CASE-A", &mut &data[..], None).unwrap();
         assert!(meta.encrypted);
         let on_disk = fs::read(store.object_path(&meta.address)).unwrap();

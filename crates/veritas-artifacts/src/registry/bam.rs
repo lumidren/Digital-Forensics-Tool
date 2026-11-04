@@ -20,14 +20,19 @@ pub struct BamEntry {
 
 pub fn entries(hive: &Hive) -> Vec<BamEntry> {
     let mut out = Vec::new();
-    let Some(ccs) = current_control_set(hive) else { return out };
+    let Some(ccs) = current_control_set(hive) else {
+        return out;
+    };
     for svc in ["bam", "dam"] {
         for sub in ["State\\UserSettings", "UserSettings"] {
             let rel = format!("{ccs}\\Services\\{svc}\\{sub}");
             let Some(k) = hive.key(&rel) else { continue };
             for sid in k.subkeys() {
                 for v in sid.values() {
-                    if v.name.eq_ignore_ascii_case("Version") || v.name.eq_ignore_ascii_case("SequenceNumber") || v.raw.len() < 8 {
+                    if v.name.eq_ignore_ascii_case("Version")
+                        || v.name.eq_ignore_ascii_case("SequenceNumber")
+                        || v.raw.len() < 8
+                    {
                         continue;
                     }
                     let ft = crate::util::u64_at(&v.raw, 0).unwrap_or(0);
@@ -50,10 +55,18 @@ pub fn events(hive: &Hive, ctx: &Ctx<'_>) -> Vec<Event> {
     entries(hive)
         .into_iter()
         .map(|e| {
-            ctx.event("bam", "windows:registry:bam", desc::LAST_RUN, e.last_executed_ns, format!("{} {} (SID {})", e.service.to_uppercase(), e.path, e.sid), &e.key_rel_path, e.key_offset)
-                .attr("service", e.service)
-                .attr("user_sid", e.sid)
-                .attr("path", e.path)
+            ctx.event(
+                "bam",
+                "windows:registry:bam",
+                desc::LAST_RUN,
+                e.last_executed_ns,
+                format!("{} {} (SID {})", e.service.to_uppercase(), e.path, e.sid),
+                &e.key_rel_path,
+                e.key_offset,
+            )
+            .attr("service", e.service)
+            .attr("user_sid", e.sid)
+            .attr("path", e.path)
         })
         .collect()
 }

@@ -202,10 +202,13 @@ impl Matcher {
         if comps.is_empty() {
             return None;
         }
-        self.rules.iter().find(|(_, pat)| {
-            let p: Vec<&str> = pat.iter().map(|s| s.as_str()).collect();
-            match_components(&p, &comps)
-        }).map(|(k, _)| *k)
+        self.rules
+            .iter()
+            .find(|(_, pat)| {
+                let p: Vec<&str> = pat.iter().map(|s| s.as_str()).collect();
+                match_components(&p, &comps)
+            })
+            .map(|(k, _)| *k)
     }
 }
 
@@ -213,7 +216,12 @@ impl Matcher {
 pub fn sanitize_component(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
-        let bad = (c as u32) < 0x20 || matches!(c, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' | '%') || c as u32 == 0x7F;
+        let bad = (c as u32) < 0x20
+            || matches!(
+                c,
+                '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' | '%'
+            )
+            || c as u32 == 0x7F;
         if bad {
             let mut buf = [0u8; 4];
             for b in c.encode_utf8(&mut buf).bytes() {
@@ -232,7 +240,10 @@ pub fn sanitize_component(s: &str) -> String {
         out = "%00".into();
     }
     let stem = out.split('.').next().unwrap_or("").to_ascii_uppercase();
-    const RESERVED: &[&str] = &["CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"];
+    const RESERVED: &[&str] = &[
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
+        "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    ];
     if RESERVED.contains(&stem.as_str()) {
         out.insert(0, '_');
     }
@@ -246,7 +257,9 @@ pub fn output_path(out: &Path, partition: usize, fs_path: &str) -> Result<PathBu
         p.push(sanitize_component(c));
     }
     // Defence in depth: every component must be a normal name below `out`.
-    let rel = p.strip_prefix(out).map_err(|_| FsError::invalid(0, "output path escapes target"))?;
+    let rel = p
+        .strip_prefix(out)
+        .map_err(|_| FsError::invalid(0, "output path escapes target"))?;
     if rel.components().any(|c| !matches!(c, Component::Normal(_))) {
         return Err(FsError::invalid(0, "output path escapes target"));
     }
@@ -293,7 +306,11 @@ impl Sink {
         if let Some(d) = p.parent() {
             std::fs::create_dir_all(d)?;
         }
-        Ok(Sink { file: std::fs::File::create(p)?, hasher: veritas_hash::MultiHasher::new(), size: 0 })
+        Ok(Sink {
+            file: std::fs::File::create(p)?,
+            hasher: veritas_hash::MultiHasher::new(),
+            size: 0,
+        })
     }
     fn write(&mut self, b: &[u8]) -> Result<()> {
         self.file.write_all(b)?;
@@ -316,10 +333,23 @@ fn unique_target(p: PathBuf, id: u64) -> PathBuf {
 }
 
 fn rel_string(out: &Path, p: &Path) -> String {
-    p.strip_prefix(out).map(|r| r.components().map(|c| c.as_os_str().to_string_lossy().into_owned()).collect::<Vec<_>>().join("/")).unwrap_or_default()
+    p.strip_prefix(out)
+        .map(|r| {
+            r.components()
+                .map(|c| c.as_os_str().to_string_lossy().into_owned())
+                .collect::<Vec<_>>()
+                .join("/")
+        })
+        .unwrap_or_default()
 }
 
-fn harvest_volume(v: &ImageVolume, out: &Path, max_size: u64, m: &Matcher, rep: &mut HarvestReport) -> Result<()> {
+fn harvest_volume(
+    v: &ImageVolume,
+    out: &Path,
+    max_size: u64,
+    m: &Matcher,
+    rep: &mut HarvestReport,
+) -> Result<()> {
     let fs = AnyFs::open(v)?;
     let fs_type = fs.type_name();
     let entries = fs.entries(false)?;
@@ -343,7 +373,13 @@ fn harvest_volume(v: &ImageVolume, out: &Path, max_size: u64, m: &Matcher, rep: 
     }
     jobs.sort();
     for (path, id, size, kind) in jobs {
-        let err = |e: String, rep: &mut HarvestReport| rep.errors.push(HarvestError { partition: v.index, path: path.clone(), error: e });
+        let err = |e: String, rep: &mut HarvestReport| {
+            rep.errors.push(HarvestError {
+                partition: v.index,
+                path: path.clone(),
+                error: e,
+            })
+        };
         if size > max_size {
             err(format!("size {size} exceeds cap {max_size}"), rep);
             continue;
@@ -364,7 +400,10 @@ fn harvest_volume(v: &ImageVolume, out: &Path, max_size: u64, m: &Matcher, rep: 
                         None => (path.clone(), String::new()),
                     };
                     let e = n.entry(n.lookup(&p).unwrap_or(id))?;
-                    let s = e.stream(&stream).ok_or_else(|| FsError::NotFound(format!("stream '{stream}'")))?.clone();
+                    let s = e
+                        .stream(&stream)
+                        .ok_or_else(|| FsError::NotFound(format!("stream '{stream}'")))?
+                        .clone();
                     let mut off = 0u64;
                     while off < s.size {
                         let len = CHUNK.min(s.size - off);
@@ -384,8 +423,16 @@ fn harvest_volume(v: &ImageVolume, out: &Path, max_size: u64, m: &Matcher, rep: 
                 fs_type: fs_type.clone(),
                 size: sz,
                 sha256: sha,
-                mft_entry: if matches!(fs, AnyFs::Ntfs(_)) { Some(id) } else { None },
-                inode: if matches!(fs, AnyFs::Ext(_) | AnyFs::Apfs(_)) { Some(id) } else { None },
+                mft_entry: if matches!(fs, AnyFs::Ntfs(_)) {
+                    Some(id)
+                } else {
+                    None
+                },
+                inode: if matches!(fs, AnyFs::Ext(_) | AnyFs::Apfs(_)) {
+                    Some(id)
+                } else {
+                    None
+                },
                 kind: kind.to_string(),
                 output: rel_string(out, &target),
             }),
@@ -400,7 +447,12 @@ fn harvest_volume(v: &ImageVolume, out: &Path, max_size: u64, m: &Matcher, rep: 
 
 /// Harvest artifacts from every supported volume (or only `partition`) into `out`.
 /// Writes `<out>/manifest.jsonl` (sorted by path) and `<out>/harvest_errors.jsonl`.
-pub fn harvest(src: Source, out: &Path, partition: Option<usize>, max_size: u64) -> Result<HarvestReport> {
+pub fn harvest(
+    src: Source,
+    out: &Path,
+    partition: Option<usize>,
+    max_size: u64,
+) -> Result<HarvestReport> {
     std::fs::create_dir_all(out)?;
     let m = Matcher::new();
     let mut rep = HarvestReport::default();
@@ -409,7 +461,11 @@ pub fn harvest(src: Source, out: &Path, partition: Option<usize>, max_size: u64)
             continue;
         }
         if let Err(e) = harvest_volume(&v, out, max_size, &m, &mut rep) {
-            rep.errors.push(HarvestError { partition: v.index, path: "/".into(), error: e.to_string() });
+            rep.errors.push(HarvestError {
+                partition: v.index,
+                path: "/".into(),
+                error: e.to_string(),
+            });
         }
     }
     rep.manifest.sort();
@@ -435,7 +491,13 @@ mod tests {
     fn brace_expansion() {
         let v = expand_braces("a/{b,c/d}/{x,y}.z");
         assert_eq!(v, vec!["a/b/x.z", "a/b/y.z", "a/c/d/x.z", "a/c/d/y.z"]);
-        assert_eq!(expand_braces("Library/Launch{Agents,Daemons}/*.plist"), vec!["Library/LaunchAgents/*.plist", "Library/LaunchDaemons/*.plist"]);
+        assert_eq!(
+            expand_braces("Library/Launch{Agents,Daemons}/*.plist"),
+            vec![
+                "Library/LaunchAgents/*.plist",
+                "Library/LaunchDaemons/*.plist"
+            ]
+        );
         assert_eq!(expand_braces("x{,.LOG1}"), vec!["x", "x.LOG1"]);
         assert_eq!(expand_braces("unbalanced{a,b"), vec!["unbalanced{a,b"]);
     }
@@ -446,8 +508,14 @@ mod tests {
         assert!(glob_component("$I*", "$IABC123.txt"));
         assert!(!glob_component("*.pf", "x.pfx"));
         assert!(glob_component("auth.log*", "auth.log.2.gz"));
-        assert!(match_components(&["a", "**", "*.journal"], &["a", "b", "c", "x.journal"]));
-        assert!(match_components(&["a", "**", "*.journal"], &["a", "x.journal"]));
+        assert!(match_components(
+            &["a", "**", "*.journal"],
+            &["a", "b", "c", "x.journal"]
+        ));
+        assert!(match_components(
+            &["a", "**", "*.journal"],
+            &["a", "x.journal"]
+        ));
         assert!(match_components(&["t", "**"], &["t", "x"]));
         assert!(!match_components(&["a", "*"], &["a", "b", "c"]));
     }
@@ -519,10 +587,19 @@ mod tests {
         assert_eq!(sanitize_component("CON"), "_CON");
         assert_eq!(sanitize_component("nul.txt"), "_nul.txt");
         let out = Path::new("out");
-        for evil in ["../../etc/passwd", "/..", "a/../../b", "C:\\Windows", "..\\..\\x"] {
+        for evil in [
+            "../../etc/passwd",
+            "/..",
+            "a/../../b",
+            "C:\\Windows",
+            "..\\..\\x",
+        ] {
             let p = output_path(out, 0, evil).unwrap();
             assert!(p.starts_with(out.join("0")), "{evil} -> {p:?}");
-            assert!(p.components().all(|c| matches!(c, Component::Normal(_))), "{evil} -> {p:?}");
+            assert!(
+                p.components().all(|c| matches!(c, Component::Normal(_))),
+                "{evil} -> {p:?}"
+            );
         }
     }
 }

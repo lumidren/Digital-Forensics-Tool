@@ -85,7 +85,10 @@ pub const KNOWN_FOLDERS: &[(&str, &str)] = &[
     ("0ac0837c-bbf8-452a-850d-79d08e667ca7", "Computer"),
     ("1ac14e77-02e7-4e5d-b744-2eb1ae5198b7", "System32"),
     ("1cf1260c-4dd0-4ebb-811f-33c572699fde", "Music"),
-    ("1f4de370-d627-11d1-ba4f-00a0c91eedba", "Search Results - Computers"),
+    (
+        "1f4de370-d627-11d1-ba4f-00a0c91eedba",
+        "Search Results - Computers",
+    ),
     ("18989b1d-99b5-455b-841c-ab7c74e4ddfc", "Videos"),
     ("208d2c60-3aea-1069-a2d7-08002b30309d", "My Network Places"),
     ("20d04fe0-3aea-1069-a2d8-08002b30309d", "My Computer"),
@@ -116,15 +119,24 @@ pub const KNOWN_FOLDERS: &[(&str, &str)] = &[
     ("62ab5d82-fdc1-4dc3-a9dd-070d1d495d97", "ProgramData"),
     ("645ff040-5081-101b-9f08-00aa002f954e", "Recycle Bin"),
     ("679f85cb-0220-4080-b29b-5540cc05aab6", "Quick Access"),
-    ("7b81be6a-ce2b-4676-a29e-eb907a5126c5", "Programs and Features"),
-    ("7c5a40ef-a0fb-4bfc-874a-c0f2e0b9fa8e", "Program Files (x86)"),
+    (
+        "7b81be6a-ce2b-4676-a29e-eb907a5126c5",
+        "Programs and Features",
+    ),
+    (
+        "7c5a40ef-a0fb-4bfc-874a-c0f2e0b9fa8e",
+        "Program Files (x86)",
+    ),
     ("82a5ea35-d9cd-47c5-9629-e15d2f714e6e", "Common Startup"),
     ("871c5380-42a0-1069-a2ea-08002b30309d", "Internet Explorer"),
     ("8983036c-27c0-404b-8f08-102d10dcfd74", "SendTo"),
     ("905e63b6-c1bf-494e-b29c-65b732d3d21a", "Program Files"),
     ("9e3995ab-1f9c-4f13-b827-48b24b6c7174", "User Pinned"),
     ("a0953c92-50dc-43bf-be83-3742fed03c9c", "Videos"),
-    ("a00ee528-ebd9-48b8-944a-8942113d46ac", "Start Menu Commanding"),
+    (
+        "a00ee528-ebd9-48b8-944a-8942113d46ac",
+        "Start Menu Commanding",
+    ),
     ("a77f5d77-2e2b-44c3-a6a2-aba601054a51", "Programs"),
     ("a8cdff1c-4878-43be-b5fd-f8091c1c60d0", "Documents"),
     ("ae50c081-ebd2-438a-8655-8a092e34987a", "Recent Items"),
@@ -136,8 +148,14 @@ pub const KNOWN_FOLDERS: &[(&str, &str)] = &[
     ("c4900540-2379-4c75-844b-64e6faf8716b", "Sample Pictures"),
     ("d20beec4-5ca8-4905-ae3b-bf251ea09b53", "Network"),
     ("d3162b92-9365-467a-956b-92703aca08af", "Documents"),
-    ("d34a6ca6-62c2-4c34-8a7c-14709c1ad938", "Common Places FS Folder"),
-    ("dffacdc5-679f-4156-8947-c5c76bc0b67f", "Delegate folder in Users Files"),
+    (
+        "d34a6ca6-62c2-4c34-8a7c-14709c1ad938",
+        "Common Places FS Folder",
+    ),
+    (
+        "dffacdc5-679f-4156-8947-c5c76bc0b67f",
+        "Delegate folder in Users Files",
+    ),
     ("e17d4fc0-5564-11d1-83f2-00a0c90dc849", "Search Results"),
     ("ed228fdf-9ea8-4870-83b1-96b02cfe0d52", "Games"),
     ("f02c1a0d-be21-4350-88b0-7367fc96ef3c", "Network"),
@@ -210,12 +228,17 @@ pub fn parse_shell_item_list(data: &[u8]) -> Result<Vec<ShellItem>> {
             break;
         }
         if size < 3 {
-            return Err(ParseError::Invalid { offset: off, reason: format!("shell item size {size} too small") });
+            return Err(ParseError::Invalid {
+                offset: off,
+                reason: format!("shell item size {size} too small"),
+            });
         }
         let raw = need(data, off, size)?;
         items.push(parse_shell_item(raw)?);
         if items.len() >= MAX_ITEMS {
-            return Err(ParseError::Limit(format!("more than {MAX_ITEMS} shell items")));
+            return Err(ParseError::Limit(format!(
+                "more than {MAX_ITEMS} shell items"
+            )));
         }
         off += size;
     }
@@ -250,7 +273,9 @@ fn root_folder(d: &[u8]) -> ShellItem {
     let mut it = ShellItem::new("root_folder", d.len());
     if let Ok(g) = need(d, 4, 16) {
         if let Some(gs) = guid_string(g) {
-            it.name = known_folder_name(&gs).map(|n| n.to_string()).unwrap_or_else(|| format!("{{{gs}}}"));
+            it.name = known_folder_name(&gs)
+                .map(|n| n.to_string())
+                .unwrap_or_else(|| format!("{{{gs}}}"));
             it.class_id = Some(gs);
         }
     }
@@ -268,7 +293,9 @@ fn volume(d: &[u8], class: u8) -> ShellItem {
     } else if d.len() >= 20 {
         // Volume shell item carrying a class identifier (e.g. removable media).
         if let Some(g) = need(d, 4, 16).ok().and_then(guid_string) {
-            it.name = known_folder_name(&g).map(|n| n.to_string()).unwrap_or_else(|| format!("{{{g}}}"));
+            it.name = known_folder_name(&g)
+                .map(|n| n.to_string())
+                .unwrap_or_else(|| format!("{{{g}}}"));
             it.class_id = Some(g);
         }
     }
@@ -289,7 +316,11 @@ fn file_entry(d: &[u8], class: u8) -> Result<ShellItem> {
     }
     it.modification_ns = fat_pair(d, 8);
     let unicode = class & 0x04 != 0;
-    let (name, consumed) = if unicode { utf16z(d, 14) } else { asciiz(d, 14) };
+    let (name, consumed) = if unicode {
+        utf16z(d, 14)
+    } else {
+        asciiz(d, 14)
+    };
     it.name = name;
     let mut next = 14 + consumed;
     if next % 2 == 1 {
@@ -303,7 +334,11 @@ fn file_entry(d: &[u8], class: u8) -> Result<ShellItem> {
 }
 
 fn apply_beef0004(it: &mut ShellItem) {
-    if let Some(b) = it.extension_blocks.iter().find(|b| b.signature == 0xbeef0004) {
+    if let Some(b) = it
+        .extension_blocks
+        .iter()
+        .find(|b| b.signature == 0xbeef0004)
+    {
         if let Some(v) = b.fields.get("creation_ns").and_then(|v| v.as_i64()) {
             it.creation_ns = Some(v);
         }
@@ -339,7 +374,11 @@ fn network(d: &[u8]) -> ShellItem {
         f.insert("comments".to_string(), Value::from(com));
     }
     f.insert("flags".to_string(), Value::from(flags));
-    it.extension_blocks.push(ExtensionBlock { signature: 0, version: 0, fields: f });
+    it.extension_blocks.push(ExtensionBlock {
+        signature: 0,
+        version: 0,
+        fields: f,
+    });
     it
 }
 
@@ -356,7 +395,11 @@ fn uri(d: &[u8]) -> ShellItem {
         }
     }
     let probe = if start < d.len() { start } else { 6 };
-    let (s, _) = if unicode { utf16z(d, probe) } else { asciiz(d, probe) };
+    let (s, _) = if unicode {
+        utf16z(d, probe)
+    } else {
+        asciiz(d, probe)
+    };
     it.name = s;
     it
 }
@@ -364,7 +407,9 @@ fn uri(d: &[u8]) -> ShellItem {
 fn control_panel(d: &[u8]) -> ShellItem {
     let mut it = ShellItem::new("control_panel", d.len());
     if let Some(g) = need(d, 14, 16).ok().and_then(guid_string) {
-        it.name = known_folder_name(&g).map(|n| n.to_string()).unwrap_or_else(|| format!("{{{g}}}"));
+        it.name = known_folder_name(&g)
+            .map(|n| n.to_string())
+            .unwrap_or_else(|| format!("{{{g}}}"));
         it.class_id = Some(g);
     }
     it
@@ -403,7 +448,14 @@ fn delegate(d: &[u8]) -> Result<ShellItem> {
 }
 
 fn users_property_view(d: &[u8], class: u8) -> ShellItem {
-    let mut it = ShellItem::new(if class == 0x01 { "control_panel_category" } else { "users_property_view" }, d.len());
+    let mut it = ShellItem::new(
+        if class == 0x01 {
+            "control_panel_category"
+        } else {
+            "users_property_view"
+        },
+        d.len(),
+    );
     if class == 0x01 {
         let cat = u32_at(d, 8).unwrap_or(0);
         it.name = format!("<control panel category {cat}>");
@@ -422,8 +474,15 @@ fn users_property_view(d: &[u8], class: u8) -> ShellItem {
     if it.name.is_empty() {
         it.name = format!("<users property view 0x{sig:08x}>");
     }
-    f.insert("hex".to_string(), Value::from(hex::encode(&d[..d.len().min(256)])));
-    it.extension_blocks.push(ExtensionBlock { signature: 0, version: 0, fields: f });
+    f.insert(
+        "hex".to_string(),
+        Value::from(hex::encode(&d[..d.len().min(256)])),
+    );
+    it.extension_blocks.push(ExtensionBlock {
+        signature: 0,
+        version: 0,
+        fields: f,
+    });
     it
 }
 
@@ -432,8 +491,15 @@ fn unknown(d: &[u8], class: u8) -> ShellItem {
     it.name = format!("<unknown 0x{class:02x}>");
     let mut f = BTreeMap::new();
     f.insert("class_type".to_string(), Value::from(class));
-    f.insert("hex".to_string(), Value::from(hex::encode(&d[..d.len().min(256)])));
-    it.extension_blocks.push(ExtensionBlock { signature: 0, version: 0, fields: f });
+    f.insert(
+        "hex".to_string(),
+        Value::from(hex::encode(&d[..d.len().min(256)])),
+    );
+    it.extension_blocks.push(ExtensionBlock {
+        signature: 0,
+        version: 0,
+        fields: f,
+    });
     it
 }
 
@@ -455,7 +521,11 @@ pub fn parse_extension_blocks(d: &[u8], start: usize) -> Vec<ExtensionBlock> {
             break;
         }
         let b = &d[o..o + size];
-        out.push(ExtensionBlock { signature: sig, version, fields: ext_fields(b, sig, version) });
+        out.push(ExtensionBlock {
+            signature: sig,
+            version,
+            fields: ext_fields(b, sig, version),
+        });
         o += size;
     }
     out
@@ -499,7 +569,11 @@ fn ext_fields(b: &[u8], sig: u32, version: u16) -> BTreeMap<String, Value> {
             ins(&mut f, "long_name", ln);
             o += c;
             if version >= 3 && long_string_size > 0 && o + 2 < b.len() {
-                let (loc, _) = if version >= 7 { utf16z(b, o) } else { asciiz(b, o) };
+                let (loc, _) = if version >= 7 {
+                    utf16z(b, o)
+                } else {
+                    asciiz(b, o)
+                };
                 ins(&mut f, "localized_name", loc);
             }
         }
@@ -572,6 +646,8 @@ pub fn shell_item_path(items: &[ShellItem]) -> String {
 /// Parse a hex string (whitespace allowed) into bytes, for CLI input.
 pub fn parse_hex_input(s: &str) -> Result<Vec<u8>> {
     let cleaned: String = s.chars().filter(|c| !c.is_whitespace()).collect();
-    hex::decode(cleaned).map_err(|e| ParseError::Invalid { offset: 0, reason: format!("hex: {e}") })
+    hex::decode(cleaned).map_err(|e| ParseError::Invalid {
+        offset: 0,
+        reason: format!("hex: {e}"),
+    })
 }
-

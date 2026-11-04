@@ -24,7 +24,10 @@ fn split_host_port(s: &str) -> (String, Option<u16>) {
     }
     match s.rfind(':') {
         Some(i) => {
-            let host = s[..i].trim_start_matches('[').trim_end_matches(']').to_string();
+            let host = s[..i]
+                .trim_start_matches('[')
+                .trim_end_matches(']')
+                .to_string();
             (host, s[i + 1..].parse().ok())
         }
         None => (s.to_string(), None),
@@ -37,7 +40,9 @@ pub fn parse_netstat_windows(text: &str) -> Vec<Connection> {
     for line in text.lines() {
         let f: Vec<&str> = line.split_whitespace().collect();
         let proto = match f.first() {
-            Some(p) if p.eq_ignore_ascii_case("TCP") || p.eq_ignore_ascii_case("UDP") => p.to_ascii_uppercase(),
+            Some(p) if p.eq_ignore_ascii_case("TCP") || p.eq_ignore_ascii_case("UDP") => {
+                p.to_ascii_uppercase()
+            }
             _ => continue,
         };
         let (state, pid) = match (proto.as_str(), f.len()) {
@@ -47,7 +52,18 @@ pub fn parse_netstat_windows(text: &str) -> Vec<Connection> {
         };
         let (la, lp) = split_host_port(f[1]);
         let (ra, rp) = split_host_port(f[2]);
-        out.push(Connection { protocol: proto, local_address: la, local_port: lp, remote_address: ra, remote_port: rp, state, pid, process: None, inode: None, uid: None });
+        out.push(Connection {
+            protocol: proto,
+            local_address: la,
+            local_port: lp,
+            remote_address: ra,
+            remote_port: rp,
+            state,
+            pid,
+            process: None,
+            inode: None,
+            uid: None,
+        });
     }
     out
 }
@@ -76,7 +92,10 @@ fn decode_proc_addr(s: &str) -> Option<(String, u16)> {
         8 => {
             let v = u32::from_str_radix(addr, 16).ok()?;
             let b = v.to_le_bytes();
-            Some((std::net::Ipv4Addr::new(b[0], b[1], b[2], b[3]).to_string(), port))
+            Some((
+                std::net::Ipv4Addr::new(b[0], b[1], b[2], b[3]).to_string(),
+                port,
+            ))
         }
         32 => {
             let mut bytes = [0u8; 16];
@@ -98,9 +117,16 @@ pub fn parse_proc_net(text: &str, protocol: &str) -> Vec<Connection> {
         if f.len() < 10 {
             continue;
         }
-        let (Some((la, lp)), Some((ra, rp))) = (decode_proc_addr(f[1]), decode_proc_addr(f[2])) else { continue };
+        let (Some((la, lp)), Some((ra, rp))) = (decode_proc_addr(f[1]), decode_proc_addr(f[2]))
+        else {
+            continue;
+        };
         let st = u8::from_str_radix(f[3], 16).unwrap_or(0);
-        let state = if protocol.starts_with("tcp") { Some(tcp_state(st).to_string()) } else { None };
+        let state = if protocol.starts_with("tcp") {
+            Some(tcp_state(st).to_string())
+        } else {
+            None
+        };
         out.push(Connection {
             protocol: protocol.to_string(),
             local_address: la,
@@ -130,7 +156,9 @@ pub fn parse_lsof(text: &str) -> Vec<Connection> {
             continue;
         }
         let name = f[8];
-        let state = f.get(9).map(|s| s.trim_matches(|c| c == '(' || c == ')').to_string());
+        let state = f
+            .get(9)
+            .map(|s| s.trim_matches(|c| c == '(' || c == ')').to_string());
         let (local, remote) = match name.split_once("->") {
             Some((l, r)) => (l, r),
             None => (name, "*:*"),
@@ -157,15 +185,28 @@ pub fn parse_lsof(text: &str) -> Vec<Connection> {
 /// users' processes are unreadable without root).
 pub fn linux_socket_owners() -> BTreeMap<u64, (u32, String)> {
     let mut map = BTreeMap::new();
-    let Ok(procs) = std::fs::read_dir("/proc") else { return map };
+    let Ok(procs) = std::fs::read_dir("/proc") else {
+        return map;
+    };
     for p in procs.flatten() {
-        let Ok(pid) = p.file_name().to_string_lossy().parse::<u32>() else { continue };
-        let comm = std::fs::read_to_string(p.path().join("comm")).unwrap_or_default().trim().to_string();
-        let Ok(fds) = std::fs::read_dir(p.path().join("fd")) else { continue };
+        let Ok(pid) = p.file_name().to_string_lossy().parse::<u32>() else {
+            continue;
+        };
+        let comm = std::fs::read_to_string(p.path().join("comm"))
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        let Ok(fds) = std::fs::read_dir(p.path().join("fd")) else {
+            continue;
+        };
         for fd in fds.flatten() {
             if let Ok(target) = std::fs::read_link(fd.path()) {
                 let t = target.to_string_lossy();
-                if let Some(inode) = t.strip_prefix("socket:[").and_then(|s| s.strip_suffix(']')).and_then(|s| s.parse::<u64>().ok()) {
+                if let Some(inode) = t
+                    .strip_prefix("socket:[")
+                    .and_then(|s| s.strip_suffix(']'))
+                    .and_then(|s| s.parse::<u64>().ok())
+                {
                     map.insert(inode, (pid, comm.clone()));
                 }
             }
