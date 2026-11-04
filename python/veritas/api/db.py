@@ -76,6 +76,9 @@ class Evidence(Base):
     ingest_entry_hash: Mapped[str] = mapped_column(String(64))
     ingested: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     status: Mapped[str] = mapped_column(String(32), default="queued")
+    # Additional segment objects of a multi-file image (E02, E03, ...), each stored under its own
+    # SHA-256: [{"name": ..., "sha256": ..., "size": ...}]. The primary object is `sha256`.
+    segments: Mapped[list] = mapped_column(JSON, default=list)
 
 
 class Bookmark(Base):
@@ -201,7 +204,24 @@ def make_engine(url: str):
             cur.execute("PRAGMA journal_mode=WAL")
             cur.close()
     Base.metadata.create_all(engine)
+    _add_missing_columns(engine)
     return engine
+
+
+def _add_missing_columns(engine) -> None:
+    """Additive schema migration: add nullable columns introduced after a database was created."""
+    from sqlalchemy import inspect, text
+
+    insp = inspect(engine)
+    for table in Base.metadata.sorted_tables:
+        if not insp.has_table(table.name):
+            continue
+        have = {c["name"] for c in insp.get_columns(table.name)}
+        for col in table.columns:
+            if col.name not in have:
+                ddl = col.type.compile(dialect=engine.dialect)
+                with engine.begin() as c:
+                    c.execute(text(f'ALTER TABLE {table.name} ADD COLUMN {col.name} {ddl}'))
 
 
 def make_sessionmaker(engine):

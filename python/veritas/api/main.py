@@ -382,17 +382,21 @@ def create_app(settings: Settings | None = None, start_processor: bool | None = 
 
     # ------------------------------------------------------------------ evidence
     def _register_evidence(case_id: str, actor: str, meta, name: str, kind: str, description: str, host: str | None, acquired_by: str | None,
-                           acquisition: dict | None, tz_name: str | None, skew_ms: int) -> dict:
+                           acquisition: dict | None, tz_name: str | None, skew_ms: int, segments: list[dict] | None = None) -> dict:
         ev_id = f"EV-{uuid.uuid4().hex[:10].upper()}"
         if acquisition:
             ctx.custody(case_id, actor, "note", "acquisition record received from agent", evidence_id=ev_id, details={"agent_entry": acquisition})
         hashes = {"md5": meta.hashes.md5, "sha256": meta.hashes.sha256, "sha3_256": meta.hashes.sha3_256, "length": meta.hashes.length}
         if acquisition and acquisition.get("hashes") and acquisition["hashes"].get("sha256") != meta.hashes.sha256:
             raise HTTPException(409, "uploaded object hash differs from the acquisition record")
-        entry = ctx.custody(case_id, actor, "ingest", f"evidence {name} stored", evidence_id=ev_id, hashes=hashes, details={"name": name, "kind": kind, "store_address": meta.address})
+        details = {"name": name, "kind": kind, "store_address": meta.address}
+        if segments:
+            details["segments"] = segments
+        entry = ctx.custody(case_id, actor, "ingest", f"evidence {name} stored", evidence_id=ev_id, hashes=hashes, details=details)
         with ctx.Session() as s:
             s.add(Evidence(id=ev_id, case_id=case_id, sha256=meta.hashes.sha256, md5=meta.hashes.md5, sha3_256=meta.hashes.sha3_256, size=meta.hashes.length, name=name,
-                           kind=kind, description=description, host=host, acquired_by=acquired_by, tz_name=tz_name, clock_skew_ms=skew_ms, ingest_entry_hash=entry["entry_hash"], status="queued"))
+                           kind=kind, description=description, host=host, acquired_by=acquired_by, tz_name=tz_name, clock_skew_ms=skew_ms, ingest_entry_hash=entry["entry_hash"], status="queued",
+                           segments=segments or []))
             s.commit()
             ev = s.get(Evidence, ev_id)
             s.expunge(ev)
@@ -432,8 +436,12 @@ def create_app(settings: Settings | None = None, start_processor: bool | None = 
         meta = ctx.store.put_file(a.case_id, path, path.name)
         if body.get("expected_sha256") and body["expected_sha256"].lower() != meta.hashes.sha256:
             raise HTTPException(409, "hash mismatch")
+        segments = []
+        for seg in ewf_segment_set(path)[1:]:
+            m = ctx.store.put_file(a.case_id, seg, seg.name)
+            segments.append({"name": seg.name, "sha256": m.hashes.sha256, "md5": m.hashes.md5, "size": m.hashes.length})
         return _register_evidence(a.case_id, a.principal.user_id, meta, body.get("name") or path.name, body.get("kind", "file"), body.get("description", ""),
-                                  body.get("host"), body.get("acquired_by"), body.get("acquisition_entry"), body.get("tz_name"), int(body.get("clock_skew_ms", 0)))
+                                  body.get("host"), body.get("acquired_by"), body.get("acquisition_entry"), body.get("tz_name"), int(body.get("clock_skew_ms", 0)), segments)
 
     @app.get("/api/v1/cases/{case_id}/evidence")
     def evidence_list(a: CaseAccess = Depends(need("viewer"))):
@@ -992,10 +1000,27 @@ def _case(c: Case) -> dict[str, Any]:
             "timezone": c.timezone, "legal_hold": c.legal_hold, "retention_until": _aware(c.retention_until).isoformat() if c.retention_until else None, "ledger_id": c.ledger_id}
 
 
+def ewf_segment_set(first: Path) -> list[Path]:
+    """``x.E01`` plus its continuation segments ``x.E02`` ... ``x.E99``, ``x.EAA`` ... in EWF order."""
+    if first.suffix.upper() != ".E01":
+        return [first]
+    out = [first]
+    names = {p.name.upper(): p for p in first.parent.iterdir() if p.is_file()}
+    stem = first.name[: -len(first.suffix)].upper()
+    nums = [f"E{i:02d}" for i in range(2, 100)]
+    letters = [f"E{a}{b}" for a in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" for b in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"]
+    for ext in nums + letters:
+        p = names.get(f"{stem}.{ext}")
+        if p is None:
+            break
+        out.append(p)
+    return out
+
+
 def _ev(e: Evidence) -> dict[str, Any]:
     return {"id": e.id, "case_id": e.case_id, "sha256": e.sha256, "md5": e.md5, "sha3_256": e.sha3_256, "size": e.size, "name": e.name, "kind": e.kind, "description": e.description,
             "host": e.host, "acquired_by": e.acquired_by, "tz_name": e.tz_name, "clock_skew_ms": e.clock_skew_ms, "ingest_entry_hash": e.ingest_entry_hash,
-            "ingested": _aware(e.ingested).isoformat(), "status": e.status}
+            "ingested": _aware(e.ingested).isoformat(), "status": e.status, "segments": e.segments or []}
 
 
 def _row(o) -> dict[str, Any]:
