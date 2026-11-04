@@ -1,0 +1,56 @@
+{
+ "value": [
+  {
+   "time": "2023-03-01T09:00:00.1234567Z",
+   "resourceId": "/SUBSCRIPTIONS/0000/RESOURCEGROUPS/RG1/PROVIDERS/MICROSOFT.COMPUTE/VIRTUALMACHINES/VM1",
+   "operationName": "MICROSOFT.COMPUTE/VIRTUALMACHINES/WRITE",
+   "category": "Administrative",
+   "resultType": "Success",
+   "resultSignature": "Succeeded.Created",
+   "durationMs": "1532",
+   "callerIpAddress": "203.0.113.50",
+   "correlationId": "c0ffee00-0000-0000-0000-000000000001",
+   "level": "Information",
+   "location": "global",
+   "identity": {
+    "authorization": {
+     "scope": "/subscriptions/0000/resourceGroups/RG1",
+     "action": "Microsoft.Compute/virtualMachines/write"
+    },
+    "claims": {
+     "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/upn": "ops@contoso.com",
+     "ipaddr": "203.0.113.50",
+     "appid": "c44b4083-3bb0-49c1-b47d-974e53cbdf3c",
+     "http://schemas.microsoft.com/identity/claims/objectidentifier": "aaaa-bbbb"
+    }
+   },
+   "properties": {
+    "statusCode": "Created",
+    "serviceRequestId": "abc-123"
+   }
+  },
+  {
+   "eventTimestamp": "2023-03-01T09:30:00Z",
+   "operationName": {
+    "value": "Microsoft.Authorization/roleAssignments/write",
+    "localizedValue": "Create role assignment"
+   },
+   "category": {
+    "value": "Administrative",
+    "localizedValue": "Administrative"
+   },
+   "status": {
+    "value": "Failed",
+    "localizedValue": "Failed"
+   },
+   "subStatus": {
+    "value": "Forbidden"
+   },
+   "caller": "intruder@contoso.com",
+   "resourceId": "/subscriptions/0000",
+   "properties": {
+    "requestbody": "{\"properties\":{\"roleDefinitionId\":\"Owner\"}}"
+   }
+  }
+ ]
+}

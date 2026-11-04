@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<packages>
+  <package name="com.example.chat" codePath="/data/app/com.example.chat-1" flags="572996" ft="18674fd4200" it="18674fd4200" ut="18698c08800" version="412" userId="10123" installer="com.android.vending">
+    <perms>
+      <item name="android.permission.READ_SMS" granted="true" />
+      <item name="android.permission.CAMERA" granted="true" />
+    </perms>
+  </package>
+  <package name="com.android.settings" codePath="/system/priv-app/Settings" version="29" sharedUserId="1000" />
+  <package codePath="/nowhere" />
+</packages>

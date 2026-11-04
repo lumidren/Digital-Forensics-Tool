@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>List of known networks</key>
+	<array>
+		<dict>
+			<key>BSSID</key>
+			<string>aa:bb:cc:dd:ee:ff</string>
+			<key>SSID_STR</key>
+			<string>CoffeeShop</string>
+			<key>SecurityMode</key>
+			<string>WPA2 Personal</string>
+			<key>lastAutoJoined</key>
+			<date>2023-03-01T08:00:00Z</date>
+			<key>lastJoined</key>
+			<date>2023-02-28T08:30:00Z</date>
+		</dict>
+		<dict>
+			<key>SSID_STR</key>
+			<string>Airport_Free</string>
+			<key>SecurityMode</key>
+			<string>Open</string>
+		</dict>
+	</array>
+</dict>
+</plist>

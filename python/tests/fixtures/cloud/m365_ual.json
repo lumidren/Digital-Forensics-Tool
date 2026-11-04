@@ -1,0 +1,48 @@
+[
+ {
+  "CreationTime": "2023-03-02T01:00:00",
+  "Id": "m-5",
+  "Operation": "UserLoginFailed",
+  "RecordType": 15,
+  "ResultStatus": "Failed",
+  "UserId": "alice@contoso.com",
+  "Workload": "AzureActiveDirectory",
+  "ClientIP": "192.0.2.66",
+  "LogonError": "InvalidUserNameOrPassword"
+ },
+ {
+  "CreationTime": "2023-03-02T01:05:00",
+  "Id": "m-6",
+  "Operation": "New-InboxRule",
+  "RecordType": 1,
+  "ResultStatus": "True",
+  "UserId": "alice@contoso.com",
+  "Workload": "Exchange",
+  "ClientIP": "192.0.2.66:51234",
+  "ObjectId": "alice\\fwd",
+  "Parameters": [
+   {
+    "Name": "ForwardTo",
+    "Value": "eve@evil.example"
+   },
+   {
+    "Name": "Name",
+    "Value": "fwd"
+   }
+  ],
+  "Item": {
+   "Id": "item-1",
+   "Subject": "rule",
+   "ParentFolder": {
+    "Path": "\\Inbox"
+   }
+  }
+ },
+ {
+  "CreationTime": "2023-03-02T01:06:00",
+  "Id": "m-7",
+  "Operation": "Custom",
+  "RecordType": 999,
+  "Workload": "Other"
+ }
+]

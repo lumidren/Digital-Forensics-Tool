@@ -1,0 +1,75 @@
+{
+ "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#auditLogs/directoryAudits",
+ "value": [
+  {
+   "id": "Directory_AAAA",
+   "category": "UserManagement",
+   "correlationId": "corr-1",
+   "result": "success",
+   "resultReason": "",
+   "activityDisplayName": "Add user",
+   "activityDateTime": "2023-03-01T11:00:00.1234567Z",
+   "loggedByService": "Core Directory",
+   "operationType": "Add",
+   "initiatedBy": {
+    "app": null,
+    "user": {
+     "id": "u-admin",
+     "displayName": "Admin",
+     "userPrincipalName": "admin@contoso.com",
+     "ipAddress": "198.51.100.7"
+    }
+   },
+   "targetResources": [
+    {
+     "id": "u-bob",
+     "displayName": "Bob",
+     "type": "User",
+     "userPrincipalName": "bob@contoso.com",
+     "modifiedProperties": [
+      {
+       "displayName": "AccountEnabled",
+       "oldValue": "[]",
+       "newValue": "[true]"
+      }
+     ]
+    }
+   ],
+   "additionalDetails": [
+    {
+     "key": "UserType",
+     "value": "Member"
+    }
+   ]
+  },
+  {
+   "id": "Directory_BBBB",
+   "category": "ApplicationManagement",
+   "correlationId": "corr-2",
+   "result": "failure",
+   "resultReason": "Insufficient privileges",
+   "activityDisplayName": "Update application",
+   "activityDateTime": "2023-03-01T11:05:00Z",
+   "loggedByService": "Core Directory",
+   "operationType": "Update",
+   "initiatedBy": {
+    "user": null,
+    "app": {
+     "appId": "00000003-0000-0000-c000-000000000000",
+     "displayName": "Microsoft Graph",
+     "servicePrincipalId": "sp-1",
+     "servicePrincipalName": null
+    }
+   },
+   "targetResources": [
+    {
+     "id": "app-1",
+     "displayName": "Payroll",
+     "type": "Application",
+     "modifiedProperties": []
+    }
+   ],
+   "additionalDetails": []
+  }
+ ]
+}

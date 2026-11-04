@@ -1,0 +1,132 @@
+{
+ "kind": "admin#reports#activities",
+ "items": [
+  {
+   "kind": "admin#reports#activity",
+   "id": {
+    "time": "2023-03-01T12:00:00.000Z",
+    "uniqueQualifier": "-1234567890",
+    "applicationName": "login",
+    "customerId": "C01"
+   },
+   "etag": "\"e1\"",
+   "actor": {
+    "callerType": "USER",
+    "email": "alice@example.com",
+    "profileId": "1001"
+   },
+   "ipAddress": "203.0.113.20",
+   "events": [
+    {
+     "type": "login",
+     "name": "login_success",
+     "parameters": [
+      {
+       "name": "login_type",
+       "value": "google_password"
+      },
+      {
+       "name": "is_suspicious",
+       "boolValue": false
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "admin#reports#activity",
+   "id": {
+    "time": "2023-03-01T12:30:00.000Z",
+    "uniqueQualifier": "42",
+    "applicationName": "drive",
+    "customerId": "C01"
+   },
+   "actor": {
+    "email": "alice@example.com",
+    "profileId": "1001"
+   },
+   "ipAddress": "203.0.113.20",
+   "events": [
+    {
+     "type": "access",
+     "name": "download",
+     "parameters": [
+      {
+       "name": "doc_title",
+       "value": "Q1 plan"
+      },
+      {
+       "name": "doc_id",
+       "value": "abc"
+      },
+      {
+       "name": "visibility",
+       "value": "private"
+      },
+      {
+       "name": "billable",
+       "boolValue": true
+      }
+     ]
+    },
+    {
+     "type": "acl_change",
+     "name": "change_user_access",
+     "parameters": [
+      {
+       "name": "target_user",
+       "value": "eve@evil.example"
+      },
+      {
+       "name": "old_value",
+       "multiValue": [
+        "none"
+       ]
+      },
+      {
+       "name": "new_value",
+       "multiValue": [
+        "can_view"
+       ]
+      },
+      {
+       "name": "count",
+       "intValue": "3"
+      },
+      {
+       "name": "ids",
+       "multiIntValue": [
+        "1",
+        "2"
+       ]
+      },
+      {
+       "name": "nested",
+       "messageValue": {
+        "parameter": [
+         {
+          "name": "k",
+          "value": "v"
+         }
+        ]
+       }
+      },
+      {
+       "name": "nested_list",
+       "multiMessageValue": [
+        {
+         "parameter": [
+          {
+           "name": "a",
+           "intValue": "7"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
