@@ -1,0 +1,63 @@
+# syntax=docker/dockerfile:1.7
+# Veritas processing worker: the Python pipeline (veritas-worker) plus the Rust parser binaries,
+# Volatility 3 (with pre-fetched, checksum-verified symbol packs) and YARA.
+#   docker build -f deploy/docker/Dockerfile.worker -t ghcr.io/lumidren/veritas-worker:dev .
+# The worker needs no network egress at runtime: symbol packs are baked in at build time.
+
+FROM rust:1.91-bookworm AS rust
+WORKDIR /src
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ crates/
+RUN cargo build --release --locked --workspace --bins \
+ && install -d /out \
+ && for b in veritas veritas-verify fs-tool veritas-artifacts-dump ewf-tool; do install -m 0755 "target/release/$b" /out/; done
+
+FROM python:3.12.7-slim-bookworm AS build
+ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 PYTHONDONTWRITEBYTECODE=1
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends build-essential zlib1g-dev libffi-dev libssl-dev curl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+RUN python -m venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH
+WORKDIR /src
+COPY python/ /src/python/
+RUN pip install --upgrade pip==24.2 setuptools==75.1.0 wheel==0.44.0 \
+ && pip install "/src/python[cluster]" \
+ && python -m compileall -q /opt/venv/lib \
+ && pip check \
+ && python -c "import yara, volatility3; print('yara', yara.__version__)"
+# Volatility 3 symbol packs, verified against the published SHA256SUMS before they are installed.
+ARG VOL3_SYMBOL_PACKS="windows linux mac"
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+WORKDIR /tmp/vol3
+RUN SYMDIR="$(python -c 'import os, volatility3.symbols as s; print(os.path.dirname(s.__file__))')" \
+ && curl -fsSLO https://downloads.volatilityfoundation.org/volatility3/symbols/SHA256SUMS \
+ && for p in ${VOL3_SYMBOL_PACKS}; do curl -fsSLO "https://downloads.volatilityfoundation.org/volatility3/symbols/${p}.zip"; done \
+ && grep -E " ($(echo "${VOL3_SYMBOL_PACKS}" | tr ' ' '|'))\.zip$" SHA256SUMS | sha256sum -c - \
+ && for p in ${VOL3_SYMBOL_PACKS}; do cp "${p}.zip" "${SYMDIR}/"; done \
+ && rm -f /tmp/vol3/*.zip /tmp/vol3/SHA256SUMS
+
+FROM python:3.12.7-slim-bookworm AS runtime
+LABEL org.opencontainers.image.title="veritas-worker" \
+      org.opencontainers.image.source="https://github.com/lumidren/Digital-Forensics-Tool" \
+      org.opencontainers.image.licenses="Apache-2.0"
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends tini ca-certificates libssl3 \
+ && rm -rf /var/lib/apt/lists/* \
+ && groupadd --gid 10001 veritas \
+ && useradd --uid 10001 --gid 10001 --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin veritas \
+ && install -d -o 10001 -g 10001 -m 0750 /var/lib/veritas
+COPY --from=build /opt/venv /opt/venv
+COPY --from=rust /out/ /opt/veritas/bin/
+ENV PATH=/opt/veritas/bin:/opt/venv/bin:$PATH \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    TMPDIR=/tmp \
+    VERITAS_DATA_DIR=/var/lib/veritas \
+    VERITAS_BIN_DIR=/opt/veritas/bin
+USER 10001:10001
+WORKDIR /var/lib/veritas
+HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
+  CMD ["python", "-c", "import shutil, sys, veritas.pipeline.queue; sys.exit(0 if shutil.which('veritas') and shutil.which('veritas-verify') else 1)"]
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["veritas-worker"]

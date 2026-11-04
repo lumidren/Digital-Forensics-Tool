@@ -1,0 +1,12 @@
+# Hadolint configuration for deploy/docker/Dockerfile.*
+# DL3008 / DL3018: OS package versions are not pinned because Debian and Alpine security updates
+# replace exact versions; base images are pinned to a patch release, images are rebuilt on every
+# release and gated by a Trivy HIGH/CRITICAL scan (.github/workflows/release.yml).
+ignored:
+  - DL3008
+  - DL3018
+failure-threshold: warning
+trustedRegistries:
+  - docker.io
+  - gcr.io
+  - ghcr.io

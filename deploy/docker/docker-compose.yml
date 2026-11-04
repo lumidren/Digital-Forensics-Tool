@@ -1,0 +1,232 @@
+# Veritas cluster profile on one host (Postgres + ClickHouse + MinIO Object Lock).
+# Not used by the native quickstart (scripts/bootstrap/quickstart.*), which needs no container runtime.
+#
+#   cp deploy/docker/compose.env.example deploy/docker/.env    # then fill every value
+#   docker compose -f deploy/docker/docker-compose.yml --env-file deploy/docker/.env up -d --build
+#   docker compose -f deploy/docker/docker-compose.yml --env-file deploy/docker/.env run --rm bootstrap
+#
+# Networks: `edge` is the only network with a route out (web, api, bootstrap); `backend` is internal
+# (no egress) and carries Postgres, ClickHouse, MinIO and the worker. No service uses host networking;
+# published ports bind to 127.0.0.1 only.
+
+name: veritas
+
+x-hardening: &hardening
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  tmpfs:
+    - /tmp:size=2g,mode=1777
+
+x-veritas-env: &veritas-env
+  VERITAS_DATA_DIR: /var/lib/veritas
+  VERITAS_DATABASE_URL: postgresql+psycopg://veritas:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/veritas
+  VERITAS_TIMELINE_URL: clickhouse://veritas:${CLICKHOUSE_PASSWORD:?set CLICKHOUSE_PASSWORD}@clickhouse:8123/veritas
+  VERITAS_STORE: s3
+  VERITAS_S3_BUCKET: veritas-evidence
+  S3_ENDPOINT_URL: http://minio:9000
+  AWS_ACCESS_KEY_ID: veritas-app
+  AWS_SECRET_ACCESS_KEY: ${MINIO_APP_SECRET:?set MINIO_APP_SECRET}
+  AWS_DEFAULT_REGION: us-east-1
+  VERITAS_MASTER_KEY: ${VERITAS_MASTER_KEY:?set VERITAS_MASTER_KEY (64 hex chars)}
+  VERITAS_LOCAL_AUTH: "1"
+  VERITAS_CORS_ORIGINS: http://localhost:3000
+  VERITAS_RETENTION_DAYS: "3650"
+  OTEL_EXPORTER_OTLP_ENDPOINT: ""
+
+services:
+  postgres:
+    image: postgres:16.4-alpine3.20
+    environment:
+      POSTGRES_DB: veritas
+      POSTGRES_USER: veritas
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: --data-checksums
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U veritas -d veritas"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+    shm_size: 256m
+    restart: unless-stopped
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8.4.13-alpine
+    environment:
+      CLICKHOUSE_DB: veritas
+      CLICKHOUSE_USER: veritas
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "0"
+    volumes:
+      - chdata:/var/lib/clickhouse
+      - chbackups:/backups
+      - ./clickhouse/backups.xml:/etc/clickhouse-server/config.d/backups.xml:ro
+    networks: [backend]
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping | grep -q Ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+    volumes:
+      - miniodata:/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  # One-shot: evidence bucket with Object Lock, default COMPLIANCE retention, versioning, and a
+  # least-privilege application user (no DeleteObject, no BypassGovernanceRetention).
+  minio-init:
+    image: minio/mc:RELEASE.2024-10-08T09-37-26Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+      MINIO_APP_SECRET: ${MINIO_APP_SECRET:?set MINIO_APP_SECRET}
+      RETENTION_DAYS: ${EVIDENCE_RETENTION_DAYS:-3650}
+    volumes:
+      - ./minio/veritas-evidence-policy.json:/policy/veritas-evidence-policy.json:ro
+    networks: [backend]
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing --with-lock local/veritas-evidence
+        mc version enable local/veritas-evidence
+        mc retention set --default COMPLIANCE "$${RETENTION_DAYS}d" local/veritas-evidence
+        mc retention info --default local/veritas-evidence | grep -q COMPLIANCE
+        mc admin policy create local veritas-evidence /policy/veritas-evidence-policy.json
+        mc admin user add local veritas-app "$$MINIO_APP_SECRET"
+        mc admin policy attach local veritas-evidence --user veritas-app || true
+        echo "bucket veritas-evidence ready: object lock COMPLIANCE $${RETENTION_DAYS}d"
+    restart: "no"
+
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.api
+    image: ghcr.io/lumidren/veritas-api:local
+    <<: *hardening
+    environment:
+      <<: *veritas-env
+    volumes:
+      - veritas-data:/var/lib/veritas
+    networks: [edge, backend]
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=4).status == 200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      start_period: 40s
+      retries: 5
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.worker
+    image: ghcr.io/lumidren/veritas-worker:local
+    <<: *hardening
+    environment:
+      <<: *veritas-env
+      VERITAS_MEM_BYTES: "4294967296"
+      VERITAS_CPU_S: "3600"
+    volumes:
+      - veritas-data:/var/lib/veritas
+    networks: [backend]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_BASE: http://localhost:8000
+    image: ghcr.io/lumidren/veritas-web:local
+    <<: *hardening
+    environment:
+      VERITAS_API_URL: http://api:8000
+    networks: [edge]
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # One-shot sample case: users, case, public reference artifacts, findings, signed report, custody
+  # export verified with veritas-verify. Uses the worker image (Python + veritas-verify).
+  bootstrap:
+    image: ghcr.io/lumidren/veritas-worker:local
+    environment:
+      <<: *veritas-env
+      VERITAS_BIN_DIR: /opt/veritas/bin
+      VERITAS_BOOTSTRAP_OUT: /var/lib/veritas/bootstrap
+      VERITAS_BOOTSTRAP_PASSWORD: ${VERITAS_BOOTSTRAP_PASSWORD:-}
+    volumes:
+      - veritas-data:/var/lib/veritas
+      - ../../scripts:/opt/veritas/scripts:ro
+      - ../../testdata:/opt/veritas/testdata:ro
+    networks: [edge, backend]
+    depends_on:
+      api:
+        condition: service_healthy
+      worker:
+        condition: service_started
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    command: ["python", "/opt/veritas/scripts/bootstrap/sample_case.py", "--api", "http://api:8000", "--manifest", "/opt/veritas/testdata/MANIFEST.json", "--cache", "/tmp/veritas-corpus"]
+    restart: "no"
+
+networks:
+  edge: {}
+  backend:
+    internal: true
+
+volumes:
+  pgdata: {}
+  chdata: {}
+  chbackups: {}
+  miniodata: {}
+  veritas-data: {}

@@ -1,0 +1,32 @@
+# syntax=docker/dockerfile:1.7
+# Statically linked (musl) veritas-agent for Linux targets. The `artifact` stage holds only the binary:
+#   docker buildx build -f deploy/docker/Dockerfile.agent --target artifact --output type=local,dest=dist/agent .
+# The default `runtime` stage is a scratch image usable for container-based triage.
+
+FROM rust:1.91-alpine AS build
+RUN apk add --no-cache musl-dev build-base perl openssl-dev openssl-libs-static pkgconf file
+ENV OPENSSL_STATIC=1 \
+    OPENSSL_LIB_DIR=/usr/lib \
+    OPENSSL_INCLUDE_DIR=/usr/include \
+    PKG_CONFIG_ALL_STATIC=1 \
+    RUSTFLAGS="-C target-feature=+crt-static"
+WORKDIR /src
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ crates/
+SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
+RUN TARGET="$(rustc -vV | sed -n 's/^host: //p')" \
+ && cargo build --release --locked -p veritas-agent --target "${TARGET}" \
+ && install -D -m 0755 "target/${TARGET}/release/veritas-agent" /out/veritas-agent \
+ && file /out/veritas-agent | grep -Eq 'static(-pie)? linked' \
+ && sha256sum /out/veritas-agent | sed 's#/out/##' > /out/veritas-agent.sha256
+
+FROM scratch AS artifact
+COPY --from=build /out/ /
+
+FROM scratch AS runtime
+LABEL org.opencontainers.image.title="veritas-agent" \
+      org.opencontainers.image.source="https://github.com/lumidren/Digital-Forensics-Tool" \
+      org.opencontainers.image.licenses="Apache-2.0"
+COPY --from=build /out/veritas-agent /veritas-agent
+USER 10001:10001
+ENTRYPOINT ["/veritas-agent"]
