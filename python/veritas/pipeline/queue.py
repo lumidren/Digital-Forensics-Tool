@@ -45,6 +45,7 @@ MAGIC: list[tuple[int, bytes, str]] = [
     (0, b"\xd4\xc3\xb2\xa1", "pcap"),
     (0, b"\xa1\xb2\xc3\xd4", "pcap"),
     (0, b"\x0a\x0d\x0d\x0a", "pcap"),
+    (0, b"FILE0", "mft"),  # raw $MFT extract: first record signature
     (0, b"MZ", "pe"),
     (0, b"\x7fELF", "pe"),
     (0, b"SQLite format 3\x00", "auto"),
@@ -115,6 +116,11 @@ class Processor:
             if not e.evidence_path:
                 e.evidence_path = logical
         n = self.ctx.timeline.ingest(case_id, events)
+        from ..api import observability as obs
+
+        obs.PARSER_EVENTS.labels(parser).inc(len(events))
+        obs.BYTES_PROCESSED.inc(int(self.ctx.store.meta(address).hashes.length))
+        obs.TIMELINE_EVENTS.labels(case_id).set(self.ctx.timeline.count(case_id))
         return {"parser": parser, "events": len(events), "ingested": n, "warnings": res.warnings[:50], "duration_ms": res.duration_ms}
 
     def build_dag(self, case_id: str, ev, kind: str) -> Dag:
@@ -304,7 +310,13 @@ def main() -> None:
 
     logging.basicConfig(level=logging.INFO, format='{"ts":"%(asctime)s","level":"%(levelname)s","logger":"%(name)s","msg":"%(message)s"}')
     ctx = AppContext(load())
-    p = Processor(ctx, JobStore(ctx.settings.data_dir / "jobs.db"))
+    import os
+
+    from prometheus_client import start_http_server
+
+    # Worker pods expose /metrics on their own port (scraped by the ServiceMonitor).
+    start_http_server(int(os.environ.get("VERITAS_METRICS_PORT", "9102")))
+    p = Processor(ctx, JobStore(os.environ.get("VERITAS_JOBS_URL") or ctx.settings.data_dir / "jobs.db"))
     try:
         p.loop()
     except KeyboardInterrupt:

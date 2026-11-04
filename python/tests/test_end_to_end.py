@@ -28,7 +28,7 @@ SAMPLES = [
     ("plaso/winprefetch/CMD.EXE-087B4001.pf", "file", "prefetch", 1),
     ("plaso/SYSTEM", "file", "regf-events", 1000),
     ("plaso/NTUSER.DAT", "file", "regf-events", 100),
-    ("plaso/MFT", "file", "auto", 0),  # raw $MFT has no magic; reprocessed as 'mft' below
+    ("plaso/MFT", "file", "mft", 1000),  # raw $MFT detected by its FILE0 record signature
     ("plaso/chrome/History", "file", "auto", 10),
     ("plaso/test.pcap", "pcap", "pcap", 10),
     ("plaso/syslog/syslog", "logs", "auto", 5),
@@ -68,10 +68,7 @@ def test_pipeline_end_to_end(env):
         assert r.status_code == 201, r.text
         ev = r.json()
         assert ev["classified_as"] == expect_class, (rel, ev["classified_as"])
-        if rel.endswith("/MFT"):
-            jobs.append(c.post(f"/api/v1/cases/{cid}/evidence/{ev['id']}/reprocess", params={"kind": "mft"}, headers=a).json()["job_id"])
-        else:
-            jobs.append(ev["job_id"])
+        jobs.append(ev["job_id"])
     proc = app.state.processor
     states = {}
     while (nxt := app.state.jobs.next_job()) is not None:
