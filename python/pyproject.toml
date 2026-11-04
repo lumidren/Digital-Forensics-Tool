@@ -41,6 +41,7 @@ dependencies = [
     "python-dateutil>=2.9",
     "PyYAML>=6.0",
     "websockets>=12",
+    "defusedxml>=0.7",
 ]
 
 [project.optional-dependencies]
@@ -86,6 +87,10 @@ markers = [
 [tool.ruff]
 line-length = 120
 target-version = "py312"
+
+[tool.ruff.lint]
+# Short loop names (l) and small assigned lambdas are accepted house style.
+ignore = ["E741", "E731"]
 
 [tool.coverage.run]
 source = ["veritas"]

@@ -1,0 +1,6 @@
+line-length = 120
+target-version = "py312"
+
+[lint]
+# Short loop names (l) and small assigned lambdas are accepted house style.
+ignore = ["E741", "E731"]
