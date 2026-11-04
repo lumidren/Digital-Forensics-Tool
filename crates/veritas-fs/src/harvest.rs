@@ -37,6 +37,22 @@ pub const PATTERNS: &[(&str, &str)] = &[
     ("recyclebin", "$Recycle.Bin/*/$I*"),
     ("wmi", "Windows/System32/wbem/Repository/OBJECTS.DATA"),
     ("timeline", "Users/*/AppData/Local/ConnectedDevicesPlatform/*/ActivitiesCache.db"),
+    // Windows XP / Server 2003 layouts (Documents and Settings, legacy EVT logs, IE5 index.dat).
+    ("evt", "Windows/System32/config/{AppEvent.Evt,SecEvent.Evt,SysEvent.Evt,Internet.evt,*.evt}"),
+    ("registry", "Documents and Settings/*/{NTUSER.DAT,ntuser.dat.LOG}"),
+    ("registry", "Documents and Settings/*/Local Settings/Application Data/Microsoft/Windows/{UsrClass.dat,UsrClass.dat.LOG}"),
+    ("lnk", "Documents and Settings/*/Recent/*.lnk"),
+    ("lnk", "Documents and Settings/*/{Desktop,Start Menu/Programs/Startup}/*.lnk"),
+    ("browser", "Documents and Settings/*/Local Settings/History/History.IE5/index.dat"),
+    ("browser", "Documents and Settings/*/Local Settings/History/History.IE5/*/index.dat"),
+    ("browser", "Documents and Settings/*/Local Settings/Temporary Internet Files/Content.IE5/index.dat"),
+    ("browser", "Documents and Settings/*/Cookies/index.dat"),
+    ("browser", "Documents and Settings/*/Application Data/Mozilla/Firefox/Profiles/*/{places.sqlite,cookies.sqlite,downloads.sqlite,history.dat}"),
+    ("browser", "Documents and Settings/*/Local Settings/Application Data/Google/Chrome/User Data/*/{History,Cookies,Web Data}"),
+    ("recyclebin", "RECYCLER/*/INFO2"),
+    ("email", "Documents and Settings/*/Local Settings/Application Data/Microsoft/Outlook/*.{pst,ost}"),
+    ("email", "Documents and Settings/*/Application Data/Thunderbird/Profiles/*/Mail/**/Inbox"),
+    ("restore", "System Volume Information/_restore*/RP*/snapshot/_REGISTRY_*"),
     ("ntfs_meta", "{$MFT,$LogFile}"),
     ("ntfs_meta", "$Extend/$UsnJrnl:$J"),
     ("linux", "var/log/{auth.log*,secure*,syslog*,messages*,dpkg.log*,apt/history.log*,audit/audit.log*}"),
@@ -507,6 +523,32 @@ mod tests {
             let p = output_path(out, 0, evil).unwrap();
             assert!(p.starts_with(out.join("0")), "{evil} -> {p:?}");
             assert!(p.components().all(|c| matches!(c, Component::Normal(_))), "{evil} -> {p:?}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod xp_layout_tests {
+    use super::*;
+
+    #[test]
+    fn windows_xp_paths_are_harvested() {
+        let m = Matcher::new();
+        let cases: &[(&str, Option<&str>)] = &[
+            ("/WINDOWS/system32/config/SecEvent.Evt", Some("evt")),
+            ("/WINDOWS/system32/config/AppEvent.Evt", Some("evt")),
+            ("/Documents and Settings/Mr. Evil/NTUSER.DAT", Some("registry")),
+            ("/Documents and Settings/Mr. Evil/Local Settings/Application Data/Microsoft/Windows/UsrClass.dat", Some("registry")),
+            ("/Documents and Settings/Mr. Evil/Recent/interception.lnk", Some("lnk")),
+            ("/Documents and Settings/Mr. Evil/Local Settings/History/History.IE5/index.dat", Some("browser")),
+            ("/Documents and Settings/Mr. Evil/Local Settings/History/History.IE5/MSHist012004082020040821/index.dat", Some("browser")),
+            ("/Documents and Settings/Mr. Evil/Cookies/index.dat", Some("browser")),
+            ("/RECYCLER/S-1-5-21-2000478354-688789844-1708537768-1003/INFO2", Some("recyclebin")),
+            ("/System Volume Information/_restore{5D3F13BE}/RP2/snapshot/_REGISTRY_MACHINE_SOFTWARE", Some("restore")),
+            ("/Documents and Settings/Mr. Evil/My Documents/notes.txt", None),
+        ];
+        for (p, want) in cases {
+            assert_eq!(m.classify(p).as_deref(), *want, "{p}");
         }
     }
 }
