@@ -67,6 +67,17 @@ FULL_IMAGES = [
         "kind": "disk",
     },
 ]
+# --intrusion: NIST CFReDS "Hacking Case" (Dell Latitude CPi, user "Mr. Evil", wireless interception
+# tools), a public intrusion image. NIST publishes the EnCase files without SHA-256 values; the hashes
+# below were recorded from the NIST objects on 2026-11-04, and the E01 carries the acquisition MD5 of
+# the 4,871,301,120-byte media (aee4fcd9301c03b3b054623ca261959a), which `ewf-tool verify` re-checks.
+INTRUSION_SEGMENTS = [
+    {"name": "4Dell Latitude CPi.E01", "url": "https://cfreds-archive.nist.gov/images/4Dell%20Latitude%20CPi.E01",
+     "sha256": "96bebe80f00541bf28fbc2ef0b02b580082ee6ad58837e991852ae66f077ec31", "size": 671094597},
+    {"name": "4Dell Latitude CPi.E02", "url": "https://cfreds-archive.nist.gov/images/4Dell%20Latitude%20CPi.E02",
+     "sha256": "46bd09821dbb64675e5877d0ad7ec544a571fad5a3fd7fc3f0c3a16278887db5", "size": 419384951},
+]
+INTRUSION_MEDIA_MD5 = "aee4fcd9301c03b3b054623ca261959a"
 USERS = [("admin", "Bootstrap Admin", True), ("examiner", "Sample Examiner", False), ("reviewer", "Sample Reviewer", False)]
 TERMINAL = {"done", "failed", "skipped"}
 
@@ -235,6 +246,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--cache", default=str(REPO / "var" / "bootstrap-cache"))
     ap.add_argument("--out", default=os.environ.get("VERITAS_BOOTSTRAP_OUT", str(REPO / "var" / "bootstrap")))
     ap.add_argument("--full", action="store_true", help="also ingest a public Digital Corpora disk image")
+    ap.add_argument("--intrusion", action="store_true", help="ingest the NIST CFReDS Hacking Case image (1.1 GB download) and reconstruct the intrusion")
     ap.add_argument("--skip-users", action="store_true", help="users already exist; passwords from VERITAS_BOOTSTRAP_PASSWORD or <out>/credentials.json")
     ap.add_argument("--timeout", type=float, default=1800.0, help="seconds to wait for processing")
     args = ap.parse_args(argv)
@@ -266,8 +278,21 @@ def main(argv: list[str] | None = None) -> int:
         ev = r.json()
         say(f"  {ev['id']} {s['name']:<32} sha256={ev['sha256'][:16]}... classified={ev['classified_as']} job={ev['job_id']}")
 
+    expected_jobs = len(samples)
+    if args.intrusion:
+        say("  intrusion image: NIST CFReDS Hacking Case (two EWF segments, 1.1 GB)")
+        segs = [fetch(sg["url"], Path(args.cache) / "hacking-case" / sg["name"], sg["sha256"], sg["size"]) for sg in INTRUSION_SEGMENTS]
+        say(f"  verified segment hashes; media MD5 recorded by the acquirer: {INTRUSION_MEDIA_MD5}")
+        r = examiner.post(f"/api/v1/cases/{case_id}/evidence/register-path", "register Hacking Case image",
+                          json={"path": str(segs[0].resolve()), "kind": "disk", "name": segs[0].name, "expected_sha256": INTRUSION_SEGMENTS[0]["sha256"],
+                                "description": "NIST CFReDS Hacking Case: Dell Latitude CPi laptop (public test image)", "host": "N-1A9ODN6ZXK4LQ",
+                                "acquired_by": "NIST CFReDS", "tz_name": "America/Chicago"})
+        ev = r.json()
+        say(f"  {ev['id']} {ev['name']} sha256={ev['sha256'][:16]}... segments={1 + len(ev.get('segments', []))} job={ev['job_id']}")
+        expected_jobs += 1
+
     say("[5/8] processing")
-    jobs = wait_for_jobs(examiner, case_id, len(samples), args.timeout)
+    jobs = wait_for_jobs(examiner, case_id, expected_jobs, args.timeout)
     for j in jobs:
         failed = [st["name"] for st in j.get("steps", []) if st["state"] == "failed"]
         say(f"  {j['job_id']} {j['kind']:<14} {j['state']}" + (f" failed steps: {failed}" if failed else ""))
