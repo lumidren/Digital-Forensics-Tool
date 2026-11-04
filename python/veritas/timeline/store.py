@@ -227,10 +227,10 @@ class SqliteTimelineStore:
     def search(self, case_id: str, query: Query) -> SearchResult:
         c = self._conn()
         where, params = self._where(case_id, query)
-        total = c.execute(f"SELECT COUNT(*) FROM events e WHERE {where}", params).fetchone()[0]
+        total = c.execute(f"SELECT COUNT(*) FROM events e WHERE {where}", params).fetchone()[0]  # nosec B608 - identifiers are fixed column names; values are bound parameters or escaped
         order = "DESC" if query.descending else "ASC"
         rows = c.execute(
-            f"SELECT * FROM events e WHERE {where} ORDER BY e.timestamp {order}, e.data_type, e.evidence_path, e.offset, e.id LIMIT ? OFFSET ?",
+            f"SELECT * FROM events e WHERE {where} ORDER BY e.timestamp {order}, e.data_type, e.evidence_path, e.offset, e.id LIMIT ? OFFSET ?",  # nosec B608 - identifiers are fixed column names; values are bound parameters or escaped
             params + [max(0, min(query.limit, 10_000)), max(0, query.offset)],
         ).fetchall()
         return SearchResult(total=total, events=[self._row_to_stored(r, c) for r in rows])
@@ -242,7 +242,7 @@ class SqliteTimelineStore:
         q = dataclasses.replace(query, include_untimed=False)
         where, params = self._where(case_id, q)
         rows = c.execute(
-            f"SELECT (e.timestamp / ?) * ? AS b, COUNT(*) FROM events e WHERE {where} GROUP BY b ORDER BY b",
+            f"SELECT (e.timestamp / ?) * ? AS b, COUNT(*) FROM events e WHERE {where} GROUP BY b ORDER BY b",  # nosec B608 - identifiers are fixed column names; values are bound parameters or escaped
             [bucket_ns, bucket_ns] + params,
         ).fetchall()
         return [Bucket(start_ns=int(r[0]), count=int(r[1])) for r in rows]
@@ -253,7 +253,7 @@ class SqliteTimelineStore:
         c = self._conn()
         where, params = self._where(case_id, query)
         rows = c.execute(
-            f"SELECT e.{column}, COUNT(*) AS n FROM events e WHERE {where} GROUP BY e.{column} ORDER BY n DESC, e.{column} LIMIT ?",
+            f"SELECT e.{column}, COUNT(*) AS n FROM events e WHERE {where} GROUP BY e.{column} ORDER BY n DESC, e.{column} LIMIT ?",  # nosec B608 - identifiers are fixed column names; values are bound parameters or escaped
             params + [limit],
         ).fetchall()
         return [(r[0] if r[0] is not None else "", int(r[1])) for r in rows]
@@ -270,7 +270,7 @@ class SqliteTimelineStore:
         c = self._conn()
         q = query or Query(include_untimed=True, limit=10**9)
         where, params = self._where(case_id, q)
-        cur = c.execute(f"SELECT * FROM events e WHERE {where} ORDER BY e.timestamp, e.data_type, e.evidence_path, e.offset, e.id", params)
+        cur = c.execute(f"SELECT * FROM events e WHERE {where} ORDER BY e.timestamp, e.data_type, e.evidence_path, e.offset, e.id", params)  # nosec B608 - identifiers are fixed column names; values are bound parameters or escaped
         for row in cur:
             yield self._row_to_stored(row, c)
 
@@ -307,6 +307,11 @@ def _fts_query(text: str) -> str:
             continue
         tokens.append(f'"{tok}"' + ("*" if prefix else ""))
     return " AND ".join(tokens) if tokens else '""'
+
+
+def _ch_str(s: str) -> str:
+    """ClickHouse string literal with backslash and quote escaping."""
+    return "'" + s.replace("\\", "\\\\").replace("'", "\\'") + "'"
 
 
 class ClickHouseTimelineStore:
@@ -355,8 +360,7 @@ class ClickHouseTimelineStore:
         return len(lines)
 
     def _where(self, case_id: str, q: Query) -> str:
-        def esc(s: str) -> str:
-            return "'" + s.replace("\\", "\\\\").replace("'", "\\'") + "'"
+        esc = _ch_str
 
         clauses = [f"case_id = {esc(case_id)}"]  # THREAT:T4.2
         if q.start_ns is not None:
@@ -378,10 +382,10 @@ class ClickHouseTimelineStore:
 
     def search(self, case_id: str, query: Query) -> SearchResult:
         where = self._where(case_id, query)
-        total = int(self._sql(f"SELECT count() FROM {self._db}.events FINAL WHERE {where}").strip() or 0)
+        total = int(self._sql(f"SELECT count() FROM {self._db}.events FINAL WHERE {where}").strip() or 0)  # nosec B608 - identifiers are fixed column names; values are bound parameters or escaped
         order = "DESC" if query.descending else "ASC"
         text = self._sql(
-            f"SELECT * FROM {self._db}.events FINAL WHERE {where} ORDER BY timestamp {order}, data_type, evidence_path, offset "
+            f"SELECT * FROM {self._db}.events FINAL WHERE {where} ORDER BY timestamp {order}, data_type, evidence_path, offset "  # nosec B608 - identifiers are fixed column names; values are bound parameters or escaped
             f"LIMIT {int(query.limit)} OFFSET {int(query.offset)} FORMAT JSONEachRow"
         )
         events = []
@@ -394,7 +398,7 @@ class ClickHouseTimelineStore:
     def histogram(self, case_id: str, query: Query, bucket_ns: int) -> list[Bucket]:
         where = self._where(case_id, dataclasses.replace(query, include_untimed=False))
         text = self._sql(
-            f"SELECT intDiv(timestamp, {int(bucket_ns)}) * {int(bucket_ns)} AS b, count() AS n FROM {self._db}.events FINAL WHERE {where} GROUP BY b ORDER BY b FORMAT JSONEachRow"
+            f"SELECT intDiv(timestamp, {int(bucket_ns)}) * {int(bucket_ns)} AS b, count() AS n FROM {self._db}.events FINAL WHERE {where} GROUP BY b ORDER BY b FORMAT JSONEachRow"  # nosec B608 - identifiers are fixed column names; values are bound parameters or escaped
         )
         return [Bucket(start_ns=int(json.loads(l)["b"]), count=int(json.loads(l)["n"])) for l in text.splitlines()]
 
@@ -403,12 +407,12 @@ class ClickHouseTimelineStore:
             raise ValueError(f"facet column not allowed: {column}")
         where = self._where(case_id, query)
         text = self._sql(
-            f"SELECT {column} AS v, count() AS n FROM {self._db}.events FINAL WHERE {where} GROUP BY v ORDER BY n DESC, v LIMIT {int(limit)} FORMAT JSONEachRow"
+            f"SELECT {column} AS v, count() AS n FROM {self._db}.events FINAL WHERE {where} GROUP BY v ORDER BY n DESC, v LIMIT {int(limit)} FORMAT JSONEachRow"  # nosec B608 - identifiers are fixed column names; values are bound parameters or escaped
         )
         return [((json.loads(l)["v"] or ""), int(json.loads(l)["n"])) for l in text.splitlines()]
 
     def count(self, case_id: str) -> int:
-        return int(self._sql(f"SELECT count() FROM {self._db}.events FINAL WHERE case_id = '{case_id}'").strip() or 0)
+        return int(self._sql(f"SELECT count() FROM {self._db}.events FINAL WHERE case_id = {_ch_str(case_id)}").strip() or 0)  # nosec B608 - case id escaped
 
     def get(self, case_id: str, event_id: int) -> StoredEvent | None:
         res = self.search(case_id, Query(include_untimed=True, limit=1, offset=event_id))
@@ -426,7 +430,7 @@ class ClickHouseTimelineStore:
 
     def delete_case(self, case_id: str) -> int:
         n = self.count(case_id)
-        self._sql(f"ALTER TABLE {self._db}.events DELETE WHERE case_id = '{case_id}'")
+        self._sql(f"ALTER TABLE {self._db}.events DELETE WHERE case_id = {_ch_str(case_id)}")  # nosec B608 - case id escaped
         return n
 
 
