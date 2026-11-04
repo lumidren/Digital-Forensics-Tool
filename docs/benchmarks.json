@@ -1,0 +1,200 @@
+{
+ "env": {
+  "date": "2026-11-04",
+  "os": "Windows 11",
+  "cpu": "12th Gen Intel(R) Core(TM) i7-12700H",
+  "ram_gb": 16
+ },
+ "acquisition": [
+  {
+   "stage": "hash (MD5+SHA-256+SHA3-256, single pass)",
+   "bytes": 2147483648,
+   "seconds": 10.25,
+   "gb_per_hour": 755
+  },
+  {
+   "stage": "E01 imaging (zlib fast) + hashing",
+   "bytes": 2147483648,
+   "seconds": 18.38,
+   "gb_per_hour": 421,
+   "output_bytes": 1085149948
+  },
+  {
+   "stage": "E01 verify (decompress + re-hash, fast)",
+   "bytes": 2147483648,
+   "seconds": 11.66,
+   "gb_per_hour": 663
+  },
+  {
+   "stage": "E01 imaging (zlib best) + hashing",
+   "bytes": 2147483648,
+   "seconds": 30.96,
+   "gb_per_hour": 250,
+   "output_bytes": 1076105827
+  },
+  {
+   "stage": "E01 verify (decompress + re-hash, best)",
+   "bytes": 2147483648,
+   "seconds": 11.78,
+   "gb_per_hour": 656
+  }
+ ],
+ "parsers": [
+  {
+   "input": "System.evtx",
+   "bytes": 2166784,
+   "operation": "hash (md5+sha256+sha3)",
+   "median_seconds": 0.0098719,
+   "mb_per_s": 219.49006776810947,
+   "gb_per_hour": 790.1642439651941,
+   "events": null
+  },
+  {
+   "input": "System.evtx",
+   "bytes": 2166784,
+   "operation": "parse evtx",
+   "median_seconds": 0.1624378,
+   "mb_per_s": 13.339161205088963,
+   "gb_per_hour": 48.020980338320264,
+   "events": 5009
+  },
+  {
+   "input": "MFT",
+   "bytes": 13402112,
+   "operation": "hash (md5+sha256+sha3)",
+   "median_seconds": 0.0568237,
+   "mb_per_s": 235.85426503377994,
+   "gb_per_hour": 849.0753541216077,
+   "events": null
+  },
+  {
+   "input": "MFT",
+   "bytes": 13402112,
+   "operation": "parse mft",
+   "median_seconds": 1.1283394,
+   "mb_per_s": 11.877731115300946,
+   "gb_per_hour": 42.759832015083404,
+   "events": 126276
+  },
+  {
+   "input": "SYSTEM",
+   "bytes": 15990784,
+   "operation": "hash (md5+sha256+sha3)",
+   "median_seconds": 0.0776142,
+   "mb_per_s": 206.029102921888,
+   "gb_per_hour": 741.7047705187969,
+   "events": null
+  },
+  {
+   "input": "SYSTEM",
+   "bytes": 15990784,
+   "operation": "parse registry",
+   "median_seconds": 0.2982551,
+   "mb_per_s": 53.614452862666894,
+   "gb_per_hour": 193.0120303056008,
+   "events": 31587
+  },
+  {
+   "input": "SOFTWARE",
+   "bytes": 37748736,
+   "operation": "hash (md5+sha256+sha3)",
+   "median_seconds": 0.2113567,
+   "mb_per_s": 178.60203154193835,
+   "gb_per_hour": 642.9673135509781,
+   "events": null
+  },
+  {
+   "input": "SOFTWARE",
+   "bytes": 37748736,
+   "operation": "parse registry",
+   "median_seconds": 1.0176643,
+   "mb_per_s": 37.093505196163406,
+   "gb_per_hour": 133.53661870618825,
+   "events": 117932
+  },
+  {
+   "input": "NTUSER.DAT",
+   "bytes": 786432,
+   "operation": "hash (md5+sha256+sha3)",
+   "median_seconds": 0.0042985,
+   "mb_per_s": 182.95498429684773,
+   "gb_per_hour": 658.6379434686519,
+   "events": null
+  },
+  {
+   "input": "NTUSER.DAT",
+   "bytes": 786432,
+   "operation": "parse registry",
+   "median_seconds": 0.02533,
+   "mb_per_s": 31.047453612317412,
+   "gb_per_hour": 111.77083300434268,
+   "events": 1168
+  },
+  {
+   "input": "ntfs.raw",
+   "bytes": 4194304,
+   "operation": "hash (md5+sha256+sha3)",
+   "median_seconds": 0.0209889,
+   "mb_per_s": 199.83438865304993,
+   "gb_per_hour": 719.4037991509797,
+   "events": null
+  },
+  {
+   "input": "ntfs.raw",
+   "bytes": 4194304,
+   "operation": "parse fs",
+   "median_seconds": 0.0354417,
+   "mb_per_s": 118.34375890547011,
+   "gb_per_hour": 426.03753205969235,
+   "events": 204
+  },
+  {
+   "input": "ext4.raw",
+   "bytes": 4194304,
+   "operation": "hash (md5+sha256+sha3)",
+   "median_seconds": 0.0234104,
+   "mb_per_s": 179.1641321805693,
+   "gb_per_hour": 644.9908758500495,
+   "events": null
+  },
+  {
+   "input": "ext4.raw",
+   "bytes": 4194304,
+   "operation": "parse fs",
+   "median_seconds": 0.0339877,
+   "mb_per_s": 123.40652647869669,
+   "gb_per_hour": 444.2634953233081,
+   "events": 24
+  },
+  {
+   "input": "CMD.EXE-087B4001.pf",
+   "bytes": 11986,
+   "operation": "hash (md5+sha256+sha3)",
+   "median_seconds": 0.0008059,
+   "mb_per_s": 14.8728130040948,
+   "gb_per_hour": 53.54212681474128,
+   "events": null
+  },
+  {
+   "input": "CMD.EXE-087B4001.pf",
+   "bytes": 11986,
+   "operation": "parse prefetch",
+   "median_seconds": 0.01297,
+   "mb_per_s": 0.9241326137239784,
+   "gb_per_hour": 3.326877409406322,
+   "events": 1
+  }
+ ],
+ "timeline": {
+  "events": 1000000,
+  "ingest_seconds": 35.5,
+  "events_per_second": 28154,
+  "db_bytes": 942372328,
+  "queries": 240,
+  "p50_ms": 65.5,
+  "p95_ms": 242.3,
+  "p99_ms": 660.8,
+  "max_ms": 752.5,
+  "full_histogram_ms": 336.0
+ }
+}
