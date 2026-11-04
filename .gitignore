@@ -32,3 +32,4 @@ htmlcov/
 # fuzz
 fuzz/artifacts/
 fuzz/corpus/
+fuzz-smoke.log
