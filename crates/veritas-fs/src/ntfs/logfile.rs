@@ -156,6 +156,11 @@ pub fn parse_logfile(data: &[u8], cluster_size: u64, record_size: u64) -> Result
     if data.len() > MAX_LOGFILE_SIZE {
         return Err(FsError::Limit("$LogFile too large".into()));
     }
+    // A log that was never written (mkntfs fills it with 0xFF; some tools zero it) is valid and
+    // empty, not malformed.
+    if !data.is_empty() && (data.iter().all(|&b| b == 0xFF) || data.iter().all(|&b| b == 0)) {
+        return Ok(LogFile { restart_areas: Vec::new(), page_size: 0, record_pages: 0, records: Vec::new() });
+    }
     if need(data, 0, 4)? != b"RSTR" && need(data, 0, 4)? != b"CHKD" {
         return Err(FsError::sig(0, "RSTR", &data[..4]));
     }
@@ -248,4 +253,18 @@ pub fn parse_logfile(data: &[u8], cluster_size: u64, record_size: u64) -> Result
     records.sort_by_key(|r| (r.lsn, r.offset));
     records.dedup_by_key(|r| r.lsn);
     Ok(LogFile { restart_areas, page_size: page_size as u32, record_pages, records })
+}
+
+#[cfg(test)]
+mod empty_log_tests {
+    use super::*;
+
+    #[test]
+    fn never_written_log_is_empty_not_an_error() {
+        for fill in [0xFFu8, 0x00] {
+            let lf = parse_logfile(&vec![fill; 65536], 4096, 1024).expect("empty log parses");
+            assert!(lf.records.is_empty() && lf.restart_areas.is_empty());
+        }
+        assert!(parse_logfile(&[0xAB; 4096], 4096, 1024).is_err());
+    }
 }
