@@ -1,0 +1,28 @@
+{
+ "digests": {
+  "auto:plaso/bash_history": "cfce9d4ae63f7ba1838a06409ce91cddee00025e45d328820b8d67b07f521751",
+  "auto:plaso/chrome/History": "a4ac1549e2f18a8c225bac8435e086b1664a286d7bddbc85fa5a9fd04d8ff72b",
+  "auto:plaso/firefox/places.sqlite": "3407ed4a001742dfbf3f95aead86e5edcac531c21641a403a18daefd9d1ba788",
+  "auto:plaso/syslog/syslog": "8195cf47ff8e6f95ad0723d8637354d8f11c4fbb7062612b7060427af9b10474",
+  "evtx:plaso/evtx/System.evtx": "a2b453675eae3bcdca424ea94829c6279f7a1a4f491c4e39a7e41c25fae81b59",
+  "fs-events:dfvfs/apfs.raw": "8912c44741282c7cfb377941c8faf05e1421bc55a28916b77a9372f43b0b9b7d",
+  "fs-events:dfvfs/ext4.raw": "0bfe5ae73c5198c64d299f8754a895e4863c92e6059407a1518849fba9abebc1",
+  "fs-events:dfvfs/fat12.raw": "e41e7a0ff0db36dd23a1062b26e6435bae8322d7e67a6c6d645abecfc0080ec8",
+  "fs-events:dfvfs/ntfs.raw": "d09da536d9b838976358d7d39b02993a2da51f9a34fe37e6c36e13a3698bae5e",
+  "journald:plaso/systemd/journal/system.journal": "acb7eb0059f2463e46210ab6ae3df50fb2a5c22eb3f4eb42fe3aa793fae08812",
+  "jumplist:plaso/automaticDestinations-ms/1b4dd67f29cb1962.automaticDestinations-ms": "820f010b3870e4a6ab871c40d51251c5d7f683fa76fdac1f043259a60501a3b0",
+  "lnk:plaso/NeroInfoTool.lnk": "8d7e4843d69a71a76ac7ee75aa5ea1f403187d868944a261a8a399e5a7f84703",
+  "mft:plaso/MFT": "c9fddb7bdab075e6877549de8bb278ef59fc61e7e6daa6ee2c54d94c004d4a38",
+  "pcap:plaso/test.pcap": "fe3381128407baf9d59df489a9c03458bc5f91f9e94d9b5aea1899bad0215763",
+  "pe:plaso/test_pe.exe": "f88a7a31f2e47941f14263cfd37d59e243d8b4aa4620fc8f18fce2fab9bd3588",
+  "plist:plaso/plist/InstallHistory.plist": "451890e4b60475f3dc909d1925a6be38e8afe2f82ade44953f2c8b961f12822d",
+  "prefetch:plaso/winprefetch/CMD.EXE-087B4001.pf": "636389971a59735ad63285774a55e5159e6452ffbe71daae70589529007d70f4",
+  "prefetch:plaso/winprefetch/WUAUCLT.EXE-830BCC14.pf": "9ac6816b2b50531ad95313cbaab80645737a0e59192fe24f1e2b796a69f31316",
+  "regf-events:plaso/NTUSER.DAT": "e4765bad1bb6dd1ae1129bd92e59a1d65c1be4321475aa287e48c2ce9e8f51ed",
+  "regf-events:plaso/SYSTEM": "936e44c148f7db56e25ef02d837371a6cae5055110c151c9152a6880ed3b2a55",
+  "usn:plaso/UsnJrnl.raw": "6bd81df6d3a3067baae7e353883cedd71e71ee3b8d0d83acbc47d8c7dee14fc3"
+ },
+ "failures": [],
+ "platform": "Windows AMD64 py3.12.16",
+ "skipped": []
+}
