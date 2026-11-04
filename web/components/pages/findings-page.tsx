@@ -1,10 +1,11 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PlayIcon, PlusIcon } from "lucide-react";
+import { FlagIcon, PlayIcon, PlusIcon, SearchXIcon } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import { PageHeader, QueryStatus, SeverityBadge } from "@/components/common";
+import { PageHeader, QueryStatus, SEVERITY_COLOR, SeverityBadge } from "@/components/common";
 import { FindingDetail } from "@/components/findings/finding-detail";
 import { Hypotheses } from "@/components/findings/hypotheses";
 import { TasksBoard } from "@/components/findings/tasks-board";
@@ -42,7 +43,11 @@ export function FindingsPage() {
   const { caseId, access, data: kase } = useCase();
   const qc = useQueryClient();
   const findings = useQuery({ queryKey: ["findings", caseId], queryFn: () => api.listFindings(caseId) });
-  const [filter, setFilter] = useState<FindingFilter>(NO_FINDING_FILTER);
+  const params = useSearchParams();
+  const [filter, setFilter] = useState<FindingFilter>(() => ({
+    ...NO_FINDING_FILTER,
+    technique: params.get("technique") ?? "",
+  }));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const examiner = gate(access, "examiner");
@@ -50,7 +55,8 @@ export function FindingsPage() {
   const filtered = filterFindings(all, filter);
   const groups = groupByState(filtered);
   const flat = groups.flatMap((g) => g.items);
-  const selected = all.find((f) => f.id === selectedId) ?? null;
+  // Never show an empty detail panel: fall back to the first finding in the filtered list.
+  const selected = all.find((f) => f.id === selectedId) ?? flat[0] ?? null;
   const itemRefs = useRef(new Map<string, HTMLButtonElement>());
 
   const { selected: navIndex, setSelected: setNavIndex } = useTableNav(flat.length, {
@@ -119,6 +125,7 @@ export function FindingsPage() {
   return (
     <>
       <PageHeader
+        icon={FlagIcon}
         title="Findings"
         description="Rules propose; an examiner confirms with a rationale; a different reviewer approves. Only approved findings reach reports."
         actions={
@@ -188,7 +195,7 @@ export function FindingsPage() {
           </div>
           <QueryStatus isLoading={findings.isLoading} error={findings.error}>
             {all.length === 0 ? (
-              <EmptyState title="No findings yet">
+              <EmptyState title="No findings yet" icon={FlagIcon}>
                 {examiner.allowed ? "Run analytics to propose findings from the timeline." : null}
               </EmptyState>
             ) : (
@@ -198,11 +205,12 @@ export function FindingsPage() {
                     <section key={g.state} aria-labelledby={`fg-${g.state}`}>
                       <h2
                         id={`fg-${g.state}`}
-                        className="text-muted-foreground mb-1 text-xs font-semibold uppercase"
+                        className="text-muted-foreground mb-1.5 flex items-center gap-2 text-xs font-semibold uppercase"
                       >
                         {g.state} ({g.items.length})
+                        <span aria-hidden className="bg-border h-px flex-1" />
                       </h2>
-                      <ul className="grid gap-1">
+                      <ul className="grid gap-1.5">
                         {g.items.map((f) => {
                           const idx = flat.indexOf(f);
                           const isSel = f.id === selected?.id;
@@ -221,17 +229,29 @@ export function FindingsPage() {
                                 }}
                                 data-testid="finding-item"
                                 className={cn(
-                                  "bg-card hover:bg-accent focus-visible:ring-ring grid w-full gap-1 rounded-md border p-2 text-left text-sm focus-visible:ring-2 focus-visible:outline-none",
-                                  (isSel || navIndex === idx) && "border-primary bg-accent",
+                                  "bg-card hover:bg-muted/60 focus-visible:ring-ring relative grid w-full gap-1 overflow-hidden rounded-lg border py-2 pr-2.5 pl-3.5 text-left text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none",
+                                  (isSel || navIndex === idx) &&
+                                    "bg-accent hover:bg-accent border-[color-mix(in_oklch,var(--primary)_55%,var(--border))]",
                                 )}
                               >
+                                <span
+                                  aria-hidden
+                                  className="absolute inset-y-0 left-0 w-1"
+                                  style={{ background: SEVERITY_COLOR[f.severity] }}
+                                />
                                 <span className="flex min-w-0 items-center gap-1.5">
                                   <SeverityBadge severity={f.severity} />
                                   <span className="truncate font-medium">{f.title}</span>
                                 </span>
-                                <span className="text-muted-foreground truncate text-xs">
-                                  {f.rule} · {f.attack_techniques.join(", ") || "no technique"} ·{" "}
-                                  {f.event_ids.length} events
+                                <span className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs">
+                                  <span className="truncate">{f.rule}</span>
+                                  <span aria-hidden>·</span>
+                                  <span className="truncate font-mono">
+                                    {f.attack_techniques.join(", ") || "no technique"}
+                                  </span>
+                                  <span className="tabular ml-auto shrink-0">
+                                    {f.event_ids.length} event{f.event_ids.length === 1 ? "" : "s"}
+                                  </span>
                                 </span>
                               </button>
                             </li>
@@ -241,12 +261,14 @@ export function FindingsPage() {
                     </section>
                   ))}
                 </nav>
-                <Card className="min-w-0">
+                <Card className="min-w-0 self-start">
                   <CardContent>
                     {selected ? (
                       <FindingDetail key={selected.id} caseId={caseId} finding={selected} access={access} />
                     ) : (
-                      <EmptyState title="Select a finding">Use J/K to move through the list.</EmptyState>
+                      <EmptyState title="No findings match the filters" icon={SearchXIcon}>
+                        Clear the severity, rule or technique filter to see more.
+                      </EmptyState>
                     )}
                   </CardContent>
                 </Card>

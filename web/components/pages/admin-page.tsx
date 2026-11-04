@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ShieldCheckIcon, Trash2Icon } from "lucide-react";
+import { BriefcaseIcon, ShieldCheckIcon, ShieldIcon, Trash2Icon, UserPlusIcon } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { Mono, PageHeader, QueryStatus } from "@/components/common";
@@ -114,7 +114,9 @@ function UsersTab() {
       </Card>
       <Card aria-labelledby="new-user">
         <CardHeader>
-          <CardTitle id="new-user">Create user</CardTitle>
+          <CardTitle id="new-user">
+            <UserPlusIcon aria-hidden /> Create user
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <form className="grid gap-3" onSubmit={submit}>
@@ -309,7 +311,9 @@ function MembershipTab() {
           </Card>
           <Card aria-labelledby="add-member">
             <CardHeader>
-              <CardTitle id="add-member">Add member</CardTitle>
+              <CardTitle id="add-member">
+                <UserPlusIcon aria-hidden /> Add member
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <form
@@ -350,7 +354,7 @@ function MembershipTab() {
           </Card>
         </div>
       ) : (
-        <EmptyState title="No cases" />
+        <EmptyState title="No cases" icon={BriefcaseIcon} />
       )}
     </div>
   );
@@ -530,7 +534,7 @@ export function AdminPage() {
   if (me.data && !me.data.is_admin) {
     return (
       <>
-        <PageHeader title="Administration" />
+        <PageHeader icon={ShieldIcon} title="Administration" />
         <Alert variant="destructive" role="alert">
           Administration requires a global administrator account.
         </Alert>
@@ -540,6 +544,7 @@ export function AdminPage() {
   return (
     <>
       <PageHeader
+        icon={ShieldIcon}
         title="Administration"
         description="Users, signing keys, case membership, retention, audit log and store integrity."
       />

@@ -1,10 +1,27 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CommandIcon, KeyboardIcon, LogOutIcon, ShieldCheckIcon, ShieldIcon, UserIcon } from "lucide-react";
+import {
+  CommandIcon,
+  CpuIcon,
+  FileTextIcon,
+  FlagIcon,
+  HardDriveIcon,
+  KeyboardIcon,
+  LayersIcon,
+  LayoutDashboardIcon,
+  LinkIcon,
+  LogOutIcon,
+  ScanSearchIcon,
+  ShieldIcon,
+  UserIcon,
+  WaypointsIcon,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { BrandMark } from "@/components/brand";
 import { CommandPalette } from "@/components/command-palette";
 import { ShortcutSheet } from "@/components/shortcut-sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -32,6 +49,18 @@ import {
 } from "@/lib/nav";
 import { clearToken } from "@/lib/token-store";
 import { cn } from "@/lib/utils";
+
+const SECTION_ICON: Record<string, LucideIcon> = {
+  dashboard: LayoutDashboardIcon,
+  evidence: HardDriveIcon,
+  timeline: LayersIcon,
+  memory: CpuIcon,
+  graph: WaypointsIcon,
+  findings: FlagIcon,
+  iocs: ScanSearchIcon,
+  reports: FileTextIcon,
+  custody: LinkIcon,
+};
 
 export function focusSearch(doc: Document = document): boolean {
   const el = doc.querySelector<HTMLElement>("[data-search]");
@@ -127,9 +156,15 @@ export function AppShell({ children }: { children: ReactNode }) {
       </a>
       <header className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-40 border-b backdrop-blur">
         <div className="flex h-12 items-center gap-2 px-3 sm:px-4">
-          <Link href="/cases" className="flex items-center gap-1.5 rounded-md px-1 font-semibold">
-            <ShieldCheckIcon className="text-primary size-5" aria-hidden />
+          <Link
+            href="/cases"
+            className="flex items-center gap-2 rounded-md px-1 font-semibold tracking-tight"
+          >
+            <BrandMark />
             <span>Veritas</span>
+            <span className="text-muted-foreground hidden rounded border px-1 py-px text-[10px] font-medium tracking-wide uppercase md:inline">
+              DFIR
+            </span>
           </Link>
           {caseId ? (
             <>
@@ -142,7 +177,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 title={caseName ?? caseId}
               >
                 <span className="text-muted-foreground font-mono text-xs">{caseId}</span>
-                {caseName ? <span className="ml-2 hidden sm:inline">{caseName}</span> : null}
+                {caseName ? <span className="ml-2 hidden font-medium sm:inline">{caseName}</span> : null}
               </Link>
             </>
           ) : null}
@@ -202,22 +237,32 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
         {caseId ? (
-          <nav aria-label="Case sections" className="overflow-x-auto border-t px-2 sm:px-3">
-            <ul className="flex min-w-max gap-0.5 py-1">
+          <nav aria-label="Case sections" className="overflow-x-auto px-2 sm:px-3">
+            <ul className="flex min-w-max gap-0.5">
               {CASE_SECTIONS.map((s) => {
                 const active = section === s.key;
+                const Icon = SECTION_ICON[s.key];
                 return (
-                  <li key={s.key}>
+                  <li key={s.key} className="relative py-1">
                     <Link
                       href={s.path(encodeURIComponent(caseId))}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "hover:bg-accent inline-flex h-8 items-center rounded-md px-2.5 text-sm",
-                        active ? "bg-accent text-accent-foreground font-medium" : "text-muted-foreground",
+                        "hover:bg-accent hover:text-accent-foreground inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm transition-colors",
+                        active ? "text-foreground font-medium" : "text-muted-foreground",
                       )}
                     >
+                      {Icon ? (
+                        <Icon aria-hidden className={cn("size-4", active ? "text-primary" : "opacity-80")} />
+                      ) : null}
                       {s.label}
                     </Link>
+                    {active ? (
+                      <span
+                        aria-hidden
+                        className="bg-primary absolute inset-x-2 bottom-0 h-0.5 rounded-full"
+                      />
+                    ) : null}
                   </li>
                 );
               })}
@@ -225,7 +270,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
         ) : null}
       </header>
-      <main id="main" tabIndex={-1} className="flex-1 px-3 py-4 outline-none sm:px-4">
+      <main
+        id="main"
+        tabIndex={-1}
+        className="mx-auto w-full max-w-[1600px] flex-1 px-3 py-5 outline-none sm:px-5"
+      >
         {children}
       </main>
       <CommandPalette

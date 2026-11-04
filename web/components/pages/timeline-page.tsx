@@ -1,14 +1,23 @@
 "use client";
 
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { DownloadIcon, SaveIcon, SearchIcon, XIcon } from "lucide-react";
+import {
+  BookmarkIcon,
+  DownloadIcon,
+  FilterIcon,
+  LayersIcon,
+  SaveIcon,
+  SearchIcon,
+  SearchXIcon,
+  XIcon,
+} from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/common";
 import { EventDrawer } from "@/components/timeline/event-drawer";
 import { FacetSidebar } from "@/components/timeline/facets";
-import { Histogram } from "@/components/timeline/histogram";
+import { Histogram, type HistogramStack } from "@/components/timeline/histogram";
 import { ResultsTable } from "@/components/timeline/results-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,7 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, EmptyState } from "@/components/ui/misc";
+import { Alert, EmptyState, Skeleton } from "@/components/ui/misc";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCase } from "@/hooks/use-case";
@@ -50,6 +59,8 @@ import {
   toSearchBody,
   type TimelineFilters,
 } from "@/lib/filters";
+import { stackBuckets } from "@/lib/charts";
+import { groupDataTypes } from "@/lib/data-types";
 import { fillBuckets } from "@/lib/histogram";
 import { PAGE_SIZE, pageOf, pagesForRange } from "@/lib/paging";
 import { formatNs, isoToNs, nsToInput } from "@/lib/format";
@@ -134,6 +145,41 @@ export function TimelinePage() {
     () => fillBuckets(histogram.data?.buckets ?? [], histogram.data?.bucket_ns ?? 0),
     [histogram.data],
   );
+  // Stack the histogram by data-type category: one histogram per top category, same bucket width.
+  const dtFacets = useQuery({
+    queryKey: ["facets", caseId, "data_type", histBody],
+    queryFn: () => api.facets(caseId, "data_type", histBody),
+    staleTime: 15_000,
+  });
+  const groups = useMemo(() => groupDataTypes(dtFacets.data ?? [], 6), [dtFacets.data]);
+  const bucketNs = histogram.data?.bucket_ns ?? 0;
+  const layerQueries = useQueries({
+    queries: groups.map((g) => {
+      const b = { ...histBody, data_types: g.dataTypes };
+      return {
+        queryKey: ["histogram", caseId, b, bucketNs],
+        queryFn: () => api.histogram(caseId, b, bucketNs),
+        enabled: bucketNs > 0 && groups.length > 0,
+        staleTime: 15_000,
+        meta: { silent: true },
+      };
+    }),
+  });
+  const layersReady =
+    groups.length > 0 && layerQueries.every((q) => q.isSuccess && q.data.bucket_ns === bucketNs);
+  const stack: HistogramStack | null = layersReady
+    ? {
+        layers: groups.map((g) => ({
+          key: g.category.key,
+          label: g.category.label,
+          color: g.category.color,
+        })),
+        rows: stackBuckets(
+          buckets,
+          layerQueries.map((q) => q.data?.buckets ?? []),
+        ),
+      }
+    : null;
 
   const views = useQuery({ queryKey: ["views", caseId], queryFn: () => api.listViews(caseId) });
   const bookmarks = useQuery({ queryKey: ["bookmarks", caseId], queryFn: () => api.listBookmarks(caseId) });
@@ -231,6 +277,7 @@ export function TimelinePage() {
   return (
     <>
       <PageHeader
+        icon={LayersIcon}
         title="Timeline"
         description={
           <span role="status" aria-live="polite" data-testid="result-count">
@@ -325,8 +372,9 @@ export function TimelinePage() {
       <div className="mt-3">
         <Histogram
           buckets={buckets}
-          bucketNs={histogram.data?.bucket_ns ?? 0}
+          bucketNs={bucketNs}
           loading={histogram.isLoading}
+          stack={stack}
           onRange={(r) => {
             setSelected(null);
             setFilters({ ...filters, ...r });
@@ -337,7 +385,11 @@ export function TimelinePage() {
       <div className="mt-2 flex flex-wrap items-center gap-1.5" aria-label="Active filters" role="list">
         {chips.map((c) => (
           <span role="listitem" key={c.key}>
-            <Badge variant="secondary" className="gap-1 py-0 pr-0">
+            <Badge
+              variant="secondary"
+              className="bg-accent gap-1 border-[color-mix(in_oklch,var(--primary)_25%,transparent)] py-0 pr-0"
+            >
+              <FilterIcon aria-hidden className="text-primary" />
               <span className="text-muted-foreground">{c.label}:</span>
               <span className="max-w-[18rem] truncate">{c.value}</span>
               <Button
@@ -440,7 +492,9 @@ export function TimelinePage() {
                   ))}
                 </ul>
               ) : (
-                <EmptyState title="No bookmarks">Select a row and press B.</EmptyState>
+                <EmptyState title="No bookmarks" icon={BookmarkIcon}>
+                  Select a row and press B.
+                </EmptyState>
               )}
             </TabsContent>
             <TabsContent value="views">
@@ -461,7 +515,7 @@ export function TimelinePage() {
                   ))}
                 </ul>
               ) : (
-                <EmptyState title="No saved views" />
+                <EmptyState title="No saved views" icon={SaveIcon} />
               )}
             </TabsContent>
           </Tabs>
@@ -472,7 +526,23 @@ export function TimelinePage() {
               {firstPage.error instanceof ApiError ? firstPage.error.detail : "Search failed"}
             </Alert>
           ) : total === 0 && !firstPage.isLoading ? (
-            <EmptyState title="No events match">Adjust the search or remove filters.</EmptyState>
+            <EmptyState title="No events match" icon={SearchXIcon} className="py-16">
+              Adjust the search or remove filters.
+            </EmptyState>
+          ) : firstPage.isLoading ? (
+            <div className="bg-card grid gap-px overflow-hidden rounded-lg border" aria-busy="true">
+              <span className="sr-only" role="status">
+                Loading events…
+              </span>
+              {Array.from({ length: 12 }, (_, i) => (
+                <div key={i} className="flex items-center gap-3 px-3 py-2">
+                  <Skeleton className="h-3.5 w-40" />
+                  <Skeleton className="h-3.5 w-24" />
+                  <Skeleton className="h-3.5 w-32" />
+                  <Skeleton className="h-3.5 flex-1" />
+                </div>
+              ))}
+            </div>
           ) : (
             <ResultsTable
               total={total}

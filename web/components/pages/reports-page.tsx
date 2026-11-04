@@ -1,7 +1,15 @@
 "use client";
 
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileDownIcon, FileSignatureIcon, PlusIcon, XIcon } from "lucide-react";
+import {
+  FileCheck2Icon,
+  FileDownIcon,
+  FilePenLineIcon,
+  FileSignatureIcon,
+  FileTextIcon,
+  PlusIcon,
+  XIcon,
+} from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { GateNote, Mono, PageHeader, QueryStatus } from "@/components/common";
@@ -83,13 +91,16 @@ export function ReportsPage() {
   return (
     <>
       <PageHeader
+        icon={FileTextIcon}
         title="Reports"
         description="Deterministic PDF/DOCX reports of approved findings, signed with your examiner key and recorded in custody."
       />
       <div className="grid gap-4 lg:grid-cols-[24rem_minmax(0,1fr)]">
         <Card aria-labelledby="rb-title">
           <CardHeader>
-            <CardTitle id="rb-title">Report builder</CardTitle>
+            <CardTitle id="rb-title">
+              <FilePenLineIcon aria-hidden /> Report builder
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {examiner.allowed ? (
@@ -176,7 +187,9 @@ export function ReportsPage() {
         </Card>
         <Card aria-labelledby="rep-list">
           <CardHeader>
-            <CardTitle id="rep-list">Generated reports</CardTitle>
+            <CardTitle id="rep-list">
+              <FileCheck2Icon aria-hidden /> Generated reports
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div role="status" aria-live="polite">
@@ -193,7 +206,7 @@ export function ReportsPage() {
             </div>
             <QueryStatus isLoading={reports.isLoading} error={reports.error}>
               {(reports.data ?? []).length === 0 ? (
-                <EmptyState title="No reports yet" />
+                <EmptyState title="No reports yet" icon={FileTextIcon} />
               ) : (
                 <ul className="grid gap-3">
                   {(reports.data ?? []).map((r, i) => {

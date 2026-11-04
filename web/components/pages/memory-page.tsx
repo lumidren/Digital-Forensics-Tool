@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronRightIcon, CpuIcon, ListTreeIcon, TriangleAlertIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type KeyboardEvent } from "react";
 import { PageHeader, QueryStatus } from "@/components/common";
@@ -96,19 +96,22 @@ export function MemoryPage() {
   return (
     <>
       <PageHeader
+        icon={CpuIcon}
         title="Memory analysis"
         description="Process tree from Volatility process listings, with injection, hollowing and hidden-process flags."
       />
       <QueryStatus isLoading={events.isLoading} error={events.error}>
         {tree.byPid.size === 0 ? (
-          <EmptyState title="No memory process events">
+          <EmptyState title="No memory process events" icon={CpuIcon}>
             Upload and process a memory image to populate this view.
           </EmptyState>
         ) : (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
             <Card aria-labelledby="proc-tree">
               <CardHeader>
-                <CardTitle id="proc-tree">Process tree ({tree.byPid.size} processes)</CardTitle>
+                <CardTitle id="proc-tree">
+                  <ListTreeIcon aria-hidden /> Process tree ({tree.byPid.size} processes)
+                </CardTitle>
                 {truncated ? (
                   <span className="text-warning text-xs">Showing the first 5,000 memory events.</span>
                 ) : null}
@@ -197,7 +200,9 @@ export function MemoryPage() {
             </Card>
             <Card aria-labelledby="proc-flagged">
               <CardHeader>
-                <CardTitle id="proc-flagged">Flagged processes</CardTitle>
+                <CardTitle id="proc-flagged">
+                  <TriangleAlertIcon aria-hidden /> Flagged processes
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {tree.flagged.length ? (

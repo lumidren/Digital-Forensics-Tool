@@ -1,7 +1,15 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshCwIcon, ShieldCheckIcon } from "lucide-react";
+import {
+  BinaryIcon,
+  ClipboardListIcon,
+  FileDigitIcon,
+  FingerprintIcon,
+  LinkIcon,
+  RefreshCwIcon,
+  ShieldCheckIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -60,6 +68,7 @@ export function EvidenceDetailPage() {
       {e ? (
         <>
           <PageHeader
+            icon={FileDigitIcon}
             title={e.name}
             description={
               <>
@@ -104,7 +113,9 @@ export function EvidenceDetailPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             <Card aria-labelledby="ev-hashes">
               <CardHeader>
-                <CardTitle id="ev-hashes">Hashes and metadata</CardTitle>
+                <CardTitle id="ev-hashes">
+                  <FingerprintIcon aria-hidden /> Hashes and metadata
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <dl>
@@ -135,7 +146,9 @@ export function EvidenceDetailPage() {
             </Card>
             <Card aria-labelledby="ev-ledger">
               <CardHeader>
-                <CardTitle id="ev-ledger">Ingest ledger entry</CardTitle>
+                <CardTitle id="ev-ledger">
+                  <LinkIcon aria-hidden /> Ingest ledger entry
+                </CardTitle>
                 <Link
                   href={`/cases/${encodeURIComponent(caseId)}/custody?evidence=${encodeURIComponent(e.id)}`}
                   className="text-primary ml-auto text-xs underline"
@@ -177,7 +190,9 @@ export function EvidenceDetailPage() {
           </div>
           <Card className="mt-4" aria-labelledby="ev-jobs">
             <CardHeader>
-              <CardTitle id="ev-jobs">Processing jobs</CardTitle>
+              <CardTitle id="ev-jobs">
+                <ClipboardListIcon aria-hidden /> Processing jobs
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {e.jobs.length ? (
@@ -201,7 +216,9 @@ export function EvidenceDetailPage() {
           </Card>
           <Card className="mt-4" aria-labelledby="ev-hex">
             <CardHeader>
-              <CardTitle id="ev-hex">Byte browser</CardTitle>
+              <CardTitle id="ev-hex">
+                <BinaryIcon aria-hidden /> Byte browser
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {examiner.allowed ? (

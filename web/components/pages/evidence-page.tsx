@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { UploadIcon, XIcon } from "lucide-react";
+import { ClipboardListIcon, HardDriveIcon, UploadIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type DragEvent, type FormEvent } from "react";
@@ -138,13 +138,16 @@ export function EvidencePage() {
   return (
     <>
       <PageHeader
+        icon={HardDriveIcon}
         title="Evidence"
         description="Intake, hashing, processing status and integrity verification."
       />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,26rem)_1fr]">
         <Card aria-labelledby="intake-title">
           <CardHeader>
-            <CardTitle id="intake-title">Upload evidence</CardTitle>
+            <CardTitle id="intake-title">
+              <UploadIcon aria-hidden /> Upload evidence
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {!canUpload.allowed ? (
@@ -289,7 +292,9 @@ export function EvidencePage() {
         </Card>
         <Card aria-labelledby="queue-title">
           <CardHeader>
-            <CardTitle id="queue-title">Processing queue</CardTitle>
+            <CardTitle id="queue-title">
+              <ClipboardListIcon aria-hidden /> Processing queue
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <ProcessingQueue caseId={caseId} evidence={rows} />
@@ -298,12 +303,14 @@ export function EvidencePage() {
       </div>
       <Card className="mt-4" aria-labelledby="ev-list-title">
         <CardHeader>
-          <CardTitle id="ev-list-title">Evidence items</CardTitle>
+          <CardTitle id="ev-list-title">
+            <HardDriveIcon aria-hidden /> Evidence items
+          </CardTitle>
         </CardHeader>
         <QueryStatus isLoading={evidence.isLoading} error={evidence.error}>
           {rows.length === 0 ? (
             <CardContent>
-              <EmptyState title="No evidence yet" />
+              <EmptyState title="No evidence yet" icon={HardDriveIcon} />
             </CardContent>
           ) : (
             <Table aria-label="Evidence items">
@@ -347,7 +354,20 @@ export function EvidencePage() {
                     <TableCell>
                       <Mono title={ev.sha256}>{shortHash(ev.sha256, 16)}</Mono>
                     </TableCell>
-                    <TableCell data-testid="evidence-status">{ev.status}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          ev.status === "processed"
+                            ? "success"
+                            : ev.status === "failed"
+                              ? "destructive-soft"
+                              : "warning"
+                        }
+                        data-testid="evidence-status"
+                      >
+                        {ev.status}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-xs whitespace-nowrap">{formatDate(ev.ingested)}</TableCell>
                   </TableRow>
                 ))}

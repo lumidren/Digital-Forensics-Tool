@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { DownloadIcon, RadarIcon, Trash2Icon } from "lucide-react";
+import { CrosshairIcon, DownloadIcon, FileUpIcon, RadarIcon, ScanSearchIcon, Trash2Icon } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { GateNote, PageHeader, QueryStatus } from "@/components/common";
@@ -70,6 +70,7 @@ export function IocsPage() {
   return (
     <>
       <PageHeader
+        icon={ScanSearchIcon}
         title="Indicators of compromise"
         description="Import indicators, sweep the case timeline, and export a STIX 2.1 bundle."
         actions={
@@ -91,7 +92,9 @@ export function IocsPage() {
       <div className="grid gap-4 lg:grid-cols-[22rem_minmax(0,1fr)]">
         <Card aria-labelledby="ioc-import">
           <CardHeader>
-            <CardTitle id="ioc-import">Import</CardTitle>
+            <CardTitle id="ioc-import">
+              <FileUpIcon aria-hidden /> Import
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {examiner.allowed ? (
@@ -120,7 +123,9 @@ export function IocsPage() {
         </Card>
         <Card aria-labelledby="ioc-list">
           <CardHeader>
-            <CardTitle id="ioc-list">Indicators ({iocs.data?.length ?? 0})</CardTitle>
+            <CardTitle id="ioc-list">
+              <CrosshairIcon aria-hidden /> Indicators ({iocs.data?.length ?? 0})
+            </CardTitle>
             <div className="ml-auto w-full sm:w-56">
               <Label htmlFor="ioc-filter" className="sr-only">
                 Filter indicators
@@ -137,7 +142,7 @@ export function IocsPage() {
           <QueryStatus isLoading={iocs.isLoading} error={iocs.error}>
             {rows.length === 0 ? (
               <CardContent>
-                <EmptyState title="No indicators" />
+                <EmptyState title="No indicators" icon={ScanSearchIcon} />
               </CardContent>
             ) : (
               <Table aria-label="Indicators">
@@ -173,13 +178,13 @@ export function IocsPage() {
                       <TableCell className="tabular text-right" data-testid="ioc-hits">
                         {i.hits > 0 ? (
                           <a
-                            className="text-primary underline"
+                            className="border-sev-high/45 bg-sev-high-soft text-sev-high inline-flex min-w-7 justify-center rounded-full border px-2 py-0.5 text-xs font-semibold hover:underline"
                             href={`/cases/${encodeURIComponent(caseId)}/timeline?q=${encodeURIComponent(`"${i.value}"`)}`}
                           >
                             {i.hits}
                           </a>
                         ) : (
-                          i.hits
+                          <span className="text-muted-foreground">{i.hits}</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
