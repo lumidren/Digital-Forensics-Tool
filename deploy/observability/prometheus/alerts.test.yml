@@ -1,0 +1,84 @@
+# promtool test rules deploy/observability/prometheus/alerts.test.yml
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'veritas_queue_depth{job="veritas-api", instance="a"}'
+        values: '40x45'
+      - series: 'up{job="veritas-api", instance="a"}'
+        values: '1x45'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: VeritasQueueDepthHigh
+        exp_alerts: []
+      - eval_time: 40m
+        alertname: VeritasQueueDepthHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Processing queue above 25 jobs for 30 minutes
+              description: "40 jobs pending or running. Workers are saturated or stuck."
+              runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritasqueuedepthhigh
+      - eval_time: 40m
+        alertname: VeritasApiDown
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'veritas_custody_verify_ok{case_id="C-1", job="veritas-custody-verify"}'
+        values: '1 1 0 0'
+      - series: 'veritas_custody_verify_ok{case_id="C-2", job="veritas-custody-verify"}'
+        values: '1 1 1 1'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: VeritasCustodyVerifyFailed
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: VeritasCustodyVerifyFailed
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              case_id: C-1
+            exp_annotations:
+              summary: "Custody ledger verification FAILED for case C-1"
+              description: The scheduled hash-chain and signature verification of a custody ledger failed. Freeze the case and follow the runbook.
+              runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritascustodyverifyfailed
+
+  - interval: 1m
+    input_series:
+      - series: 'veritas_http_requests_total{job="veritas-api", route="/api/v1/cases", method="GET", status="200"}'
+        values: '0+60x30'
+      - series: 'veritas_http_requests_total{job="veritas-api", route="/api/v1/cases", method="GET", status="500"}'
+        values: '0+6x30'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: VeritasApi5xxRatioHigh
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: API 5xx responses above 2%
+              description: "9.091% of API responses are 5xx."
+              runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritasapi5xxratiohigh
+
+  - interval: 1m
+    input_series:
+      - series: 'veritas_backup_last_status{job="veritas-backup"}'
+        values: '1 1 0 0 0 0 0 0'
+      - series: 'veritas_backup_last_success_timestamp_seconds{job="veritas-backup"}'
+        values: '60 60 60 60 60 60 60 60'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: VeritasBackupFailed
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: Veritas backup failed or is overdue
+              description: The hourly backup job failed or no successful backup was recorded in 2 hours.
+              runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritasbackupfailed

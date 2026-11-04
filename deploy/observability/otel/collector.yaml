@@ -1,0 +1,120 @@
+# OpenTelemetry Collector (contrib distribution >= 0.110) for Veritas.
+# The API exports traces over OTLP/HTTP to OTEL_EXPORTER_OTLP_ENDPOINT (Helm: config.otelEndpoint,
+# default http://otel-collector.monitoring.svc:4318). The collector scrubs attributes that could carry
+# secrets or evidence content, then forwards traces to Tempo and span metrics to Prometheus.
+#
+# Deploy with the upstream chart:
+#   helm upgrade --install otel-collector open-telemetry/opentelemetry-collector -n monitoring \
+#     --set mode=deployment --set image.repository=otel/opentelemetry-collector-contrib \
+#     --set-file config=deploy/observability/otel/collector.yaml
+# Environment: TEMPO_OTLP_ENDPOINT (e.g. tempo-distributor.monitoring.svc:4317).
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+  # Never ship credentials, tokens or query strings (search text can contain case data).
+  attributes/scrub:
+    actions:
+      - key: http.request.header.authorization
+        action: delete
+      - key: http.request.header.cookie
+        action: delete
+      - key: http.response.header.set-cookie
+        action: delete
+      - key: url.query
+        action: delete
+      - key: http.target
+        action: delete
+      - key: db.statement
+        action: hash
+      - key: enduser.id
+        action: hash
+  resource/env:
+    attributes:
+      - key: service.namespace
+        value: veritas
+        action: upsert
+      - key: deployment.environment
+        value: ${env:VERITAS_ENVIRONMENT}
+        action: upsert
+  k8sattributes:
+    auth_type: serviceAccount
+    passthrough: false
+    extract:
+      metadata:
+        - k8s.namespace.name
+        - k8s.pod.name
+        - k8s.deployment.name
+        - k8s.node.name
+  tail_sampling:
+    decision_wait: 10s
+    policies:
+      - name: errors
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      - name: slow
+        type: latency
+        latency:
+          threshold_ms: 1000
+      - name: baseline
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10
+  batch:
+    send_batch_size: 8192
+    timeout: 5s
+
+connectors:
+  spanmetrics:
+    histogram:
+      explicit:
+        buckets: [5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s]
+    dimensions:
+      - name: http.route
+      - name: http.response.status_code
+
+exporters:
+  otlp/tempo:
+    endpoint: ${env:TEMPO_OTLP_ENDPOINT}
+    tls:
+      insecure: false
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    namespace: veritas_otel
+    resource_to_telemetry_conversion:
+      enabled: false
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    # Every span feeds the RED span metrics; only sampled traces are stored in Tempo.
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, k8sattributes, attributes/scrub, resource/env, batch]
+      exporters: [spanmetrics]
+    traces/sampled:
+      receivers: [otlp]
+      processors: [memory_limiter, k8sattributes, attributes/scrub, resource/env, tail_sampling, batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [spanmetrics]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]
