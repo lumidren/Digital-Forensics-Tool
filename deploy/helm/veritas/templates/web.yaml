@@ -1,0 +1,157 @@
+{{- $c := dict "ctx" $ "component" "web" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "veritas.fullname" . }}-web
+  labels:
+    {{- include "veritas.componentLabels" $c | nindent 4 }}
+spec:
+  replicas: {{ .Values.web.replicas }}
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "veritas.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "veritas.componentLabels" $c | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccounts.web.name }}
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: web
+          image: {{ include "veritas.image" (dict "ctx" $ "image" .Values.web.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.web.port }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.web.port | quote }}
+            - name: HOSTNAME
+              value: 0.0.0.0
+            - name: VERITAS_API_URL
+              value: {{ printf "http://%s-api:%v" (include "veritas.fullname" .) .Values.api.port | quote }}
+            {{- with .Values.web.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.web.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: next-cache
+              mountPath: /app/.next/cache
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+        - name: next-cache
+          emptyDir:
+            sizeLimit: 512Mi
+      {{- with .Values.web.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.web.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.web.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "veritas.fullname" . }}-web
+  labels:
+    {{- include "veritas.componentLabels" $c | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "veritas.selector" $c | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.web.port }}
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "veritas.fullname" . }}-web
+  labels:
+    {{- include "veritas.componentLabels" $c | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.web.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "veritas.selector" $c | nindent 6 }}
+---
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "veritas.fullname" . }}
+  labels:
+    {{- include "veritas.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Values.ingress.tlsSecretName }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          # Only the API surface is routed to the API; /metrics, /healthz and /readyz stay cluster-internal.
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "veritas.fullname" . }}-api
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "veritas.fullname" . }}-web
+                port:
+                  name: http
+{{- end }}

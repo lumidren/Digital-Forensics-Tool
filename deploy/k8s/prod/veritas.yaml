@@ -1,0 +1,1493 @@
+# Rendered from deploy/helm/veritas with values-prod.yaml - do not edit by hand.
+# Regenerate: helm template veritas deploy/helm/veritas --namespace veritas -f deploy/helm/veritas/values-prod.yaml > deploy/k8s/prod/veritas.yaml
+---
+# Source: veritas/templates/networkpolicies.yaml
+# Default deny: nothing in the release may send or receive traffic unless a policy below allows it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: veritas-default-deny
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# Source: veritas/templates/networkpolicies.yaml
+# DNS for every pod (CoreDNS in kube-system).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: veritas-dns
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+---
+# Source: veritas/templates/networkpolicies.yaml
+# API: from the ingress controller, the web tier and Prometheus; to Postgres, ClickHouse, the AWS
+# interface endpoints (S3, KMS, STS) and the OpenTelemetry collector.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: veritas-api
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: veritas
+      app.kubernetes.io/instance: veritas
+      app.kubernetes.io/component: api
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: veritas
+              app.kubernetes.io/instance: veritas
+              app.kubernetes.io/component: web
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - {protocol: TCP, port: 8000}
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.30.96.0/20
+        - ipBlock:
+            cidr: 10.30.112.0/20
+        - ipBlock:
+            cidr: 10.30.128.0/20
+      ports:
+        - {protocol: TCP, port: 5432}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: clickhouse
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: clickhouse
+      ports:
+        - {protocol: TCP, port: 8123}
+    - to:
+        - ipBlock:
+            cidr: 10.30.0.0/16
+      ports:
+        - {protocol: TCP, port: 443}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - {protocol: TCP, port: 4318}
+---
+# Source: veritas/templates/networkpolicies.yaml
+# Worker: no ingress at all; egress only to the case database, the timeline store and the evidence
+# store (S3/KMS/STS endpoints). No internet, no OTel, no other pods.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: veritas-worker
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: veritas
+      app.kubernetes.io/instance: veritas
+      app.kubernetes.io/component: worker
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.30.96.0/20
+        - ipBlock:
+            cidr: 10.30.112.0/20
+        - ipBlock:
+            cidr: 10.30.128.0/20
+      ports:
+        - {protocol: TCP, port: 5432}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: clickhouse
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: clickhouse
+      ports:
+        - {protocol: TCP, port: 8123}
+    - to:
+        - ipBlock:
+            cidr: 10.30.0.0/16
+      ports:
+        - {protocol: TCP, port: 443}
+---
+# Source: veritas/templates/networkpolicies.yaml
+# Web: from the ingress controller only; egress to the API only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: veritas-web
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: veritas
+      app.kubernetes.io/instance: veritas
+      app.kubernetes.io/component: web
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - {protocol: TCP, port: 3000}
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: veritas
+              app.kubernetes.io/instance: veritas
+              app.kubernetes.io/component: api
+      ports:
+        - {protocol: TCP, port: 8000}
+---
+# Source: veritas/templates/networkpolicies.yaml
+# Operations CronJobs (custody verification, backups): same data paths as the API plus the Pushgateway.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: veritas-ops
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: veritas
+      app.kubernetes.io/instance: veritas
+      app.kubernetes.io/component: ops
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.30.96.0/20
+        - ipBlock:
+            cidr: 10.30.112.0/20
+        - ipBlock:
+            cidr: 10.30.128.0/20
+      ports:
+        - {protocol: TCP, port: 5432}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: clickhouse
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: clickhouse
+      ports:
+        - {protocol: TCP, port: 8123}
+    - to:
+        - ipBlock:
+            cidr: 10.30.0.0/16
+      ports:
+        - {protocol: TCP, port: 443}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - {protocol: TCP, port: 9091}
+---
+# Source: veritas/templates/api.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: veritas-api
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+    app.kubernetes.io/component: api
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: veritas
+      app.kubernetes.io/instance: veritas
+      app.kubernetes.io/component: api
+---
+# Source: veritas/templates/web.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: veritas-web
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+    app.kubernetes.io/component: web
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: veritas
+      app.kubernetes.io/instance: veritas
+      app.kubernetes.io/component: web
+---
+# Source: veritas/templates/worker.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: veritas-worker
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+    app.kubernetes.io/component: worker
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: veritas
+      app.kubernetes.io/instance: veritas
+      app.kubernetes.io/component: worker
+---
+# Source: veritas/templates/config.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: veritas-api
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+automountServiceAccountToken: false
+---
+# Source: veritas/templates/config.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: veritas-ops
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+automountServiceAccountToken: false
+---
+# Source: veritas/templates/config.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: veritas-web
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+automountServiceAccountToken: false
+---
+# Source: veritas/templates/config.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: veritas-worker
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+automountServiceAccountToken: false
+---
+# Source: veritas/templates/config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: veritas-config
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+data:
+  VERITAS_STORE: "s3"
+  VERITAS_S3_BUCKET: "veritas-evidence-prod"
+  VERITAS_LOCAL_AUTH: "0"
+  VERITAS_OIDC_ISSUER: "https://login.veritas.example.org/realms/veritas"
+  VERITAS_OIDC_AUDIENCE: "veritas"
+  VERITAS_OIDC_JWKS_URL: "https://login.veritas.example.org/realms/veritas/protocol/openid-connect/certs"
+  VERITAS_TOKEN_TTL_S: "28800"
+  VERITAS_CORS_ORIGINS: "https://veritas.example.org"
+  VERITAS_RETENTION_DAYS: "3650"
+  VERITAS_MAX_UPLOAD_BYTES: "2199023255552"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.monitoring.svc:4318"
+---
+# Source: veritas/templates/monitoring.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: veritas-ops-scripts
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+data:
+  custody_verify.py: |
+    """Scheduled custody verification (CronJob): ``python -m veritas.api.manage verify-custody <case>`` for every case.
+    
+    Pushes to the Prometheus Pushgateway (job ``veritas-custody-verify``):
+      veritas_custody_verify_ok{case_id}                    1 PASS / 0 FAIL  (alert VeritasCustodyVerifyFailed)
+      veritas_custody_verify_last_run_timestamp_seconds     (alert VeritasCustodyVerifyStale)
+      veritas_custody_verify_cases / _failed_cases / _duration_seconds
+    Exits 1 when any ledger fails, so the Job is also marked failed.
+    """
+    from __future__ import annotations
+    
+    import os
+    import subprocess
+    import sys
+    import time
+    
+    from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
+    
+    from veritas.api.config import load
+    from veritas.api.db import Case, make_engine, make_sessionmaker
+    
+    
+    def main() -> int:
+        t0 = time.perf_counter()
+        settings = load()
+        session = make_sessionmaker(make_engine(settings.database_url))
+        with session() as s:
+            case_ids = sorted(c.id for c in s.query(Case))
+        reg = CollectorRegistry()
+        ok_g = Gauge("veritas_custody_verify_ok", "1 if the case custody ledger verified, 0 otherwise", ["case_id"], registry=reg)
+        failed = []
+        for case_id in case_ids:
+            proc = subprocess.run([sys.executable, "-m", "veritas.api.manage", "verify-custody", case_id], capture_output=True, text=True, check=False, timeout=3600)
+            ok = proc.returncode == 0
+            ok_g.labels(case_id).set(1 if ok else 0)
+            print(f"{'PASS' if ok else 'FAIL'} {case_id}", flush=True)
+            if not ok:
+                failed.append(case_id)
+                print(proc.stdout[-2000:], proc.stderr[-2000:], sep="\n", flush=True)
+        Gauge("veritas_custody_verify_cases", "Cases verified in the last run", registry=reg).set(len(case_ids))
+        Gauge("veritas_custody_verify_failed_cases", "Cases that failed verification in the last run", registry=reg).set(len(failed))
+        Gauge("veritas_custody_verify_duration_seconds", "Duration of the last verification run", registry=reg).set(time.perf_counter() - t0)
+        Gauge("veritas_custody_verify_last_run_timestamp_seconds", "Unix time of the last completed run", registry=reg).set_to_current_time()
+        gateway = os.environ.get("VERITAS_PUSHGATEWAY_URL")
+        if gateway:
+            push_to_gateway(gateway, job="veritas-custody-verify", registry=reg)
+        print(f"verified {len(case_ids)} case(s), {len(failed)} failed", flush=True)
+        return 1 if failed else 0
+    
+    
+    if __name__ == "__main__":
+        sys.exit(main())
+---
+# Source: veritas/templates/config.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: veritas-data
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: efs-sc
+  resources:
+    requests:
+      storage: 500Gi
+---
+# Source: veritas/templates/api.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: veritas-api
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+    app.kubernetes.io/component: api
+    veritas.io/job: veritas-api
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/component: api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+      protocol: TCP
+---
+# Source: veritas/templates/web.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: veritas-web
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+    app.kubernetes.io/component: web
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/component: web
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+      protocol: TCP
+---
+# Source: veritas/templates/api.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: veritas-api
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+    app.kubernetes.io/component: api
+spec:
+  replicas: 3
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: veritas
+      app.kubernetes.io/instance: veritas
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: veritas-0.1.0
+        app.kubernetes.io/name: veritas
+        app.kubernetes.io/instance: veritas
+        app.kubernetes.io/version: "0.1.0"
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/part-of: veritas
+        app.kubernetes.io/component: api
+      annotations:
+        checksum/config: 7adba52c1a7f56b77abc3f9afdb71e94b229765d698a87290bab5b1b7d842d13
+    spec:
+      serviceAccountName: veritas-api
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: api
+          image: ghcr.io/lumidren/veritas-api:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: veritas-config
+          env:
+            - name: VERITAS_DATA_DIR
+              value: /var/lib/veritas
+            - name: AWS_REGION
+              value: "eu-west-1"
+            - name: AWS_DEFAULT_REGION
+              value: "eu-west-1"
+            - name: VERITAS_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: veritas-runtime
+                  key: VERITAS_DATABASE_URL
+            - name: VERITAS_TIMELINE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: veritas-runtime
+                  key: VERITAS_TIMELINE_URL
+            - name: VERITAS_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: veritas-runtime
+                  key: VERITAS_MASTER_KEY
+            - name: VERITAS_SERVICE_KEY_SEED
+              valueFrom:
+                secretKeyRef:
+                  name: veritas-runtime
+                  key: VERITAS_SERVICE_KEY_SEED
+                  optional: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            limits:
+              cpu: "4"
+              memory: 8Gi
+            requests:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/veritas
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: veritas-data
+        - name: tmp
+          emptyDir:
+            sizeLimit: 100Gi
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: veritas
+              app.kubernetes.io/instance: veritas
+              app.kubernetes.io/component: api
+---
+# Source: veritas/templates/web.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: veritas-web
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+    app.kubernetes.io/component: web
+spec:
+  replicas: 3
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: veritas
+      app.kubernetes.io/instance: veritas
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: veritas-0.1.0
+        app.kubernetes.io/name: veritas
+        app.kubernetes.io/instance: veritas
+        app.kubernetes.io/version: "0.1.0"
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/part-of: veritas
+        app.kubernetes.io/component: web
+    spec:
+      serviceAccountName: veritas-web
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: ghcr.io/lumidren/veritas-web:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "3000"
+            - name: HOSTNAME
+              value: 0.0.0.0
+            - name: VERITAS_API_URL
+              value: "http://veritas-api:8000"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: next-cache
+              mountPath: /app/.next/cache
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+        - name: next-cache
+          emptyDir:
+            sizeLimit: 512Mi
+---
+# Source: veritas/templates/worker.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: veritas-worker
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+    app.kubernetes.io/component: worker
+spec:
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: veritas
+      app.kubernetes.io/instance: veritas
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: veritas-0.1.0
+        app.kubernetes.io/name: veritas
+        app.kubernetes.io/instance: veritas
+        app.kubernetes.io/version: "0.1.0"
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/part-of: veritas
+        app.kubernetes.io/component: worker
+      annotations:
+        checksum/config: 7adba52c1a7f56b77abc3f9afdb71e94b229765d698a87290bab5b1b7d842d13
+    spec:
+      serviceAccountName: veritas-worker
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      runtimeClassName: gvisor
+      securityContext:
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      # Long parser runs: give a running step time to finish before the pod is killed.
+      terminationGracePeriodSeconds: 900
+      containers:
+        - name: worker
+          image: ghcr.io/lumidren/veritas-worker:0.1.0
+          imagePullPolicy: IfNotPresent
+          command: ["/usr/bin/tini", "--", "veritas-worker"]
+          envFrom:
+            - configMapRef:
+                name: veritas-config
+          env:
+            - name: VERITAS_DATA_DIR
+              value: /var/lib/veritas
+            - name: AWS_REGION
+              value: "eu-west-1"
+            - name: AWS_DEFAULT_REGION
+              value: "eu-west-1"
+            - name: VERITAS_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: veritas-runtime
+                  key: VERITAS_DATABASE_URL
+            - name: VERITAS_TIMELINE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: veritas-runtime
+                  key: VERITAS_TIMELINE_URL
+            - name: VERITAS_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: veritas-runtime
+                  key: VERITAS_MASTER_KEY
+            - name: VERITAS_SERVICE_KEY_SEED
+              valueFrom:
+                secretKeyRef:
+                  name: veritas-runtime
+                  key: VERITAS_SERVICE_KEY_SEED
+                  optional: true
+            - name: VERITAS_BIN_DIR
+              value: /opt/veritas/bin
+            - name: VERITAS_MEM_BYTES
+              value: "8589934592"
+            - name: VERITAS_CPU_S
+              value: "3600"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+          livenessProbe:
+            exec:
+              command: ["python", "-c", "import shutil, sys, veritas.pipeline.queue; sys.exit(0 if shutil.which('veritas') and shutil.which('veritas-verify') else 1)"]
+            periodSeconds: 60
+            timeoutSeconds: 20
+            failureThreshold: 3
+          resources:
+            limits:
+              cpu: "8"
+              memory: 16Gi
+            requests:
+              cpu: "2"
+              memory: 8Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/veritas
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: veritas-data
+        - name: tmp
+          emptyDir:
+            sizeLimit: 500Gi
+      nodeSelector:
+        veritas.io/pool: workers
+      tolerations:
+        - effect: NoSchedule
+          key: veritas.io/pool
+          operator: Equal
+          value: workers
+---
+# Source: veritas/templates/cronjobs.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: veritas-custody-verify
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+    app.kubernetes.io/component: ops
+spec:
+  schedule: "17 */4 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  startingDeadlineSeconds: 3600
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 18000
+      template:
+        metadata:
+          labels:
+            helm.sh/chart: veritas-0.1.0
+            app.kubernetes.io/name: veritas
+            app.kubernetes.io/instance: veritas
+            app.kubernetes.io/version: "0.1.0"
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/part-of: veritas
+            app.kubernetes.io/component: ops
+        spec:
+          restartPolicy: Never
+          serviceAccountName: veritas-ops
+          automountServiceAccountToken: false
+          enableServiceLinks: false
+          securityContext:
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            runAsGroup: 10001
+            runAsNonRoot: true
+            runAsUser: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: custody-verify
+              image: ghcr.io/lumidren/veritas-api:0.1.0
+              imagePullPolicy: IfNotPresent
+              command: ["python", "/opt/veritas/ops/custody_verify.py"]
+              envFrom:
+                - configMapRef:
+                    name: veritas-config
+              env:
+                - name: VERITAS_DATA_DIR
+                  value: /var/lib/veritas
+                - name: AWS_REGION
+                  value: "eu-west-1"
+                - name: AWS_DEFAULT_REGION
+                  value: "eu-west-1"
+                - name: VERITAS_DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: veritas-runtime
+                      key: VERITAS_DATABASE_URL
+                - name: VERITAS_TIMELINE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: veritas-runtime
+                      key: VERITAS_TIMELINE_URL
+                - name: VERITAS_MASTER_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: veritas-runtime
+                      key: VERITAS_MASTER_KEY
+                - name: VERITAS_SERVICE_KEY_SEED
+                  valueFrom:
+                    secretKeyRef:
+                      name: veritas-runtime
+                      key: VERITAS_SERVICE_KEY_SEED
+                      optional: true
+                - name: VERITAS_PUSHGATEWAY_URL
+                  value: "http://prometheus-pushgateway.monitoring.svc:9091"
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                  - ALL
+                privileged: false
+                readOnlyRootFilesystem: true
+              resources:
+                limits:
+                  cpu: "1"
+                  memory: 1Gi
+                requests:
+                  cpu: 250m
+                  memory: 512Mi
+              volumeMounts:
+                - name: data
+                  mountPath: /var/lib/veritas
+                - name: tmp
+                  mountPath: /tmp
+                - name: ops-scripts
+                  mountPath: /opt/veritas/ops
+                  readOnly: true
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: veritas-data
+            - name: tmp
+              emptyDir:
+                sizeLimit: 1Gi
+            - name: ops-scripts
+              configMap:
+                name: veritas-ops-scripts
+---
+# Source: veritas/templates/cronjobs.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: veritas-backup
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+    app.kubernetes.io/component: ops
+spec:
+  schedule: "5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  startingDeadlineSeconds: 1800
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 10800
+      template:
+        metadata:
+          labels:
+            helm.sh/chart: veritas-0.1.0
+            app.kubernetes.io/name: veritas
+            app.kubernetes.io/instance: veritas
+            app.kubernetes.io/version: "0.1.0"
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/part-of: veritas
+            app.kubernetes.io/component: ops
+        spec:
+          restartPolicy: Never
+          serviceAccountName: veritas-ops
+          automountServiceAccountToken: false
+          enableServiceLinks: false
+          securityContext:
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            runAsGroup: 10001
+            runAsNonRoot: true
+            runAsUser: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: backup
+              image: ghcr.io/lumidren/veritas-api:0.1.0
+              imagePullPolicy: IfNotPresent
+              command:
+                - python
+                - /opt/veritas/scripts/backup/backup.py
+                - create
+                - --out
+                - /scratch
+                - --upload
+                - "s3://veritas-backups-prod/app"
+              envFrom:
+                - configMapRef:
+                    name: veritas-config
+              env:
+                - name: VERITAS_DATA_DIR
+                  value: /var/lib/veritas
+                - name: AWS_REGION
+                  value: "eu-west-1"
+                - name: AWS_DEFAULT_REGION
+                  value: "eu-west-1"
+                - name: VERITAS_DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: veritas-runtime
+                      key: VERITAS_DATABASE_URL
+                - name: VERITAS_TIMELINE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: veritas-runtime
+                      key: VERITAS_TIMELINE_URL
+                - name: VERITAS_MASTER_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: veritas-runtime
+                      key: VERITAS_MASTER_KEY
+                - name: VERITAS_SERVICE_KEY_SEED
+                  valueFrom:
+                    secretKeyRef:
+                      name: veritas-runtime
+                      key: VERITAS_SERVICE_KEY_SEED
+                      optional: true
+                - name: VERITAS_BACKUP_RECIPIENT
+                  valueFrom:
+                    secretKeyRef:
+                      name: veritas-runtime
+                      key: VERITAS_BACKUP_RECIPIENT
+                - name: VERITAS_PUSHGATEWAY_URL
+                  value: "http://prometheus-pushgateway.monitoring.svc:9091"
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                  - ALL
+                privileged: false
+                readOnlyRootFilesystem: true
+              resources:
+                limits:
+                  cpu: "2"
+                  memory: 2Gi
+                requests:
+                  cpu: 250m
+                  memory: 512Mi
+              volumeMounts:
+                - name: data
+                  mountPath: /var/lib/veritas
+                - name: tmp
+                  mountPath: /tmp
+                - name: scratch
+                  mountPath: /scratch
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: veritas-data
+            - name: tmp
+              emptyDir:
+                sizeLimit: 2Gi
+            - name: scratch
+              emptyDir:
+                sizeLimit: 50Gi
+---
+# Source: veritas/templates/web.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: veritas
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "Strict-Transport-Security: max-age=63072000; includeSubDomains; preload";
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - veritas.example.org
+      secretName: veritas-prod-tls
+  rules:
+    - host: veritas.example.org
+      http:
+        paths:
+          # Only the API surface is routed to the API; /metrics, /healthz and /readyz stay cluster-internal.
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: veritas-api
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: veritas-web
+                port:
+                  name: http
+---
+# Source: veritas/templates/config.yaml
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: veritas-runtime
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: aws-secrets-manager
+  target:
+    name: veritas-runtime
+    creationPolicy: Owner
+    deletionPolicy: Retain
+  dataFrom:
+    - extract:
+        key: veritas/prod/runtime
+---
+# Source: veritas/templates/monitoring.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: veritas
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+    release: kube-prometheus-stack
+spec:
+  # Same content as deploy/observability/prometheus/alerts.yml (CI checks the two copies are identical).
+  groups:
+    - name: veritas.recording
+      interval: 1m
+      rules:
+        - record: veritas:bytes_processed:rate5m
+          expr: sum(rate(veritas_bytes_processed_total[5m]))
+        - record: veritas:http_requests:rate5m
+          expr: sum by (route, status) (rate(veritas_http_requests_total[5m]))
+        - record: veritas:http_5xx_ratio:rate10m
+          expr: |
+            sum(rate(veritas_http_requests_total{status=~"5.."}[10m]))
+              / clamp_min(sum(rate(veritas_http_requests_total[10m])), 1e-9)
+        - record: veritas:search_latency_seconds:p95_10m
+          expr: histogram_quantile(0.95, sum by (le) (rate(veritas_search_latency_seconds_bucket[10m])))
+        # Parser failures per (failures + emitted events) over 30 minutes.
+        - record: veritas:parser_error_ratio:rate30m
+          expr: |
+            sum(rate(veritas_parser_errors_total[30m]))
+              / clamp_min(sum(rate(veritas_parser_errors_total[30m])) + sum(rate(veritas_parser_events_total[30m])), 1e-9)
+        - record: veritas:store_bytes:delta1h
+          expr: max(delta(veritas_store_bytes[1h]))
+  
+    - name: veritas.alerts
+      rules:
+        - alert: VeritasApiDown
+          expr: absent(up{job="veritas-api"} == 1)
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: No Veritas API target is up
+            description: Prometheus has not scraped a healthy veritas-api target for 5 minutes.
+            runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritasapidown
+  
+        - alert: VeritasQueueDepthHigh
+          expr: max(veritas_queue_depth) > 25
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: Processing queue above 25 jobs for 30 minutes
+            description: "{{ $value }} jobs pending or running. Workers are saturated or stuck."
+            runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritasqueuedepthhigh
+  
+        - alert: VeritasParserErrorRatioHigh
+          expr: veritas:parser_error_ratio:rate30m > 0.05 and sum(increase(veritas_parser_errors_total[30m])) >= 3
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Parser error ratio above 5%
+            description: "Parser failure ratio is {{ $value | humanizePercentage }} over 30 minutes."
+            runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritasparsererrorratiohigh
+  
+        - alert: VeritasSearchLatencyP95High
+          expr: veritas:search_latency_seconds:p95_10m > 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Timeline search p95 above 1 s
+            description: "p95 search latency is {{ $value | humanizeDuration }}."
+            runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritassearchlatencyp95high
+  
+        - alert: VeritasApi5xxRatioHigh
+          expr: veritas:http_5xx_ratio:rate10m > 0.02 and sum(rate(veritas_http_requests_total[10m])) > 0.05
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: API 5xx responses above 2%
+            description: "{{ $value | humanizePercentage }} of API responses are 5xx."
+            runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritasapi5xxratiohigh
+  
+        - alert: VeritasStoreGrowthAnomaly
+          expr: |
+            veritas:store_bytes:delta1h > 10e9
+              and veritas:store_bytes:delta1h > 4 * avg_over_time(veritas:store_bytes:delta1h[7d])
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: Evidence store growing much faster than its 7-day baseline
+            description: "Store grew {{ $value | humanize1024 }}B in the last hour."
+            runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritasstoregrowthanomaly
+  
+        - alert: VeritasStoreShrank
+          expr: max(delta(veritas_store_objects[1h])) < 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: Evidence store object count decreased
+            description: The WORM evidence store must never lose objects. Treat as a potential integrity incident.
+            runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritasstoreshrank
+  
+        - alert: VeritasCustodyVerifyFailed
+          expr: max by (case_id) (veritas_custody_verify_ok) == 0
+          labels:
+            severity: critical
+          annotations:
+            summary: "Custody ledger verification FAILED for case {{ $labels.case_id }}"
+            description: The scheduled hash-chain and signature verification of a custody ledger failed. Freeze the case and follow the runbook.
+            runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritascustodyverifyfailed
+  
+        - alert: VeritasCustodyVerifyStale
+          expr: time() - max(veritas_custody_verify_last_run_timestamp_seconds) > 8 * 3600
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Custody verification has not completed in 8 hours
+            description: The custody-verify CronJob (every 6 h) has not pushed a result.
+            runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritascustodyverifystale
+  
+        - alert: VeritasBackupFailed
+          expr: |
+            max(veritas_backup_last_status) == 0
+              or time() - max(veritas_backup_last_success_timestamp_seconds) > 2 * 3600
+              or max(kube_job_status_failed{job_name=~".*veritas.*backup.*"}) > 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: Veritas backup failed or is overdue
+            description: The hourly backup job failed or no successful backup was recorded in 2 hours.
+            runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritasbackupfailed
+  
+        - alert: VeritasCertificateExpiringSoon
+          expr: (max by (name, namespace) (certmanager_certificate_expiration_timestamp_seconds{name=~".*veritas.*"}) - time()) < 14 * 86400
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "TLS certificate {{ $labels.namespace }}/{{ $labels.name }} expires in under 14 days"
+            description: cert-manager has not renewed the certificate; check the Certificate and ClusterIssuer status.
+            runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritascertificateexpiringsoon
+  
+        - alert: VeritasCertificateNotReady
+          expr: max by (name, namespace) (certmanager_certificate_ready_status{name=~".*veritas.*", condition="False"}) == 1
+          for: 30m
+          labels:
+            severity: critical
+          annotations:
+            summary: "TLS certificate {{ $labels.namespace }}/{{ $labels.name }} is not ready"
+            runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritascertificateexpiringsoon
+---
+# Source: veritas/templates/config.yaml
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: gvisor
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+handler: runsc
+scheduling:
+  nodeSelector:
+    veritas.io/pool: workers
+  tolerations:
+    - effect: NoSchedule
+      key: veritas.io/pool
+      operator: Equal
+      value: workers
+---
+# Source: veritas/templates/worker.yaml
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: veritas-worker
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+    app.kubernetes.io/component: worker
+spec:
+  scaleTargetRef:
+    name: veritas-worker
+  minReplicaCount: 1
+  maxReplicaCount: 1
+  pollingInterval: 30
+  cooldownPeriod: 600
+  fallback:
+    failureThreshold: 3
+    replicas: 1
+  advanced:
+    horizontalPodAutoscalerConfig:
+      name: veritas-worker-keda
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 900
+          policies:
+            - type: Pods
+              value: 1
+              periodSeconds: 300
+  triggers:
+    - type: prometheus
+      name: queue-depth
+      metadata:
+        serverAddress: http://kube-prometheus-stack-prometheus.monitoring.svc:9090
+        query: "max(veritas_queue_depth{job=\"veritas-api\"})"
+        threshold: "4"
+        activationThreshold: "1"
+    - type: cpu
+      name: cpu
+      metricType: Utilization
+      metadata:
+        value: "75"
+---
+# Source: veritas/templates/monitoring.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: veritas-api
+  labels:
+    helm.sh/chart: veritas-0.1.0
+    app.kubernetes.io/name: veritas
+    app.kubernetes.io/instance: veritas
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: veritas
+    release: kube-prometheus-stack
+spec:
+  jobLabel: veritas.io/job
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: veritas
+      app.kubernetes.io/instance: veritas
+      app.kubernetes.io/component: api
+  namespaceSelector:
+    matchNames:
+      - veritas
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 20s

@@ -1,0 +1,173 @@
+{{- $c := dict "ctx" $ "component" "worker" -}}
+{{- $name := printf "%s-worker" (include "veritas.fullname" .) -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "veritas.componentLabels" $c | nindent 4 }}
+spec:
+  {{- if not .Values.worker.autoscaling.keda.enabled }}
+  replicas: {{ .Values.worker.replicas }}
+  {{- end }}
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
+  selector:
+    matchLabels:
+      {{- include "veritas.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "veritas.componentLabels" $c | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccounts.worker.name }}
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      {{- if .Values.worker.gvisor.enabled }}
+      runtimeClassName: {{ .Values.worker.gvisor.runtimeClassName }}
+      {{- end }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      # Long parser runs: give a running step time to finish before the pod is killed.
+      terminationGracePeriodSeconds: 900
+      containers:
+        - name: worker
+          image: {{ include "veritas.image" (dict "ctx" $ "image" .Values.worker.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/usr/bin/tini", "--", "veritas-worker"]
+          envFrom:
+            - configMapRef:
+                name: {{ include "veritas.fullname" . }}-config
+          env:
+            {{- include "veritas.env" . | nindent 12 }}
+            - name: VERITAS_BIN_DIR
+              value: /opt/veritas/bin
+            - name: VERITAS_MEM_BYTES
+              value: {{ .Values.worker.memoryBytesPerParser | int64 | quote }}
+            - name: VERITAS_CPU_S
+              value: {{ .Values.worker.cpuSecondsPerParser | quote }}
+            {{- with .Values.worker.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          livenessProbe:
+            exec:
+              command: ["python", "-c", "import shutil, sys, veritas.pipeline.queue; sys.exit(0 if shutil.which('veritas') and shutil.which('veritas-verify') else 1)"]
+            periodSeconds: 60
+            timeoutSeconds: 20
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          volumeMounts:
+            {{- include "veritas.volumeMounts" . | nindent 12 }}
+      volumes:
+        {{- include "veritas.dataVolume" . | nindent 8 }}
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .Values.worker.tmpSizeLimit }}
+      {{- with .Values.worker.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "veritas.componentLabels" $c | nindent 4 }}
+spec:
+  maxUnavailable: {{ .Values.worker.pdb.maxUnavailable }}
+  selector:
+    matchLabels:
+      {{- include "veritas.selector" $c | nindent 6 }}
+---
+{{- $as := .Values.worker.autoscaling }}
+{{- if $as.keda.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "veritas.componentLabels" $c | nindent 4 }}
+spec:
+  scaleTargetRef:
+    name: {{ $name }}
+  minReplicaCount: {{ $as.minReplicas }}
+  maxReplicaCount: {{ $as.maxReplicas }}
+  pollingInterval: {{ $as.keda.pollingInterval }}
+  cooldownPeriod: {{ $as.keda.cooldownPeriod }}
+  fallback:
+    failureThreshold: 3
+    replicas: {{ $as.keda.fallbackReplicas }}
+  advanced:
+    horizontalPodAutoscalerConfig:
+      name: {{ $name }}-keda
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 900
+          policies:
+            - type: Pods
+              value: 1
+              periodSeconds: 300
+  triggers:
+    - type: prometheus
+      name: queue-depth
+      metadata:
+        serverAddress: {{ $as.keda.serverAddress }}
+        query: {{ $as.keda.query | quote }}
+        threshold: {{ $as.keda.jobsPerReplica | quote }}
+        activationThreshold: {{ $as.keda.activationThreshold | quote }}
+    - type: cpu
+      name: cpu
+      metricType: Utilization
+      metadata:
+        value: {{ $as.keda.cpuUtilization | quote }}
+{{- else if $as.hpa.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "veritas.componentLabels" $c | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $name }}
+  minReplicas: {{ $as.minReplicas }}
+  maxReplicas: {{ $as.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $as.hpa.cpuUtilization }}
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 900
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 300
+{{- end }}

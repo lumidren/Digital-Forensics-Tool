@@ -1,0 +1,18 @@
+apiVersion: v2
+name: veritas
+description: Veritas DFIR platform (cluster profile) - API, processing workers, web UI, custody verification and backups
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.29.0-0"
+home: https://github.com/lumidren/Digital-Forensics-Tool
+sources:
+  - https://github.com/lumidren/Digital-Forensics-Tool
+maintainers:
+  - name: lumidren
+keywords:
+  - dfir
+  - forensics
+  - chain-of-custody
+annotations:
+  artifacthub.io/license: Apache-2.0

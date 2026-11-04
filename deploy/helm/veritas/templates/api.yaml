@@ -1,0 +1,134 @@
+{{- $c := dict "ctx" $ "component" "api" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "veritas.fullname" . }}-api
+  labels:
+    {{- include "veritas.componentLabels" $c | nindent 4 }}
+spec:
+  replicas: {{ .Values.api.replicas }}
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "veritas.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "veritas.componentLabels" $c | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccounts.api.name }}
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: api
+          image: {{ include "veritas.image" (dict "ctx" $ "image" .Values.api.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.api.port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "veritas.fullname" . }}-config
+          env:
+            {{- include "veritas.env" . | nindent 12 }}
+            {{- with .Values.api.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+          volumeMounts:
+            {{- include "veritas.volumeMounts" . | nindent 12 }}
+      volumes:
+        {{- include "veritas.dataVolume" . | nindent 8 }}
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .Values.api.tmpSizeLimit }}
+      {{- with .Values.api.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.api.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- range .Values.api.topologySpreadConstraints }}
+        - maxSkew: {{ .maxSkew }}
+          topologyKey: {{ .topologyKey }}
+          whenUnsatisfiable: {{ .whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              {{- include "veritas.selector" $c | nindent 14 }}
+        {{- end }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "veritas.fullname" . }}-api
+  labels:
+    {{- include "veritas.componentLabels" $c | nindent 4 }}
+    veritas.io/job: veritas-api
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "veritas.selector" $c | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.api.port }}
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "veritas.fullname" . }}-api
+  labels:
+    {{- include "veritas.componentLabels" $c | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.api.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "veritas.selector" $c | nindent 6 }}

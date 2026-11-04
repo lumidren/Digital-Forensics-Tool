@@ -1,0 +1,11 @@
+Veritas {{ .Chart.AppVersion }} deployed as release {{ .Release.Name }} in namespace {{ .Release.Namespace }}.
+
+Web UI:  https://{{ .Values.ingress.host }}
+API:     https://{{ .Values.ingress.host }}/api/v1   (OpenAPI: /api/docs)
+
+Smoke test from inside the cluster:
+  kubectl -n {{ .Release.Namespace }} run veritas-smoke --rm -i --restart=Never --image=curlimages/curl:8.10.1 -- \
+    curl -fsS http://{{ include "veritas.fullname" . }}-api:{{ .Values.api.port }}/readyz
+
+Custody verification runs on "{{ .Values.custodyVerify.schedule }}"; backups on "{{ .Values.backup.schedule }}".
+Runbook: docs/RUNBOOK.md   Disaster recovery: docs/DR.md

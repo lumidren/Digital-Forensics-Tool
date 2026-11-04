@@ -1,0 +1,65 @@
+# Production overlay: helm upgrade --install veritas deploy/helm/veritas -f deploy/helm/veritas/values-prod.yaml
+# Account-specific ARNs come from `terraform -chdir=deploy/terraform/aws/environments/prod output` and are
+# passed by .github/workflows/deploy.yml with --set. Images are deployed by digest in production.
+global:
+  awsRegion: eu-west-1
+
+config:
+  s3Bucket: veritas-evidence-prod
+  oidcIssuer: https://login.veritas.example.org/realms/veritas
+  oidcAudience: veritas
+  oidcJwksUrl: https://login.veritas.example.org/realms/veritas/protocol/openid-connect/certs
+  corsOrigins: [https://veritas.example.org]
+  retentionDays: 3650
+
+externalSecrets:
+  enabled: true
+  remoteKey: veritas/prod/runtime
+
+persistence:
+  size: 500Gi
+
+api:
+  replicas: 3
+  pdb:
+    minAvailable: 2
+  resources:
+    requests: {cpu: "1", memory: 2Gi}
+    limits: {cpu: "4", memory: 8Gi}
+  tmpSizeLimit: 100Gi
+
+worker:
+  gvisor:
+    enabled: true
+    runtimeClassName: gvisor
+    createRuntimeClass: true
+  resources:
+    requests: {cpu: "2", memory: 8Gi}
+    limits: {cpu: "8", memory: 16Gi}
+  memoryBytesPerParser: 8589934592
+  tmpSizeLimit: 500Gi
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 1
+    keda:
+      enabled: true
+
+web:
+  replicas: 3
+  pdb:
+    minAvailable: 2
+
+ingress:
+  host: veritas.example.org
+  clusterIssuer: letsencrypt-prod
+  tlsSecretName: veritas-prod-tls
+
+networkPolicy:
+  postgresCidrs: [10.30.96.0/20, 10.30.112.0/20, 10.30.128.0/20]
+  awsEndpointCidrs: [10.30.0.0/16]
+
+custodyVerify:
+  schedule: "17 */4 * * *"
+
+backup:
+  uploadUrl: s3://veritas-backups-prod/app

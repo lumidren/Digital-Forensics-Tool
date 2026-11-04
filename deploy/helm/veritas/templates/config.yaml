@@ -1,0 +1,112 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "veritas.fullname" . }}-config
+  labels:
+    {{- include "veritas.labels" . | nindent 4 }}
+data:
+  VERITAS_STORE: {{ .Values.config.store | quote }}
+  VERITAS_S3_BUCKET: {{ .Values.config.s3Bucket | quote }}
+  {{- with .Values.config.s3EndpointUrl }}
+  S3_ENDPOINT_URL: {{ . | quote }}
+  {{- end }}
+  VERITAS_LOCAL_AUTH: {{ ternary "1" "0" .Values.config.localAuth | quote }}
+  {{- with .Values.config.oidcIssuer }}
+  VERITAS_OIDC_ISSUER: {{ . | quote }}
+  {{- end }}
+  VERITAS_OIDC_AUDIENCE: {{ .Values.config.oidcAudience | quote }}
+  {{- with .Values.config.oidcJwksUrl }}
+  VERITAS_OIDC_JWKS_URL: {{ . | quote }}
+  {{- end }}
+  VERITAS_TOKEN_TTL_S: {{ .Values.config.tokenTtlSeconds | quote }}
+  VERITAS_CORS_ORIGINS: {{ join "," (default (list (printf "https://%s" .Values.ingress.host)) .Values.config.corsOrigins) | quote }}
+  VERITAS_RETENTION_DAYS: {{ .Values.config.retentionDays | quote }}
+  VERITAS_MAX_UPLOAD_BYTES: {{ .Values.config.maxUploadBytes | int64 | quote }}
+  {{- with .Values.config.otelEndpoint }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ . | quote }}
+  {{- end }}
+---
+{{- if and .Values.secret.create (not .Values.externalSecrets.enabled) }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.secret.name }}
+  labels:
+    {{- include "veritas.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  {{- range $k, $v := .Values.secret.values }}
+  {{ $k }}: {{ $v | quote }}
+  {{- end }}
+{{- end }}
+---
+{{- if .Values.externalSecrets.enabled }}
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: {{ .Values.secret.name }}
+  labels:
+    {{- include "veritas.labels" . | nindent 4 }}
+spec:
+  refreshInterval: {{ .Values.externalSecrets.refreshInterval }}
+  secretStoreRef:
+    kind: {{ .Values.externalSecrets.secretStoreRef.kind }}
+    name: {{ .Values.externalSecrets.secretStoreRef.name }}
+  target:
+    name: {{ .Values.secret.name }}
+    creationPolicy: Owner
+    deletionPolicy: Retain
+  dataFrom:
+    - extract:
+        key: {{ .Values.externalSecrets.remoteKey }}
+{{- end }}
+---
+{{- if .Values.persistence.enabled }}
+{{- if not .Values.persistence.existingClaim }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "veritas.dataClaim" . }}
+  labels:
+    {{- include "veritas.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    {{- toYaml .Values.persistence.accessModes | nindent 4 }}
+  storageClassName: {{ .Values.persistence.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+{{- end }}
+{{- end }}
+---
+{{- range $key, $sa := .Values.serviceAccounts }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $sa.name }}
+  labels:
+    {{- include "veritas.labels" $ | nindent 4 }}
+  {{- if $sa.roleArn }}
+  annotations:
+    eks.amazonaws.com/role-arn: {{ $sa.roleArn }}
+    eks.amazonaws.com/sts-regional-endpoints: "true"
+  {{- end }}
+automountServiceAccountToken: false
+---
+{{- end }}
+{{- if and .Values.worker.gvisor.enabled .Values.worker.gvisor.createRuntimeClass }}
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: {{ .Values.worker.gvisor.runtimeClassName }}
+  labels:
+    {{- include "veritas.labels" . | nindent 4 }}
+handler: {{ .Values.worker.gvisor.handler }}
+scheduling:
+  nodeSelector:
+    {{- toYaml .Values.worker.nodeSelector | nindent 4 }}
+  tolerations:
+    {{- toYaml .Values.worker.tolerations | nindent 4 }}
+{{- end }}

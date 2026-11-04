@@ -1,0 +1,146 @@
+groups:
+  - name: veritas.recording
+    interval: 1m
+    rules:
+      - record: veritas:bytes_processed:rate5m
+        expr: sum(rate(veritas_bytes_processed_total[5m]))
+      - record: veritas:http_requests:rate5m
+        expr: sum by (route, status) (rate(veritas_http_requests_total[5m]))
+      - record: veritas:http_5xx_ratio:rate10m
+        expr: |
+          sum(rate(veritas_http_requests_total{status=~"5.."}[10m]))
+            / clamp_min(sum(rate(veritas_http_requests_total[10m])), 1e-9)
+      - record: veritas:search_latency_seconds:p95_10m
+        expr: histogram_quantile(0.95, sum by (le) (rate(veritas_search_latency_seconds_bucket[10m])))
+      # Parser failures per (failures + emitted events) over 30 minutes.
+      - record: veritas:parser_error_ratio:rate30m
+        expr: |
+          sum(rate(veritas_parser_errors_total[30m]))
+            / clamp_min(sum(rate(veritas_parser_errors_total[30m])) + sum(rate(veritas_parser_events_total[30m])), 1e-9)
+      - record: veritas:store_bytes:delta1h
+        expr: max(delta(veritas_store_bytes[1h]))
+
+  - name: veritas.alerts
+    rules:
+      - alert: VeritasApiDown
+        expr: absent(up{job="veritas-api"} == 1)
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: No Veritas API target is up
+          description: Prometheus has not scraped a healthy veritas-api target for 5 minutes.
+          runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritasapidown
+
+      - alert: VeritasQueueDepthHigh
+        expr: max(veritas_queue_depth) > 25
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: Processing queue above 25 jobs for 30 minutes
+          description: "{{ $value }} jobs pending or running. Workers are saturated or stuck."
+          runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritasqueuedepthhigh
+
+      - alert: VeritasParserErrorRatioHigh
+        expr: veritas:parser_error_ratio:rate30m > 0.05 and sum(increase(veritas_parser_errors_total[30m])) >= 3
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Parser error ratio above 5%
+          description: "Parser failure ratio is {{ $value | humanizePercentage }} over 30 minutes."
+          runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritasparsererrorratiohigh
+
+      - alert: VeritasSearchLatencyP95High
+        expr: veritas:search_latency_seconds:p95_10m > 1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Timeline search p95 above 1 s
+          description: "p95 search latency is {{ $value | humanizeDuration }}."
+          runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritassearchlatencyp95high
+
+      - alert: VeritasApi5xxRatioHigh
+        expr: veritas:http_5xx_ratio:rate10m > 0.02 and sum(rate(veritas_http_requests_total[10m])) > 0.05
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: API 5xx responses above 2%
+          description: "{{ $value | humanizePercentage }} of API responses are 5xx."
+          runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritasapi5xxratiohigh
+
+      - alert: VeritasStoreGrowthAnomaly
+        expr: |
+          veritas:store_bytes:delta1h > 10e9
+            and veritas:store_bytes:delta1h > 4 * avg_over_time(veritas:store_bytes:delta1h[7d])
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: Evidence store growing much faster than its 7-day baseline
+          description: "Store grew {{ $value | humanize1024 }}B in the last hour."
+          runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritasstoregrowthanomaly
+
+      - alert: VeritasStoreShrank
+        expr: max(delta(veritas_store_objects[1h])) < 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Evidence store object count decreased
+          description: The WORM evidence store must never lose objects. Treat as a potential integrity incident.
+          runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritasstoreshrank
+
+      - alert: VeritasCustodyVerifyFailed
+        expr: max by (case_id) (veritas_custody_verify_ok) == 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "Custody ledger verification FAILED for case {{ $labels.case_id }}"
+          description: The scheduled hash-chain and signature verification of a custody ledger failed. Freeze the case and follow the runbook.
+          runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritascustodyverifyfailed
+
+      - alert: VeritasCustodyVerifyStale
+        expr: time() - max(veritas_custody_verify_last_run_timestamp_seconds) > 8 * 3600
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Custody verification has not completed in 8 hours
+          description: The custody-verify CronJob (every 6 h) has not pushed a result.
+          runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritascustodyverifystale
+
+      - alert: VeritasBackupFailed
+        expr: |
+          max(veritas_backup_last_status) == 0
+            or time() - max(veritas_backup_last_success_timestamp_seconds) > 2 * 3600
+            or max(kube_job_status_failed{job_name=~".*veritas.*backup.*"}) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Veritas backup failed or is overdue
+          description: The hourly backup job failed or no successful backup was recorded in 2 hours.
+          runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritasbackupfailed
+
+      - alert: VeritasCertificateExpiringSoon
+        expr: (max by (name, namespace) (certmanager_certificate_expiration_timestamp_seconds{name=~".*veritas.*"}) - time()) < 14 * 86400
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "TLS certificate {{ $labels.namespace }}/{{ $labels.name }} expires in under 14 days"
+          description: cert-manager has not renewed the certificate; check the Certificate and ClusterIssuer status.
+          runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritascertificateexpiringsoon
+
+      - alert: VeritasCertificateNotReady
+        expr: max by (name, namespace) (certmanager_certificate_ready_status{name=~".*veritas.*", condition="False"}) == 1
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: "TLS certificate {{ $labels.namespace }}/{{ $labels.name }} is not ready"
+          runbook_url: https://github.com/lumidren/Digital-Forensics-Tool/blob/main/docs/RUNBOOK.md#veritascertificateexpiringsoon

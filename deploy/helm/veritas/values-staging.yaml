@@ -1,0 +1,54 @@
+# Staging overlay: helm upgrade --install veritas deploy/helm/veritas -f deploy/helm/veritas/values-staging.yaml
+# Account-specific ARNs and CIDRs come from `terraform -chdir=deploy/terraform/aws/environments/staging output`
+# and are passed by .github/workflows/deploy.yml with --set (see the "Render Terraform outputs" step).
+global:
+  awsRegion: eu-west-1
+
+config:
+  s3Bucket: veritas-evidence-staging
+  oidcIssuer: https://login.staging.veritas.example.org/realms/veritas
+  oidcAudience: veritas-staging
+  oidcJwksUrl: https://login.staging.veritas.example.org/realms/veritas/protocol/openid-connect/certs
+  corsOrigins: [https://staging.veritas.example.org]
+  retentionDays: 365
+
+externalSecrets:
+  enabled: true
+  remoteKey: veritas/staging/runtime
+
+persistence:
+  size: 50Gi
+
+api:
+  replicas: 2
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {cpu: "1", memory: 2Gi}
+
+worker:
+  gvisor:
+    enabled: false
+  resources:
+    requests: {cpu: 500m, memory: 2Gi}
+    limits: {cpu: "2", memory: 6Gi}
+  tmpSizeLimit: 50Gi
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 1
+
+web:
+  replicas: 1
+  pdb:
+    minAvailable: 0
+
+ingress:
+  host: staging.veritas.example.org
+  clusterIssuer: letsencrypt-staging
+  tlsSecretName: veritas-staging-tls
+
+networkPolicy:
+  postgresCidrs: [10.20.96.0/20, 10.20.112.0/20, 10.20.128.0/20]
+  awsEndpointCidrs: [10.20.0.0/16]
+
+backup:
+  uploadUrl: s3://veritas-backups-staging/app

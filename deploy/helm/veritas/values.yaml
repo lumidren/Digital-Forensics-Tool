@@ -1,0 +1,243 @@
+# Default values for the Veritas chart (cluster profile). Environment overlays: values-staging.yaml,
+# values-prod.yaml. Every secret value comes from a Kubernetes Secret (created by External Secrets
+# Operator from AWS Secrets Manager when externalSecrets.enabled, otherwise supplied out of band).
+
+global:
+  # AWS region used by boto3 (S3 Object Lock store) and by IRSA.
+  awsRegion: us-east-1
+  imageRegistry: ghcr.io/lumidren
+  imagePullSecrets: []
+  # Labels added to every object.
+  labels: {}
+
+image:
+  # Tag for all Veritas images; defaults to .Chart.AppVersion. Set digests below to pin by digest.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+config:
+  # Non-secret runtime settings (python/veritas/api/config.py). Secrets are in secret.* below.
+  store: s3
+  s3Bucket: veritas-evidence
+  # Leave empty on AWS; set for MinIO or another S3-compatible endpoint.
+  s3EndpointUrl: ""
+  localAuth: false
+  oidcIssuer: ""
+  oidcAudience: veritas
+  oidcJwksUrl: ""
+  tokenTtlSeconds: 28800
+  corsOrigins: []
+  retentionDays: 3650
+  maxUploadBytes: 2199023255552
+  otelEndpoint: http://otel-collector.monitoring.svc:4318
+
+secret:
+  # Name of the Secret holding VERITAS_DATABASE_URL, VERITAS_TIMELINE_URL, VERITAS_MASTER_KEY,
+  # VERITAS_SERVICE_KEY_SEED and VERITAS_BACKUP_RECIPIENT. Created by ExternalSecret when enabled.
+  name: veritas-runtime
+  # Only for throwaway environments: render a Secret from these values (never commit real values).
+  create: false
+  values: {}
+
+externalSecrets:
+  enabled: false
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: aws-secrets-manager
+  # Secrets Manager secret whose JSON keys map onto the env var names above.
+  remoteKey: veritas/runtime
+
+serviceAccounts:
+  api:
+    name: veritas-api
+    # IRSA role with s3:PutObject/GetObject on the evidence bucket, kms:Encrypt/Decrypt/GenerateDataKey.
+    roleArn: ""
+  worker:
+    name: veritas-worker
+    roleArn: ""
+  web:
+    name: veritas-web
+  ops:
+    # Used by the custody-verify and backup CronJobs.
+    name: veritas-ops
+    roleArn: ""
+
+persistence:
+  # Shared data directory (ledgers, key registry, audit log, job queue). Must be ReadWriteMany
+  # (EFS on AWS) because API, workers and CronJobs read and append the same custody ledgers.
+  enabled: true
+  existingClaim: ""
+  storageClass: efs-sc
+  accessModes: [ReadWriteMany]
+  size: 100Gi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  privileged: false
+  capabilities:
+    drop: [ALL]
+
+api:
+  image:
+    repository: veritas-api
+    digest: ""
+  replicas: 2
+  port: 8000
+  resources:
+    requests: {cpu: 500m, memory: 1Gi}
+    limits: {cpu: "2", memory: 4Gi}
+  tmpSizeLimit: 20Gi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+  pdb:
+    minAvailable: 1
+  extraEnv: []
+
+worker:
+  image:
+    repository: veritas-worker
+    digest: ""
+  # The job queue (jobs.db) is claimed without a cross-process lock today; keep 1 replica until the
+  # Postgres-backed queue lands (see docs/RUNBOOK.md "Scaling workers").
+  replicas: 1
+  # Run parsers under gVisor (requires a node pool with the runsc RuntimeClass handler).
+  gvisor:
+    enabled: false
+    runtimeClassName: gvisor
+    createRuntimeClass: false
+    handler: runsc
+  memoryBytesPerParser: 4294967296
+  cpuSecondsPerParser: 3600
+  resources:
+    requests: {cpu: "1", memory: 4Gi}
+    limits: {cpu: "4", memory: 8Gi}
+  tmpSizeLimit: 200Gi
+  # Dedicated, tainted node group (deploy/terraform/aws/modules/eks: workers group).
+  nodeSelector:
+    veritas.io/pool: workers
+  tolerations:
+    - key: veritas.io/pool
+      operator: Equal
+      value: workers
+      effect: NoSchedule
+  affinity: {}
+  pdb:
+    maxUnavailable: 1
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 1
+    keda:
+      # ScaledObject on the Prometheus veritas_queue_depth gauge plus a CPU trigger; KEDA manages the HPA.
+      enabled: true
+      serverAddress: http://kube-prometheus-stack-prometheus.monitoring.svc:9090
+      query: max(veritas_queue_depth{job="veritas-api"})
+      jobsPerReplica: "4"
+      activationThreshold: "1"
+      pollingInterval: 30
+      cooldownPeriod: 600
+      cpuUtilization: "75"
+      # Replicas held while Prometheus is unreachable.
+      fallbackReplicas: 1
+    hpa:
+      # Plain CPU HPA, rendered only when KEDA is disabled (two HPAs must never target one Deployment).
+      enabled: true
+      cpuUtilization: 75
+  extraEnv: []
+
+web:
+  image:
+    repository: veritas-web
+    digest: ""
+  replicas: 2
+  port: 3000
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {cpu: "1", memory: 512Mi}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  pdb:
+    minAvailable: 1
+  extraEnv: []
+
+ingress:
+  enabled: true
+  className: nginx
+  host: veritas.example.org
+  clusterIssuer: letsencrypt-prod
+  tlsSecretName: veritas-tls
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "Strict-Transport-Security: max-age=63072000; includeSubDomains; preload";
+
+networkPolicy:
+  enabled: true
+  # Namespace of the ingress controller allowed to reach web and api.
+  ingressNamespace: ingress-nginx
+  # Namespace of Prometheus (scrapes api /metrics) and of the Pushgateway / OTel collector.
+  monitoringNamespace: monitoring
+  # CIDRs of the RDS subnets (Postgres 5432).
+  postgresCidrs: [10.0.0.0/16]
+  postgresPort: 5432
+  clickhouse:
+    namespace: clickhouse
+    podLabels:
+      app.kubernetes.io/name: clickhouse
+    port: 8123
+  # CIDRs reaching S3 / KMS / STS interface VPC endpoints (private DNS) on 443.
+  awsEndpointCidrs: [10.0.0.0/16]
+  # Extra egress for the API only, e.g. the OIDC provider's JWKS endpoint.
+  apiExtraEgress: []
+
+metrics:
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    labels:
+      release: kube-prometheus-stack
+  prometheusRule:
+    enabled: true
+    labels:
+      release: kube-prometheus-stack
+  pushgateway:
+    url: http://prometheus-pushgateway.monitoring.svc:9091
+
+custodyVerify:
+  enabled: true
+  schedule: "17 */6 * * *"
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {cpu: "1", memory: 1Gi}
+
+backup:
+  enabled: true
+  schedule: "5 * * * *"
+  # s3://bucket/prefix receiving encrypted .vbk archives (cross-region replicated, Object Lock).
+  uploadUrl: ""
+  # ClickHouse BACKUP destination; see scripts/backup/backup.py --clickhouse-target.
+  clickhouseTarget: ""
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {cpu: "2", memory: 2Gi}
+  scratchSizeLimit: 50Gi

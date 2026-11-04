@@ -1,0 +1,51 @@
+{{- if .Values.metrics.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "veritas.fullname" . }}-api
+  labels:
+    {{- include "veritas.labels" . | nindent 4 }}
+    {{- with .Values.metrics.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  jobLabel: veritas.io/job
+  selector:
+    matchLabels:
+      {{- include "veritas.selector" (dict "ctx" $ "component" "api") | nindent 6 }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.metrics.serviceMonitor.interval }}
+      scrapeTimeout: 20s
+{{- end }}
+---
+{{- if .Values.metrics.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "veritas.fullname" . }}
+  labels:
+    {{- include "veritas.labels" . | nindent 4 }}
+    {{- with .Values.metrics.prometheusRule.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  # Same content as deploy/observability/prometheus/alerts.yml (CI checks the two copies are identical).
+{{ .Files.Get "files/alerts.yml" | indent 2 }}
+{{- end }}
+---
+{{- if or .Values.custodyVerify.enabled .Values.backup.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "veritas.fullname" . }}-ops-scripts
+  labels:
+    {{- include "veritas.labels" . | nindent 4 }}
+data:
+  custody_verify.py: |
+{{ .Files.Get "files/custody_verify.py" | indent 4 }}
+{{- end }}
