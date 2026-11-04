@@ -18,6 +18,8 @@ import zipfile
 from typing import Any, Iterator
 from xml.etree import ElementTree
 
+import defusedxml.ElementTree as SafeET
+
 from veritas.parsers.base import BaseParser, ParserError, Provenance, clip
 from veritas.timeline.schema import Desc, Event, filetime_to_ns, iso_to_ns
 
@@ -102,7 +104,7 @@ def parse_property_set(data: bytes) -> dict[int, Any]:
 def _xml(data: bytes) -> ElementTree.Element:
     if b"<!DOCTYPE" in data[:4096].upper() or b"<!ENTITY" in data.upper():
         raise ValueError("refusing XML with DOCTYPE/ENTITY declarations")
-    return ElementTree.fromstring(data)
+    return SafeET.fromstring(data)
 
 
 def _local(tag: str) -> str:

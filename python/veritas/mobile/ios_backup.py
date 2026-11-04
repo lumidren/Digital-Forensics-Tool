@@ -41,7 +41,7 @@ PII_KEYS = ("IMEI", "MEID", "Phone Number", "Serial Number", "ICCID", "Unique Id
 
 
 def file_id(domain: str, relative_path: str) -> str:
-    return hashlib.sha1(f"{domain}-{relative_path}".encode("utf-8")).hexdigest()
+    return hashlib.sha1(f"{domain}-{relative_path}".encode("utf-8"), usedforsecurity=False).hexdigest()  # iOS backup naming scheme
 
 
 @dataclass(slots=True)
@@ -208,7 +208,7 @@ def _status_event(backup: IosBackup, sha: str) -> list:
 
 def _app_events(backup: IosBackup, sha: str) -> list:
     apps = backup.manifest_plist.get("Applications")
-    out = []
+    out: list[Any] = []
     if not isinstance(apps, dict):
         return out
     for index, bundle_id in enumerate(sorted(apps)):

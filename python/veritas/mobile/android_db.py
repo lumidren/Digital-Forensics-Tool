@@ -6,6 +6,8 @@ Every function takes a path or bytes and returns a :class:`ParseResult`. They wo
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+
+import defusedxml.ElementTree as SafeET
 from typing import Any, Callable
 
 from veritas.timeline.schema import Desc
@@ -294,7 +296,7 @@ def parse_webview(source, *, evidence_path: str = "", evidence_sha256: str = "")
             for table in ("password", "httpauth"):
                 if table not in names:
                     continue
-                for row in conn.execute(f'SELECT * FROM "{table}" ORDER BY _id'):
+                for row in conn.execute(f'SELECT * FROM "{table}" ORDER BY _id'):  # nosec B608 - table name chosen from a fixed tuple
                     attrs = {
                         "id": col(row, "_id"), "table": table, "host": text(col(row, "host")),
                         "realm": text(col(row, "realm")), "username": text(col(row, "username")),
@@ -376,7 +378,7 @@ def parse_packages_xml(source, *, evidence_path: str = "", evidence_sha256: str 
         if b"<!DOCTYPE" in data or b"<!ENTITY" in data:
             raise ParserError("packages.xml with DTD refused")
         try:
-            root = ET.fromstring(data)
+            root = SafeET.fromstring(data)
         except ET.ParseError as exc:
             raise ParserError(f"packages.xml: invalid XML: {exc}") from exc
         if root.tag != "packages":
