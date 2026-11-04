@@ -38,6 +38,11 @@ fn four_times(crtime: u64, mtime: u64, atime: u64, ctime: u64) -> [(&'static str
 /// `fs:stat:ntfs` events: one per non-zero timestamp of $STANDARD_INFORMATION and of each $FILE_NAME.
 pub fn ntfs_entry_events(ctx: &Ctx, entries: &[FileEntry]) -> Vec<Event> {
     let mut out = Vec::new();
+    // Timestomp indicators per MFT entry ($SI vs $FN only; USN-based checks run in analytics).
+    let mut stomp: std::collections::BTreeMap<u64, std::collections::BTreeSet<String>> = std::collections::BTreeMap::new();
+    for f in crate::ntfs::timestomp::detect(entries, &[]) {
+        stomp.entry(f.entry).or_default().insert(f.rule);
+    }
     for e in entries {
         if !e.is_base() {
             continue;
@@ -46,6 +51,24 @@ pub fn ntfs_entry_events(ctx: &Ctx, entries: &[FileEntry]) -> Vec<Event> {
         let name = e.name().unwrap_or_default().to_string();
         let display = format!("NTFS:{path}");
         let pref = e.best_name().map(|f| format!("{}-{}", f.parent_entry, f.parent_sequence)).unwrap_or_default();
+        // $SI and primary $FN times on every event of the entry, so analytics can compare them
+        // without re-reading the MFT.
+        let mut entry_times: Vec<(String, serde_json::Value)> = Vec::new();
+        if let Some(si) = &e.si {
+            for (k, v) in [("si_crtime_ns", si.crtime), ("si_mtime_ns", si.mtime), ("si_atime_ns", si.atime), ("si_ctime_ns", si.ctime)] {
+                if let Some(ns) = filetime_to_ns(v) {
+                    entry_times.push((k.to_string(), ns.into()));
+                }
+            }
+        }
+        if let Some(f) = e.best_name() {
+            for (k, v) in [("fn_crtime_ns", f.crtime), ("fn_mtime_ns", f.mtime), ("fn_atime_ns", f.atime), ("fn_ctime_ns", f.ctime)] {
+                if let Some(ns) = filetime_to_ns(v) {
+                    entry_times.push((k.to_string(), ns.into()));
+                }
+            }
+        }
+        let indicators: Vec<String> = stomp.get(&e.entry).map(|s| s.iter().cloned().collect()).unwrap_or_default();
         let mut push = |attr_type: u32, aname: &str, parent: &str, times: [(&'static str, Option<i64>); 4], source: &str| {
             for (d, t) in times {
                 if t.is_none() {
@@ -64,6 +87,12 @@ pub fn ntfs_entry_events(ctx: &Ctx, entries: &[FileEntry]) -> Vec<Event> {
                         .attr("display_name", display.clone()),
                 );
                 if let Some(last) = out.last_mut() {
+                    for (k, v) in &entry_times {
+                        last.attrs.insert(k.clone(), v.clone());
+                    }
+                    if !indicators.is_empty() {
+                        last.attrs.insert("timestomp_indicators".into(), indicators.clone().into());
+                    }
                     last.source_short = "FILE".into();
                     last.source_long = format!("NTFS {source}");
                 }
