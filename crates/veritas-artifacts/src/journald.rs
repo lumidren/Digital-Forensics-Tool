@@ -159,6 +159,12 @@ pub fn parse(d: &[u8]) -> Result<Journal> {
             errors.push(format!("entry array cycle at {arr}"));
             break;
         }
+        // Offsets come from the file; reject out-of-range values before any arithmetic on them
+        // (found by cargo-fuzz: `o + 8` overflowed for offsets near usize::MAX).
+        if arr >= d.len() as u64 {
+            errors.push(format!("entry array offset {arr} beyond end of file"));
+            break;
+        }
         let o = arr as usize;
         let (typ, size) = match (u8_at(d, o), u64_at(d, o + 8)) {
             (Ok(t), Ok(s)) => (t, s as usize),
@@ -188,7 +194,7 @@ pub fn parse(d: &[u8]) -> Result<Journal> {
     }
     let mut entries = Vec::with_capacity(offsets.len());
     for off in offsets {
-        match parse_entry(d, off as usize, header.compact) {
+        match parse_entry(d, usize::try_from(off).unwrap_or(usize::MAX), header.compact) {
             Ok(e) => entries.push(e),
             Err(e) => errors.push(format!("entry at {off}: {e}")),
         }
@@ -197,6 +203,9 @@ pub fn parse(d: &[u8]) -> Result<Journal> {
 }
 
 fn parse_entry(d: &[u8], o: usize, compact: bool) -> Result<Entry> {
+    if o >= d.len() {
+        return Err(ParseError::Truncated { offset: o, needed: 64, available: 0 });
+    }
     let typ = u8_at(d, o)?;
     let size = u64_at(d, o + 8)? as usize;
     if typ != OBJ_ENTRY || size < 64 {
@@ -237,6 +246,9 @@ enum DataPayload {
 }
 
 fn read_data(d: &[u8], o: usize, compact: bool) -> Result<DataPayload> {
+    if o >= d.len() {
+        return Err(ParseError::Truncated { offset: o, needed: 64, available: 0 });
+    }
     let typ = u8_at(d, o)?;
     let flags = u8_at(d, o + 1)?;
     let size = u64_at(d, o + 8)? as usize;
