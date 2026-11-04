@@ -1,0 +1,72 @@
+# Project rules run by CI next to the p/default, p/python, p/rust, p/typescript and p/secrets packs.
+rules:
+  - id: veritas-subprocess-shell-true
+    languages: [python]
+    severity: ERROR
+    message: Parsers and tools must never run through a shell; pass an argument list (evidence names are attacker-controlled).
+    pattern-either:
+      - pattern: subprocess.$F(..., shell=True, ...)
+      - pattern: os.system(...)
+      - pattern: os.popen(...)
+
+  - id: veritas-unsafe-yaml-load
+    languages: [python]
+    severity: ERROR
+    message: Use yaml.safe_load; yaml.load can construct arbitrary objects.
+    patterns:
+      - pattern: yaml.load(...)
+      - pattern-not: yaml.load(..., Loader=yaml.SafeLoader, ...)
+      - pattern-not: yaml.load(..., Loader=yaml.CSafeLoader, ...)
+
+  - id: veritas-tar-extract-without-filter
+    languages: [python]
+    severity: ERROR
+    message: tarfile extraction must use filter="data" (or validated members) to block path traversal and links.
+    patterns:
+      - pattern-either:
+          - pattern: $T.extractall(...)
+          - pattern: $T.extract(...)
+      - pattern-not: $T.extractall(..., filter="data", ...)
+      - pattern-not: $T.extract(..., filter="data", ...)
+    paths:
+      include: ["scripts/**", "python/veritas/**"]
+
+  - id: veritas-secret-in-log
+    languages: [python]
+    severity: ERROR
+    message: Never log key material or credentials (master key, seeds, passwords, tokens).
+    pattern-either:
+      - pattern: $LOG.$LEVEL(..., <... os.environ["VERITAS_MASTER_KEY"] ...>, ...)
+      - pattern: $LOG.$LEVEL(..., <... os.environ.get("VERITAS_MASTER_KEY") ...>, ...)
+      - pattern: print(..., <... os.environ["VERITAS_MASTER_KEY"] ...>, ...)
+      - pattern: $LOG.$LEVEL(..., <... $X.master_key_hex ...>, ...)
+
+  - id: veritas-pickle-on-evidence
+    languages: [python]
+    severity: ERROR
+    message: pickle/marshal must never deserialize evidence or uploaded data.
+    pattern-either:
+      - pattern: pickle.load(...)
+      - pattern: pickle.loads(...)
+      - pattern: marshal.loads(...)
+
+  - id: veritas-rust-unwrap-in-parser
+    languages: [rust]
+    severity: WARNING
+    message: Parsers handle hostile input; prefer returning an error to unwrap()/expect() on parsed data.
+    pattern-either:
+      - pattern: $X.unwrap()
+      - pattern: $X.expect(...)
+    paths:
+      include: ["crates/veritas-fs/src/**", "crates/veritas-artifacts/src/**", "crates/veritas-ewf/src/**"]
+      exclude: ["**/tests/**", "**/bin/**"]
+
+  - id: veritas-k8s-privileged
+    languages: [yaml]
+    severity: ERROR
+    message: No privileged containers or privilege escalation in Veritas manifests.
+    pattern-either:
+      - pattern: "privileged: true"
+      - pattern: "allowPrivilegeEscalation: true"
+    paths:
+      include: ["deploy/**"]

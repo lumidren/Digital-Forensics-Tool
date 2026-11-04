@@ -1,0 +1,13 @@
+# Accepted Trivy findings. Each entry needs a reason, an owner and a review date; CI fails on any
+# HIGH/CRITICAL finding not listed here (.github/workflows/ci.yml, images.yml).
+#
+# AVD-AWS-0089 (S3 bucket logging): the central log bucket (deploy/terraform/aws/modules/log_bucket) is the
+# target of server access logs; logging it to itself would recurse. Owner: platform. Review: 2027-05-01.
+AVD-AWS-0089
+# AVD-AWS-0132 (S3 encryption with customer-managed key): the same log bucket must use SSE-S3 because S3
+# server access logs and ALB access logs cannot be delivered to SSE-KMS buckets. Holds no evidence.
+# Owner: platform. Review: 2027-05-01.
+AVD-AWS-0132
+# AVD-AWS-0053 (public load balancer): the ALB is intentionally internet-facing, fronted by AWS WAF with
+# managed rule groups and a rate limit. Owner: platform. Review: 2027-05-01.
+AVD-AWS-0053
