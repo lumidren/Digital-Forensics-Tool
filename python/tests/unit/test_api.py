@@ -203,3 +203,22 @@ def test_metrics_and_headers(client):
     r = client.get("/metrics")
     assert r.status_code == 200 and b"veritas_queue_depth" in r.content
     assert r.headers["X-Frame-Options"] == "DENY"
+
+
+def test_rerunning_rules_replaces_untouched_proposals(client):
+    cid, a, b, e = make_case(client)
+    ctx = client.app_ctx
+    seed_events(client, cid, "a" * 64)
+    client.post(f"/api/v1/cases/{cid}/findings/run", headers=a)
+    first = {f["id"]: f for f in client.get(f"/api/v1/cases/{cid}/findings", headers=a).json()}
+    lat = next(f for f in first.values() if f["rule"] == "lateral_movement")
+    keep = next(f for f in first.values() if f["id"] != lat["id"])
+    client.post(f"/api/v1/cases/{cid}/findings/{keep['id']}/action", json={"action": "confirm", "text": "examiner reviewed this one"}, headers=a)
+    # New evidence changes the supporting events, so rules produce new IDs for the same subjects.
+    seed_events(client, cid, "b" * 64)
+    client.post(f"/api/v1/cases/{cid}/findings/run", headers=a)
+    second = client.get(f"/api/v1/cases/{cid}/findings", headers=a).json()
+    titles = [f["title"] for f in second if f["state"] == "proposed"]
+    assert len(titles) == len(set(titles)), titles  # no stale duplicates
+    assert lat["id"] not in {f["id"] for f in second}
+    assert any(f["id"] == keep["id"] and f["state"] == "confirmed" for f in second)  # human decisions survive

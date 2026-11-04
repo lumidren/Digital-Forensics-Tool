@@ -55,11 +55,23 @@ def upsert_proposal(s, case_id: str, f: Finding) -> bool:
 
 
 def run_rules(ctx, case_id: str) -> int:
+    """Re-evaluate every rule over the whole case.
+
+    Rules always see the complete timeline, so their output supersedes earlier proposals. Proposals
+    nobody has acted on (state ``proposed``, never confirmed, origin ``rule``) that the current run
+    no longer produces are removed, so re-running after each new evidence item does not accumulate
+    stale variants. Anything a person touched is kept unchanged.
+    """
     findings = FindingsEngine().run(ctx.timeline.iter_events(case_id))
     created = 0
+    current = {f.finding_id for f in findings}
     with ctx.Session() as s:
         for f in findings:
             created += upsert_proposal(s, case_id, f)
+        stale = s.query(FindingRow).filter_by(case_id=case_id, state="proposed", origin="rule", confirmed_by=None).all()
+        for row in stale:
+            if row.id not in current and not row.reviewer_comment:
+                s.delete(row)
         s.commit()
     return created
 
