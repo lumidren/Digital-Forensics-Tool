@@ -19,9 +19,11 @@
     "format:check": "prettier --check .",
     "gen:api": "openapi-typescript lib/openapi.json -o lib/api-schema.d.ts --default-non-nullable false",
     "e2e": "playwright test",
-    "lhci": "node scripts/lhci.ts"
+    "lhci": "node scripts/lhci.ts",
+    "screenshots": "node scripts/screenshots.ts"
   },
   "dependencies": {
+    "@dagrejs/dagre": "3.1.1",
     "@tanstack/react-query": "^5.105.3",
     "@tanstack/react-virtual": "^3.14.26",
     "@xyflow/react": "^12.12.1",
