@@ -1,0 +1,6 @@
+bucket         = "veritas-tfstate-prod"
+key            = "veritas/prod/terraform.tfstate"
+region         = "eu-west-1"
+dynamodb_table = "veritas-terraform-locks"
+encrypt        = true
+kms_key_id     = "alias/veritas-terraform-state"
