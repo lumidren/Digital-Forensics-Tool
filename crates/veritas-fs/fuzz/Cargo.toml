@@ -1,0 +1,52 @@
+[package]
+name = "veritas-fs-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+license = "Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+veritas-fs = { path = ".." }
+
+# Keep the fuzz crate out of the main workspace (it needs nightly + libFuzzer).
+[workspace]
+
+[[bin]]
+name = "image"
+path = "fuzz_targets/image.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "mft"
+path = "fuzz_targets/mft.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "usn"
+path = "fuzz_targets/usn.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "logfile"
+path = "fuzz_targets/logfile.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "vss"
+path = "fuzz_targets/vss.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "carve"
+path = "fuzz_targets/carve.rs"
+test = false
+doc = false
