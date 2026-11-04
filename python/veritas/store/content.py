@@ -21,6 +21,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import secrets
 import stat
 from dataclasses import asdict, dataclass
@@ -257,12 +258,24 @@ class LocalStore:
             return io.BufferedReader(DecryptingReader(fh, self.keyring.case_key(m.case_id), m.case_id), buffer_size=FRAME_SIZE)
         return fh
 
-    def materialize(self, address: str, dest_dir: str | Path) -> Path:
-        """Plaintext copy for tools that need a file path (parsers, Volatility). Caller deletes it."""
+    def materialize(self, address: str, dest_dir: str | Path, name: str | None = None) -> Path:
+        """Plaintext file for tools that need a path (parsers, Volatility). Caller deletes ``dest_dir``.
+
+        With ``name``, the file appears under that name (sanitized to a single path component) so
+        that parsers which use the file name to choose a format see the original name. Unencrypted
+        objects are hard-linked when possible; the committed object stays read-only either way.
+        """
         m = self.meta(address)
-        if not m.encrypted:
+        safe = re.sub(r"[^A-Za-z0-9._ -]", "_", Path(name).name)[:200] if name else None
+        if not m.encrypted and not safe:
             return self._obj(address)
-        dest = Path(dest_dir) / address
+        dest = Path(dest_dir) / (safe or address)
+        if not m.encrypted:
+            try:
+                os.link(self._obj(address), dest)
+                return dest
+            except OSError:
+                pass
         with self.open(address) as src, open(dest, "wb") as out:
             for chunk in iter(lambda: src.read(FRAME_SIZE), b""):
                 out.write(chunk)
