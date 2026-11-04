@@ -1,0 +1,115 @@
+[
+ {
+  "crate": "veritas-artifacts",
+  "target": "evtx",
+  "ok": true,
+  "executions": "44",
+  "coverage_edges": "2438",
+  "seconds": 63
+ },
+ {
+  "crate": "veritas-artifacts",
+  "target": "prefetch",
+  "ok": true,
+  "executions": "20083",
+  "coverage_edges": "933",
+  "seconds": 62
+ },
+ {
+  "crate": "veritas-artifacts",
+  "target": "lnk",
+  "ok": true,
+  "executions": "91850",
+  "coverage_edges": "2243",
+  "seconds": 62
+ },
+ {
+  "crate": "veritas-artifacts",
+  "target": "shellitems",
+  "ok": true,
+  "executions": "626181",
+  "coverage_edges": "1202",
+  "seconds": 62
+ },
+ {
+  "crate": "veritas-artifacts",
+  "target": "olecf",
+  "ok": true,
+  "executions": "19951",
+  "coverage_edges": "2628",
+  "seconds": 62
+ },
+ {
+  "crate": "veritas-artifacts",
+  "target": "journald",
+  "ok": true,
+  "executions": "398184",
+  "coverage_edges": "263",
+  "seconds": 97,
+  "note": "first run panicked (u64 offset overflow, fixed in journald.rs; regression test journald_regressions.rs); this is the re-run after the fix"
+ },
+ {
+  "crate": "veritas-artifacts",
+  "target": "plist",
+  "ok": true,
+  "executions": "93875",
+  "coverage_edges": "3029",
+  "seconds": 62
+ },
+ {
+  "crate": "veritas-artifacts",
+  "target": "regf",
+  "ok": true,
+  "executions": "282",
+  "coverage_edges": "3630",
+  "seconds": 63
+ },
+ {
+  "crate": "veritas-fs",
+  "target": "image",
+  "ok": true,
+  "executions": "24383",
+  "coverage_edges": "1853",
+  "seconds": 62
+ },
+ {
+  "crate": "veritas-fs",
+  "target": "mft",
+  "ok": true,
+  "executions": "22913",
+  "coverage_edges": "1064",
+  "seconds": 62
+ },
+ {
+  "crate": "veritas-fs",
+  "target": "usn",
+  "ok": true,
+  "executions": "405181",
+  "coverage_edges": "277",
+  "seconds": 62
+ },
+ {
+  "crate": "veritas-fs",
+  "target": "logfile",
+  "ok": true,
+  "executions": "2069307",
+  "coverage_edges": "121",
+  "seconds": 102
+ },
+ {
+  "crate": "veritas-fs",
+  "target": "vss",
+  "ok": true,
+  "executions": "1720005",
+  "coverage_edges": "56",
+  "seconds": 94
+ },
+ {
+  "crate": "veritas-fs",
+  "target": "carve",
+  "ok": true,
+  "executions": "7258",
+  "coverage_edges": "401",
+  "seconds": 62
+ }
+]
