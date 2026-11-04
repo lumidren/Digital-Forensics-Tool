@@ -18,7 +18,6 @@ import gzip
 import hashlib
 import io
 import json
-import os
 import plistlib
 import re
 import shutil

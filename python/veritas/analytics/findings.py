@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable, Iterator, Protocol
+from typing import Any, Iterable, Iterator, Protocol
 
 from ..timeline.schema import Event
 from ..timeline.store import StoredEvent
@@ -85,7 +85,7 @@ class FindingsEngine:
     """Runs every registered rule over a case's events and returns proposed findings."""
 
     def __init__(self, rules: list[Rule] | None = None):
-        from . import antiforensics, execution, ioc, lateral, persistence, provenance, timestomp, user_activity
+        from . import antiforensics, execution, lateral, persistence, provenance, timestomp, user_activity
 
         self.rules: list[Rule] = rules or [
             timestomp.TimestompRule(), antiforensics.AntiForensicsRule(), execution.ExecutionCorrelationRule(),

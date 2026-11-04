@@ -387,7 +387,14 @@ class S3Store:
     def verify(self, address: str) -> bool:
         m = self.meta(address)
         h = MultiHasher()
-        with self.open(address) as fh:
-            for chunk in iter(lambda: fh.read(FRAME_SIZE), b""):
-                h.update(chunk)
+        try:
+            with self.open(address) as fh:
+                for chunk in iter(lambda: fh.read(FRAME_SIZE), b""):
+                    h.update(chunk)
+        except CorruptObject:
+            return False
         return h.finalize() == m.hashes
+
+    def iter_verify(self) -> Iterator[tuple[str, bool]]:
+        for a in self.list():
+            yield a, self.verify(a)

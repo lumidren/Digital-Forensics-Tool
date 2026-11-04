@@ -56,7 +56,7 @@ class AppFirewallParser(TextLogParser):
         msg = f"Computer: {attrs['computer_name']} Agent: {attrs['agent']} Status: {attrs['status']} " \
               f"Process name: {attrs['process_name']} Log: {attrs['action']}"
         yield self.event("macos:appfirewall_log:entry", "Added Time", msg, ts, offset=lineno, attrs=attrs,
-                         host=attrs["computer_name"])
+                         host=str(attrs["computer_name"]) if attrs["computer_name"] is not None else None)
 
 
 PARSERS = [AppFirewallParser]

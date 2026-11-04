@@ -312,7 +312,8 @@ class PcapParser(BaseParser):
         if len(head) < 8:
             if fl.dirs[1].buffered > 4096 and not d.segs:
                 fl.stream = False  # server-first protocol
-                fl.dirs[0].segs.clear(); fl.dirs[1].segs.clear()
+                fl.dirs[0].segs.clear()
+                fl.dirs[1].segs.clear()
             return
         if httpp.looks_like_http_request(head):
             fl.service = "http"

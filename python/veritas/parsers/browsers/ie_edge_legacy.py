@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pathlib
 import struct
-from typing import Iterator
+from typing import Any, Iterator
 
 from veritas.parsers.base import BaseParser, ParserError, Provenance, clip
 from veritas.parsers.esedb_safe import get_table, is_esedb, iter_rows, open_esedb, table_names
@@ -90,7 +90,7 @@ class MsiecfParser(BaseParser):
         cache_type = "history" if b"Visited:" in data[FIRST_BLOCK:FIRST_BLOCK + 0x20000] or "MSHist" in path else "cache"
 
         allocated = set()
-        seen_tables = set()
+        seen_tables: set[Any] = set()
         off = hash_off
         while 0 < off < end - 16 and off not in seen_tables and len(seen_tables) < 4096:
             seen_tables.add(off)

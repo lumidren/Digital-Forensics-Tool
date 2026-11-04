@@ -198,7 +198,7 @@ class ExecutionCorrelationRule:
         for name, row in rows.items():
             for h in row.sha1:
                 by_hash[h].add(name)
-        for h, names in sorted(by_hash.items()):
-            if len(names) > 1:
-                evs = [by_id[i] for n in names for ids in rows[n].sources.values() for i in ids if i in by_id]
-                yield mk_finding(self.name, f"Same binary under several names ({', '.join(sorted(names))})", f"Amcache records SHA-1 {h} for more than one file name, consistent with a renamed tool.", "medium", 0.7, "defense-evasion", evs, ["T1036"], {"sha1": h, "names": sorted(names)})
+        for h, name_set in sorted(by_hash.items()):
+            if len(name_set) > 1:
+                evs = [by_id[i] for n in name_set for ids in rows[n].sources.values() for i in ids if i in by_id]
+                yield mk_finding(self.name, f"Same binary under several names ({', '.join(sorted(name_set))})", f"Amcache records SHA-1 {h} for more than one file name, consistent with a renamed tool.", "medium", 0.7, "defense-evasion", evs, ["T1036"], {"sha1": h, "names": sorted(name_set)})

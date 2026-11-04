@@ -23,7 +23,7 @@ import json
 import os
 import struct
 from dataclasses import dataclass, field
-from typing import BinaryIO, Callable, Iterable
+from typing import Any, BinaryIO, Callable, Iterable
 
 BLOCK_SIZE = 4 * 1024 * 1024
 #: Largest single APFS file extracted by :func:`decrypt_apfs`.
@@ -369,7 +369,7 @@ def list_apfs(image: str, *, password: str | None = None, recovery_password: str
     """Sorted paths of every entry in every (unlocked) APFS volume (volume name prefix when >1)."""
     with open(image, "rb") as f:
         _, vols = _apfs_volumes(image, f, password, recovery_password)
-        out = []
+        out: list[Any] = []
         for v in vols:
             pre = f"/{v.name}" if len(vols) > 1 else ""
             out.extend(pre + p for p, _ in _walk_apfs(v.get_root_directory(), ""))
@@ -396,6 +396,7 @@ def decrypt_apfs(image: str, output_dir: str, *, password: str | None = None,
         _, vols = _apfs_volumes(image, f, password, recovery_password)
         for v in vols:
             pre = f"/{v.name}" if len(vols) > 1 else ""
+            e: Any
             for path, e in _walk_apfs(v.get_root_directory(), pre):
                 mode = e.file_mode & 0o170000
                 rec = {"path": path, "identifier": e.identifier, "size": e.size, "mode": e.file_mode}

@@ -10,7 +10,7 @@ flags executables under /tmp, /dev/shm, /var/tmp or hidden paths and shell downl
 from __future__ import annotations
 
 import re
-from typing import Iterator
+from typing import Any, Iterator
 
 from veritas.parsers.base import Provenance
 from veritas.parsers.text_log import TextLogParser, is_text
@@ -68,7 +68,7 @@ class SystemdUnitParser(TextLogParser):
     def finish(self) -> Iterator[Event]:
         if not self.values:
             return
-        attrs = {"unit": self.unit}
+        attrs: dict[str, Any] = {"unit": self.unit}
         for k in KEYS:
             if k in self.values:
                 v = self.values[k]

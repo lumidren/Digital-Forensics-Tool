@@ -116,7 +116,7 @@ def _apply_windows_job_limit(proc: subprocess.Popen, memory_mb: int) -> bool:
         return False
     hproc = kernel32.OpenProcess(0x1F0FFF, False, proc.pid)
     ok = bool(hproc and kernel32.AssignProcessToJobObject(job, hproc))
-    proc._veritas_job = job  # keep the handle alive for the lifetime of the process
+    setattr(proc, "_veritas_job", job)  # keep the handle alive for the lifetime of the process
     return ok
 
 

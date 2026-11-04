@@ -91,8 +91,8 @@ class TimestompRule:
             elif e.data_type == "fs:ntfs:usn_change" and e.timestamp is not None and a.get("file_reference"):
                 reasons = str(a.get("update_reason") or a.get("update_reason_flags") or a.get("reason") or "")
                 if any(r in reasons for r in DATA_CHANGE):
-                    key = (_volume(e.evidence_path), str(a["file_reference"]))
-                    usn_change[key] = max(usn_change.get(key, 0), e.timestamp)
+                    ukey = (_volume(e.evidence_path), str(a["file_reference"]))
+                    usn_change[ukey] = max(usn_change.get(ukey, 0), e.timestamp)
 
         # Per-directory share of entries with the creation anomaly (peer-group context).
         by_dir: dict[tuple[str, str], list[bool]] = defaultdict(list)

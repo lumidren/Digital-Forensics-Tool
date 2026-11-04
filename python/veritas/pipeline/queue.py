@@ -216,7 +216,7 @@ class Processor:
                         continue
                     kind = {"$j": "usn", "$usnjrnl:$j": "usn", "$logfile": "logfile"}.get(name, kind)
                 try:
-                    r = self._parse_object(case_id, ev.id, address, item["path"], kind, clock, step)
+                    self._parse_object(case_id, ev.id, address, item["path"], kind, clock, step)
                     results["parsed"] += 1
                 except Exception as exc:  # one bad artifact never fails the image
                     results["failed"].append({"path": item["path"], "error": str(exc)[:300]})

@@ -77,13 +77,14 @@ class TokenService:
 
     def issue(self, user_id: str) -> str:
         now = int(time.time())
-        return jwt.encode({"sub": user_id, "iss": "veritas-local", "aud": "veritas", "iat": now, "nbf": now, "exp": now + self.ttl_s}, self._priv, algorithm="EdDSA")
+        return jwt.encode({"sub": user_id, "iss": "veritas-local", "aud": "veritas", "iat": now, "nbf": now, "exp": now + self.ttl_s}, self._priv, algorithm="EdDSA")  # type: ignore[arg-type]
 
     def verify(self, token: str) -> dict:
         try:
             header = jwt.get_unverified_header(token)
             if header.get("alg") == "EdDSA":
-                return jwt.decode(token, self._pub, algorithms=["EdDSA"], audience="veritas", issuer="veritas-local", options={"require": ["exp", "sub", "iat"]})
+                return jwt.decode(token, self._pub, algorithms=["EdDSA"], audience="veritas", issuer="veritas-local",  # type: ignore[arg-type]
+                                  options={"require": ["exp", "sub", "iat"]})
             if self._jwks is None:
                 raise jwt.InvalidTokenError("OIDC is not configured")
             key = self._jwks.get_signing_key_from_jwt(token).key

@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import re
 from typing import Iterator
@@ -54,7 +55,7 @@ def _split_options(text: str) -> tuple[str, str]:
 def _fingerprint(b64: str) -> str | None:
     try:
         raw = base64.b64decode(b64, validate=True)
-    except (ValueError, base64.binascii.Error):
+    except (ValueError, binascii.Error):
         return None
     return "SHA256:" + base64.b64encode(hashlib.sha256(raw).digest()).decode().rstrip("=")
 

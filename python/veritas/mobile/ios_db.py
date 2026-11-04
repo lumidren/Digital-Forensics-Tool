@@ -202,7 +202,7 @@ def parse_photos(source, *, evidence_path: str = "", evidence_sha256: str = "") 
             table = "ZASSET" if "ZASSET" in names else "ZGENERICASSET" if "ZGENERICASSET" in names else None
             if table is None:
                 raise ParserError("Photos.sqlite: neither ZASSET nor ZGENERICASSET present")
-            for row in conn.execute(f"SELECT * FROM {table} ORDER BY Z_PK"):
+            for row in conn.execute(f"SELECT * FROM {table} ORDER BY Z_PK"):  # nosec B608 - identifiers chosen from fixed names; integer cast
                 pk = col(row, "Z_PK")
                 lat, lon = col(row, "ZLATITUDE"), col(row, "ZLONGITUDE")
                 has_loc = isinstance(lat, (int, float)) and isinstance(lon, (int, float)) and lat != -180.0 and lon != -180.0 and not (lat == 0 and lon == 0)
@@ -418,7 +418,7 @@ def parse_notes(source, *, evidence_path: str = "", evidence_sha256: str = "") -
             cols = columns(conn, "ZICCLOUDSYNCINGOBJECT")
             title_col = "ZTITLE1" if "ZTITLE1" in cols else "ZTITLE"
             where = f"Z_ENT = {int(ent)}" if ent is not None else f"{title_col} IS NOT NULL"
-            for row in conn.execute(f"SELECT * FROM ZICCLOUDSYNCINGOBJECT WHERE {where} ORDER BY Z_PK"):
+            for row in conn.execute(f"SELECT * FROM ZICCLOUDSYNCINGOBJECT WHERE {where} ORDER BY Z_PK"):  # nosec B608 - identifiers chosen from fixed names; integer cast
                 pk = col(row, "Z_PK")
                 attrs = {
                     "pk": pk, "title": text(col(row, title_col)), "snippet": text(col(row, "ZSNIPPET")),

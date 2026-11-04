@@ -44,7 +44,7 @@ class NotificationCenterParser(BaseParser):
                 raise ParserError("notification_center: no record table")
             join = "LEFT JOIN app ON record.app_id = app.app_id" if has_table(conn, "app") else ""
             ident = "app.identifier AS bundle" if join else "NULL AS bundle"
-            sql = f"SELECT record.*, {ident} FROM record {join} ORDER BY record.rec_id"
+            sql = f"SELECT record.*, {ident} FROM record {join} ORDER BY record.rec_id"  # nosec B608 - fragments are code constants chosen by schema checks
             for idx, row in enumerate(rows(conn, sql), 1):
                 try:
                     plist = _decode(row["data"] if "data" in row.keys() else None)

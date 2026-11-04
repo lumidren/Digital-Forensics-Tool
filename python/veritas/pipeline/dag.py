@@ -115,7 +115,7 @@ class JobStore:
 
     def set_job(self, job_id: str, state: str, error: str | None = None) -> None:
         release = ", claimed_by = NULL, lease_until = NULL" if state != RUNNING else ""
-        self._x("UPDATE jobs SET state = :s, updated = :t, error = :e" + release + " WHERE job_id = :j", s=state, t=self._now(), e=error, j=job_id)
+        self._x("UPDATE jobs SET state = :s, updated = :t, error = :e" + release + " WHERE job_id = :j", s=state, t=self._now(), e=error, j=job_id)  # nosec B608 - constant SQL fragments only; values are bound parameters
 
     def claim(self, job_id: str) -> bool:
         """Atomically take ``job_id`` if it is pending or its lease expired."""

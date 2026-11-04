@@ -92,7 +92,8 @@ class AuditLog:
 
     def rows(self, case_id: str | None = None, actor: str | None = None, limit: int = 1000, offset: int = 0) -> Iterator[AuditRow]:
         sql = "SELECT seq, ts, actor, action, case_id, target, detail, prev_hash, row_hash FROM audit"
-        clauses, params = [], []
+        clauses: list[str] = []
+        params: list[Any] = []
         if case_id is not None:
             clauses.append("case_id = ?")
             params.append(case_id)

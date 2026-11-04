@@ -127,7 +127,7 @@ class PstParser(BaseParser):
 
     def _message(self, msg, folder_path: str, index: int) -> Iterator[Event]:
         headers_text = _text(_safe(lambda: msg.transport_headers), HEADER_LIMIT) or ""
-        hdr = email.parser.HeaderParser(policy=email.policy.compat32).parsestr(headers_text) if headers_text else {}
+        hdr: Any = email.parser.HeaderParser(policy=email.policy.compat32).parsestr(headers_text) if headers_text else {}
         body = _text(_safe(lambda: msg.plain_text_body), BODY_LIMIT)
         if not body:
             body = _text(_safe(lambda: msg.html_body), BODY_LIMIT)

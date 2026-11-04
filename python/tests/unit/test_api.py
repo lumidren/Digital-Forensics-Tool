@@ -207,7 +207,6 @@ def test_metrics_and_headers(client):
 
 def test_rerunning_rules_replaces_untouched_proposals(client):
     cid, a, b, e = make_case(client)
-    ctx = client.app_ctx
     seed_events(client, cid, "a" * 64)
     client.post(f"/api/v1/cases/{cid}/findings/run", headers=a)
     first = {f["id"]: f for f in client.get(f"/api/v1/cases/{cid}/findings", headers=a).json()}

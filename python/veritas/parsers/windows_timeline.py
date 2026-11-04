@@ -54,7 +54,7 @@ class WindowsTimelineParser(BaseParser):
                     continue
                 cols = columns(conn, table)
                 order = "ETag" if "ETag" in cols else "rowid"
-                for idx, row in enumerate(rows(conn, f'SELECT rowid AS rid, * FROM "{table}" ORDER BY {order}, rowid'), 1):
+                for idx, row in enumerate(rows(conn, f'SELECT rowid AS rid, * FROM "{table}" ORDER BY {order}, rowid'), 1):  # nosec B608 - table and order column chosen from fixed names
                     try:
                         yield from self._row(table, idx, row)
                     except Exception as exc:  # noqa: BLE001

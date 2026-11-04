@@ -69,7 +69,7 @@ class KnowledgeCParser(BaseParser):
                     if c in mcols:
                         select.append(f"m.{c} AS meta_{alias}")
                         meta_keys[alias] = f"meta_{alias}"
-            sql = f"SELECT {', '.join(select)} FROM ZOBJECT o {' '.join(joins)} ORDER BY o.Z_PK"
+            sql = f"SELECT {', '.join(select)} FROM ZOBJECT o {' '.join(joins)} ORDER BY o.Z_PK"  # nosec B608 - columns come from the constant META_COLUMNS map
             for row in rows(conn, sql):
                 try:
                     yield from self._row(row, meta_keys)

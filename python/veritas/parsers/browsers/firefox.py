@@ -84,7 +84,7 @@ class FirefoxPlacesParser(BaseParser):
                     msg += " (URL directly typed)"
                 msg += f" Transition: {attrs['visit_type_name']}"
                 yield self.event("firefox:places:page_visited", Desc.LAST_VISITED, msg, _us(col(row, "visit_date")),
-                                 offset=attrs["visit_id"] or 0, attrs=attrs)
+                                 offset=int(attrs["visit_id"] or 0), attrs=attrs)
             except Exception as exc:  # noqa: BLE001
                 self.warn(f"moz_historyvisits row: {exc}")
 
@@ -110,11 +110,11 @@ class FirefoxPlacesParser(BaseParser):
                 added = _us(col(row, "dateAdded"))
                 modified = _us(col(row, "lastModified"))
                 if added is not None:
-                    yield self.event(dtype, "Added Time", msg, added, offset=oid, attrs=attrs)
+                    yield self.event(dtype, "Added Time", msg, added, offset=int(oid), attrs=attrs)
                 if modified is not None:
-                    yield self.event(dtype, Desc.MODIFICATION, msg, modified, offset=oid, attrs=attrs)
+                    yield self.event(dtype, Desc.MODIFICATION, msg, modified, offset=int(oid), attrs=attrs)
                 if added is None and modified is None:
-                    yield self.event(dtype, Desc.NOT_A_TIME, msg, None, offset=oid, attrs=attrs)
+                    yield self.event(dtype, Desc.NOT_A_TIME, msg, None, offset=int(oid), attrs=attrs)
             except Exception as exc:  # noqa: BLE001
                 self.warn(f"moz_bookmarks row: {exc}")
 
@@ -134,9 +134,9 @@ class FirefoxPlacesParser(BaseParser):
                 added = _us(col(row, "dateAdded"))
                 modified = _us(col(row, "lastModified"))
                 if added is not None:
-                    yield self.event("firefox:places:bookmark_annotation", "Added Time", msg, added, offset=oid, attrs=attrs)
+                    yield self.event("firefox:places:bookmark_annotation", "Added Time", msg, added, offset=int(oid), attrs=attrs)
                 if modified is not None:
-                    yield self.event("firefox:places:bookmark_annotation", Desc.MODIFICATION, msg, modified, offset=oid, attrs=attrs)
+                    yield self.event("firefox:places:bookmark_annotation", Desc.MODIFICATION, msg, modified, offset=int(oid), attrs=attrs)
             except Exception as exc:  # noqa: BLE001
                 self.warn(f"moz_items_annos row: {exc}")
 
@@ -220,11 +220,11 @@ class FirefoxDownloadsParser(BaseParser):
                     start = _us(col(row, "startTime"))
                     end = _us(col(row, "endTime"))
                     if start is not None:
-                        yield self.event("firefox:downloads:download", Desc.START, msg, start, offset=oid, attrs=attrs)
+                        yield self.event("firefox:downloads:download", Desc.START, msg, start, offset=int(oid), attrs=attrs)
                     if end is not None:
-                        yield self.event("firefox:downloads:download", Desc.END, msg, end, offset=oid, attrs=attrs)
+                        yield self.event("firefox:downloads:download", Desc.END, msg, end, offset=int(oid), attrs=attrs)
                     if start is None and end is None:
-                        yield self.event("firefox:downloads:download", Desc.NOT_A_TIME, msg, None, offset=oid, attrs=attrs)
+                        yield self.event("firefox:downloads:download", Desc.NOT_A_TIME, msg, None, offset=int(oid), attrs=attrs)
                 except Exception as exc:  # noqa: BLE001
                     self.warn(f"moz_downloads row: {exc}")
 
@@ -263,11 +263,11 @@ class FirefoxCookiesParser(BaseParser):
                     accessed = _us(col(row, "lastAccessed"))
                     expiry = to_int(col(row, "expiry"))
                     if creation is not None:
-                        yield self.event("firefox:cookie:entry", Desc.CREATION, msg, creation, offset=oid, attrs=attrs)
+                        yield self.event("firefox:cookie:entry", Desc.CREATION, msg, creation, offset=int(oid), attrs=attrs)
                     if accessed is not None:
-                        yield self.event("firefox:cookie:entry", Desc.ACCESS, msg, accessed, offset=oid, attrs=attrs)
+                        yield self.event("firefox:cookie:entry", Desc.ACCESS, msg, accessed, offset=int(oid), attrs=attrs)
                     if expiry:
-                        yield self.event("firefox:cookie:entry", Desc.EXPIRATION, msg, expiry * NS, offset=oid, attrs=attrs)
+                        yield self.event("firefox:cookie:entry", Desc.EXPIRATION, msg, expiry * NS, offset=int(oid), attrs=attrs)
                 except Exception as exc:  # noqa: BLE001
                     self.warn(f"moz_cookies row: {exc}")
 

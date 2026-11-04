@@ -93,7 +93,7 @@ class MboxParser(BaseParser):
                 if fn:
                     attachments.append(clip(str(fn), 1024))
                 elif body is None and part.get_content_type() == "text/plain":
-                    payload = part.get_payload(decode=True) or b""
+                    payload: bytes = part.get_payload(decode=True) or b""  # type: ignore[assignment]
                     charset = part.get_content_charset() or "utf-8"
                     try:
                         body = payload[:BODY_LIMIT * 4].decode(charset, "replace")[:BODY_LIMIT]

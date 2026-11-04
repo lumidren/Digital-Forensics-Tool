@@ -17,6 +17,7 @@ import bz2
 import gzip
 import io
 import lzma
+import re
 from typing import BinaryIO, Iterator
 
 from veritas.parsers.base import MAX_STRING, BaseParser, ParserError, Provenance
@@ -134,7 +135,7 @@ class TextLogParser(BaseParser):
 
     source_short = "LOG"
     #: When set, ``matches`` additionally requires this regex to match somewhere in the head.
-    head_regex = None  # type: ignore[assignment]
+    head_regex: re.Pattern[str] | None = None
 
     def matches(self, path: str, head_bytes: bytes) -> bool:
         if not is_text(head_bytes):

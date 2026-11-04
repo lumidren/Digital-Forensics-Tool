@@ -24,7 +24,7 @@ from typing import Any
 
 from fastapi import Body, Depends, FastAPI, File, Form, Header, HTTPException, Query as Q, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse, Response, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -35,7 +35,6 @@ from ..analytics import provenance as prov_mod
 from ..analytics import user_activity as ua_mod
 from ..analytics.ioc import Indicator, Matcher, load_indicators
 from ..audit.log import verify as verify_audit
-from ..custody.ledger import canonical_bytes
 from ..pii.redact import Redactor
 from ..pipeline.dag import JobStore
 from ..pipeline.queue import Processor, classify
@@ -47,7 +46,7 @@ from ..timeline.store import Query
 from . import observability as obs
 from .auth import CaseAccess, Principal, case_access_factory, check_password, get_principal_factory, hash_password
 from .config import Settings, load
-from .context import SERVICE_ACTOR, AppContext
+from .context import AppContext
 from .db import ROLES, Bookmark, Case, Evidence, FindingRow, Hypothesis, IocRow, Membership, Note, Report, SavedView, Task, User
 from .findings import row_to_dict, run_rules, transition
 

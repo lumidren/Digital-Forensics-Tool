@@ -147,7 +147,7 @@ class WmiPersistenceParser(BaseParser):
                 exe = next((s for s in cmds if s.lower().endswith(".exe")), None)
                 attrs["executable_path"] = exe
                 name = next((s for s in values if IDENT.match(s) and s not in cmds and not COMMANDISH.search(s)), None)
-                payload = attrs["command_line_template"]
+                payload = cmds[0]
             else:
                 if not values:
                     return None

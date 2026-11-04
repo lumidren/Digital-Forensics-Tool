@@ -85,7 +85,7 @@ def _extensions(r: _Reader) -> list[tuple[int, bytes]]:
     if r.left() < 2:
         return []
     data = _Reader(r.vec(2))
-    out = []
+    out: list[Any] = []
     while data.left() >= 4:
         et = data.u16()
         out.append((et, data.vec(2)))
@@ -195,7 +195,7 @@ def parse_certificates(body: bytes, limit: int = 8) -> list[bytes]:
         chain = _Reader(_Reader(body).vec(3))
     except ValueError:
         return []
-    out = []
+    out: list[Any] = []
     while chain.left() >= 3 and len(out) < limit:
         try:
             out.append(chain.vec(3))

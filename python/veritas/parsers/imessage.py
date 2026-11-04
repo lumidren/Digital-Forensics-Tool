@@ -56,7 +56,7 @@ class IMessageParser(BaseParser):
             mcols = set(columns(conn, "message"))
             join = "LEFT JOIN handle ON message.handle_id = handle.ROWID" if has_table(conn, "handle") else ""
             hsel = "handle.id AS handle_value, handle.service AS handle_service" if join else "NULL AS handle_value, NULL AS handle_service"
-            sql = f"SELECT message.*, {hsel} FROM message {join} ORDER BY message.ROWID"
+            sql = f"SELECT message.*, {hsel} FROM message {join} ORDER BY message.ROWID"  # nosec B608 - fragments are code constants chosen by schema checks
             for idx, row in enumerate(rows(conn, sql), 1):
                 try:
                     text = col(row, "text")

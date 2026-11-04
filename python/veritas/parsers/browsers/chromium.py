@@ -83,7 +83,7 @@ class ChromiumHistoryParser(BaseParser):
         src = "LEFT JOIN visit_source ON visits.id = visit_source.id" if has_source else ""
         src_col = ", visit_source.source AS visit_source" if has_source else ", NULL AS visit_source"
         sql = (
-            "SELECT visits.id AS visit_id, visits.visit_time, visits.from_visit, visits.transition, "
+            "SELECT visits.id AS visit_id, visits.visit_time, visits.from_visit, visits.transition, "  # nosec B608 - fragments are code constants chosen by schema checks
             "urls.id AS url_id, urls.url, urls.title, urls.visit_count, urls.typed_count, urls.hidden"
             f"{extra}{src_col} FROM visits JOIN urls ON visits.url = urls.id {src} ORDER BY visits.id"
         )
@@ -113,7 +113,7 @@ class ChromiumHistoryParser(BaseParser):
                     msg += " (URL typed)"
                 msg += f" Type: [{transition_name(transition)}]"
                 yield self.event("chrome:history:page_visited", Desc.LAST_VISITED, msg, ts,
-                                 offset=attrs["visit_id"] or 0, attrs=attrs)
+                                 offset=int(attrs["visit_id"] or 0), attrs=attrs)
             except Exception as exc:  # noqa: BLE001
                 self.warn(f"visits row: {exc}")
 

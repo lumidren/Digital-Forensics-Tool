@@ -36,7 +36,7 @@ Source = "str | os.PathLike[str] | bytes | bytearray | memoryview"
 try:  # share one exception hierarchy with veritas.parsers when that package is present
     from veritas.parsers.base import ParserError as _BaseParserError
 except ImportError:  # pragma: no cover - standalone use without veritas.parsers
-    _BaseParserError = Exception
+    _BaseParserError = Exception  # type: ignore[misc,assignment]
 
 
 class ParserError(_BaseParserError):
@@ -500,7 +500,7 @@ class guard:
     def __enter__(self) -> "guard":
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> bool:
+    def __exit__(self, exc_type, exc, tb) -> Any:
         if exc is None or isinstance(exc, ParserError):
             return False
         if isinstance(exc, (KeyboardInterrupt, SystemExit)):

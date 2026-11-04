@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Build testdata/MANIFEST.json from local plaso/dfvfs sparse checkouts (maintainer tool)."""
-import hashlib, json, pathlib, sys
+import hashlib
+import json
+import pathlib
+import sys
 src = pathlib.Path(sys.argv[1])
 WANT = {
  "plaso": ["MFT","UsnJrnl.raw","NTUSER.DAT","NTUSER-WIN7.DAT","SYSTEM","SOFTWARE","SRUDB.dat","NeroInfoTool.lnk","example.lnk",
@@ -34,7 +37,8 @@ for proj, files in WANT.items():
     for rel in files:
         p = src / proj / "test_data" / rel
         if not p.exists():
-            print("skip missing", proj, rel); continue
+            print("skip missing", proj, rel)
+            continue
         out["files"][proj][rel] = hashlib.sha256(p.read_bytes()).hexdigest()
 pathlib.Path("testdata/MANIFEST.json").write_text(json.dumps(out, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
 print(sum(len(v) for v in out["files"].values()), "files in manifest")

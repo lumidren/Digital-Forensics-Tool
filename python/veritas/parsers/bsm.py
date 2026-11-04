@@ -251,7 +251,7 @@ class BsmParser(BaseParser):
         while r.p < end:
             t = r.u8()
             if t == 0x13:
-                magic, count = r.u16(), r.u32()
+                magic, _count = r.u16(), r.u32()
                 complete = magic == 0xB105
                 break
             try:
@@ -264,21 +264,21 @@ class BsmParser(BaseParser):
         attrs: dict[str, Any] = {"event_type": event_type, "event_type_name": EVENT_NAMES.get(event_type),
                                  "event_modifier": modifier, "record_version": version, "host_address": addr,
                                  "record_length": end - pos, "complete": complete, "tokens": tokens}
-        for t in tokens:
-            ttype = t["type"]
+        for tok in tokens:
+            ttype = tok["type"]
             if ttype.startswith("subject"):
-                attrs.setdefault("subject", {k: v for k, v in t.items() if k != "type"})
+                attrs.setdefault("subject", {k: v for k, v in tok.items() if k != "type"})
             elif ttype.startswith("return"):
-                attrs.setdefault("return_status", t["status"])
-                attrs.setdefault("return_value", t["value"])
+                attrs.setdefault("return_status", tok["status"])
+                attrs.setdefault("return_value", tok["value"])
             elif ttype == "text":
                 attrs.setdefault("text", [])
-                attrs["text"].append(t["text"])
+                attrs["text"].append(tok["text"])
             elif ttype == "path":
                 attrs.setdefault("paths", [])
-                attrs["paths"].append(t["path"])
+                attrs["paths"].append(tok["path"])
             elif ttype == "exec_args":
-                attrs["argv"] = t["strings"]
+                attrs["argv"] = tok["strings"]
         subj = attrs.get("subject") or {}
         msg = f"Type: {attrs['event_type_name'] or event_type} Return: {attrs.get('return_status')} " \
               f"auid={subj.get('audit_uid')} " + " ".join(attrs.get("text", []) + attrs.get("paths", []))

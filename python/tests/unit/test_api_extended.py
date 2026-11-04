@@ -1,7 +1,6 @@
 """Routes and pipeline paths not covered by test_api.py: admin, collaboration CRUD, analytics views,
 exports, register-path ingest, triage bundles, WebSocket progress, manage commands."""
 import hashlib
-import io
 import json
 import zipfile
 from pathlib import Path

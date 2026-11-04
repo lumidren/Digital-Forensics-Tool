@@ -100,7 +100,7 @@ def run_plaso(path: str, parser_name: str, plugin: str | None = None, gzip: bool
 
 
 def times_multiset(records: list[dict[str, Any]], data_types: set[str] | None = None) -> list[int]:
-    vals = []
+    vals: list[Any] = []
     for r in records:
         if data_types and r["data_type"] not in data_types:
             continue

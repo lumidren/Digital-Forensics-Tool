@@ -48,8 +48,8 @@ class PersistenceInventoryRule:
             text = " ".join(str(v) for v in e.attrs.values() if isinstance(v, (str, int))) + " " + e.message
             if SUSPICIOUS_PATH.search(text):
                 suspicious.append(se)
-        for kind, evs in sorted(inventory.items()):
-            tech = next(t for (k, t) in PERSISTENCE_TYPES.values() if k == kind) if any(k == kind for k, _ in PERSISTENCE_TYPES.values()) else "T1543"
-            yield mk_finding(self.name, f"Persistence inventory: {kind} ({len(evs)})", f"{len(evs)} {kind} entries were found. This is an inventory for review, not an allegation.", "info", 0.3, "persistence", evs, [tech], {"count": len(evs)})
+        for kind_name, evs in sorted(inventory.items()):
+            tech = next(t for (k, t) in PERSISTENCE_TYPES.values() if k == kind_name) if any(k == kind_name for k, _ in PERSISTENCE_TYPES.values()) else "T1543"
+            yield mk_finding(self.name, f"Persistence inventory: {kind_name} ({len(evs)})", f"{len(evs)} {kind_name} entries were found. This is an inventory for review, not an allegation.", "info", 0.3, "persistence", evs, [tech], {"count": len(evs)})
         if suspicious:
             yield mk_finding(self.name, "Persistence entries with suspicious locations or launchers", "Autostart entries reference temp/public directories, encoded PowerShell or script hosts.", "high", 0.75, "persistence", suspicious, ["T1547.001", "T1059.001"], {"count": len(suspicious)})

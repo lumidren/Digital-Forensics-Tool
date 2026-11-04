@@ -127,7 +127,7 @@ def _bookmark_path_from_toc(blob: bytes) -> list[str] | None:
     try:
         hs = struct.unpack_from("<I", blob, 12)[0]
         toc = hs + struct.unpack_from("<I", blob, hs)[0]
-        seen = set()
+        seen: set[Any] = set()
         while 0 < toc < len(blob) - 20 and toc not in seen and len(seen) < 32:
             seen.add(toc)
             _size, magic, _ident, nxt, count = struct.unpack_from("<IIIII", blob, toc)

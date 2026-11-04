@@ -87,7 +87,7 @@ def parse_line(line: str) -> tuple[str, dict[str, Any]] | None:
     minimum = {"alb": 12, "classic": 11, "nlb": 11}[kind]
     if len(fields) < minimum:
         return None
-    rec = dict(zip(layout, fields))
+    rec: dict[str, Any] = dict(zip(layout, fields))
     if len(fields) > len(layout):
         rec["extra_fields"] = fields[len(layout):]
     return kind, rec
