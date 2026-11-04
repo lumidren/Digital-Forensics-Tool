@@ -140,7 +140,7 @@ def run_parser(parser: str, evidence_path: str | Path, evidence_sha256: str, log
     for k in ("VERITAS_BIN_DIR", "TEMP", "TMP", "LOCALAPPDATA"):
         if k in os.environ:
             env[k] = os.environ[k]
-    cmd = [sys.executable, "-I", "-c", _CHILD_BOOTSTRAP, parser, str(evidence_path), evidence_sha256, logical_path, *(extra_args or [])]
+    cmd = [sys.executable, "-I", "-X", "utf8", "-c", _CHILD_BOOTSTRAP, parser, str(evidence_path), evidence_sha256, logical_path, *(extra_args or [])]
     if platform.system() == "Linux" and not limits.allow_network and shutil.which("unshare"):
         probe = subprocess.run(["unshare", "--net", "--map-root-user", "true"], capture_output=True)
         if probe.returncode == 0:

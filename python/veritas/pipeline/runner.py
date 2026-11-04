@@ -39,7 +39,10 @@ FS_KINDS = {"fs-events", "mft", "usn", "logfile"}
 
 
 def _log(level: str, msg: str) -> None:
-    sys.stderr.write(json.dumps({"level": level, "msg": msg}) + "\n")
+    # Bytes, not text: the child runs with ``python -I`` (which ignores PYTHONIOENCODING) and may
+    # inherit a legacy console code page; diagnostics must never fail to encode.
+    sys.stderr.buffer.write((json.dumps({"level": level, "msg": msg}) + "\n").encode("utf-8"))
+    sys.stderr.buffer.flush()
 
 
 def find_binary(name: str) -> str | None:
@@ -98,13 +101,22 @@ def main(argv: list[str]) -> int:
     except Exception as exc:  # parser failure is reported, never propagated to the platform
         _log("error", f"{type(exc).__name__}: {exc}"[:2000])
         return 1
-    out = sys.stdout
-    for e in sorted_events(events):
-        if not e.evidence_sha256:
-            e.evidence_sha256 = sha
-        out.write(e.to_json())
-        out.write("\n")
-    out.flush()
+    # Single-artifact parsers record the path they were handed (a temporary plaintext copy);
+    # replace it with the artifact's logical path. Image parsers keep their in-image paths.
+    relabel = parser not in FS_KINDS
+    try:
+        out = sys.stdout.buffer
+        for e in sorted_events(events):
+            if not e.evidence_sha256:
+                e.evidence_sha256 = sha
+            if relabel and logical and (not e.evidence_path or e.evidence_path == path or Path(e.evidence_path) == Path(path)):
+                e.evidence_path = logical
+            out.write(e.to_json().encode("utf-8"))
+            out.write(b"\n")
+        out.flush()
+    except Exception as exc:
+        _log("error", f"writing events failed: {type(exc).__name__}: {exc}"[:2000])
+        return 1
     return 0
 
 
