@@ -22,11 +22,18 @@ import json
 import pathlib
 import shutil
 import sys
+import time
+import urllib.parse
 import urllib.request
 
 HERE = pathlib.Path(__file__).resolve().parent
 MANIFEST = HERE / "MANIFEST.json"
 CORPUS = HERE / "corpus"
+# Corpus paths that differ from their upstream location.
+UPSTREAM = {
+    ("plaso", "msiecf/MSHist012013031020130311-index.dat"): "MSHist012013031020130311-index.dat",
+    ("plaso", "msiecf/WebCacheV01.dat"): "WebCacheV01.dat",
+}
 RAW = {
     "plaso": "https://raw.githubusercontent.com/log2timeline/plaso/main/test_data/",
     "dfvfs": "https://raw.githubusercontent.com/log2timeline/dfvfs/main/test_data/",
@@ -57,10 +64,20 @@ def main() -> int:
                 if args.src:
                     shutil.copyfile(pathlib.Path(args.src) / project / "test_data" / rel, dest)
                 else:
-                    url = RAW[project] + rel
+                    remote = UPSTREAM.get((project, rel), rel)
+                    remote = remote[:-1] + "TILDE" if remote.endswith("~") else remote  # upstream stores "x~" as "xTILDE"
+                    url = RAW[project] + urllib.parse.quote(remote)  # names contain spaces, "$" and "@"
                     print("fetch", url)
-                    with urllib.request.urlopen(url, timeout=120) as r, dest.open("wb") as fh:  # noqa: S310
-                        shutil.copyfileobj(r, fh)
+                    for attempt in range(4):
+                        try:
+                            with urllib.request.urlopen(url, timeout=120) as r, dest.open("wb") as fh:  # noqa: S310  # nosec B310 - fixed https base URLs
+                                shutil.copyfileobj(r, fh)
+                            break
+                        except OSError as exc:
+                            if attempt == 3:
+                                raise
+                            print(f"  retry after {exc}")
+                            time.sleep(2 ** attempt)
             if not dest.exists():
                 print("MISSING", project, rel)
                 failures += 1
