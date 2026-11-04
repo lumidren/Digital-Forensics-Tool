@@ -20,6 +20,7 @@ import io
 import json
 import os
 import plistlib
+import re
 import shutil
 import sqlite3
 import sys
@@ -35,6 +36,18 @@ CLOUD = HERE / "cloud"
 MOBILE = HERE / "mobile"
 COCOA = 978_307_200
 
+
+
+_TOKEN = re.compile(rb"xox[abposr]-[A-Za-z0-9-]{10,}")
+
+
+def _scrub_tokens(path: Path) -> None:
+    """The public corpus downloads.db embeds a Slack-token-shaped string; replace it with a
+    same-length placeholder (SQLite stays valid) so committed fixtures never carry secrets."""
+    data = path.read_bytes()
+    new = _TOKEN.sub(lambda m: (b"REDACTED-TOKEN-" + b"0" * len(m.group(0)))[: len(m.group(0))], data)
+    if new != data:
+        path.write_bytes(new)
 
 def _reset(path: Path) -> None:
     if path.exists():
@@ -494,8 +507,9 @@ def make_android_pull() -> None:
     root = MOBILE / "android_pull"
     _reset(root)
     prov = root / "data" / "data"
-    shutil.copyfile(CORPUS / "android" / "downloads.db",
-                    _mk(prov / "com.android.providers.downloads" / "databases" / "downloads.db"))
+    dl = _mk(prov / "com.android.providers.downloads" / "databases" / "downloads.db")
+    shutil.copyfile(CORPUS / "android" / "downloads.db", dl)
+    _scrub_tokens(dl)
     _sqlite(prov / "com.android.providers.contacts" / "databases" / "calllog.db", """
         CREATE TABLE calls (_id INTEGER PRIMARY KEY, number TEXT, date INTEGER, duration INTEGER, type INTEGER,
             new INTEGER, name TEXT, countryiso TEXT, geocoded_location TEXT, normalized_number TEXT, is_read INTEGER,
