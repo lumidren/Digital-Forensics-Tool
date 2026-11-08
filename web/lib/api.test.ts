@@ -91,6 +91,28 @@ describe("createApiClient", () => {
     expect((err as ApiError).detail).toBe("request failed");
   });
 
+  it("formats structured refusals", async () => {
+    const r = setup("t", () =>
+      jsonResponse(
+        {
+          detail: {
+            message: "disposal refused",
+            refused: [{ case_id: "C-1", reason: "case is on legal hold" }],
+          },
+        },
+        409,
+      ),
+    );
+    await expect(r.client.planDisposal(["C-1"], "elapsed")).rejects.toMatchObject({
+      status: 409,
+      detail: "disposal refused (C-1: case is on legal hold)",
+    });
+    const m = setup("t", () => jsonResponse({ detail: { message: "confirmation phrase missing" } }, 422));
+    await expect(m.client.dispose(["C-1"], "elapsed", "t", [])).rejects.toMatchObject({
+      detail: "confirmation phrase missing",
+    });
+  });
+
   it("returns undefined for 204", async () => {
     const { client } = setup("t", () => new Response(null, { status: 204 }));
     await expect(client.request("/x")).resolves.toBeUndefined();
@@ -223,6 +245,12 @@ describe("createApiClient", () => {
       [() => client.audit({ actor: "alice", limit: 5 }), "GET", "/api/v1/admin/audit?actor=alice&limit=5"],
       [() => client.verifyAudit(), "GET", "/api/v1/admin/audit/verify"],
       [() => client.retentionSweep(), "POST", "/api/v1/admin/retention/sweep"],
+      [() => client.planDisposal(["C-1"], "elapsed"), "POST", "/api/v1/admin/retention/dispose?dry_run=true"],
+      [
+        () => client.dispose(["C-1"], "elapsed", "tok", ["DISPOSE C-1"]),
+        "POST",
+        "/api/v1/admin/retention/dispose?dry_run=false",
+      ],
       [() => client.verifyStore(), "GET", "/api/v1/admin/store/verify"],
     ];
     for (const [fn] of routes) await fn();

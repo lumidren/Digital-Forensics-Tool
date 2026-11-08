@@ -16,8 +16,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMe } from "@/hooks/use-session";
 import { api } from "@/lib/api-instance";
-import { formatDate } from "@/lib/format";
-import { CASE_ROLES, type CaseRole } from "@/lib/types";
+import { formatBytes, formatDate } from "@/lib/format";
+import { confirmPhrase, isConfirmed, planTotals } from "@/lib/retention";
+import { CASE_ROLES, type CaseRole, type DisposalPlan } from "@/lib/types";
 
 function UsersTab() {
   const qc = useQueryClient();
@@ -362,27 +363,209 @@ function MembershipTab() {
 
 function RetentionTab() {
   const sweep = useMutation({ mutationFn: () => api.retentionSweep() });
+  const [reason, setReason] = useState("");
+  const [typed, setTyped] = useState("");
+  const [planned, setPlanned] = useState<{ plan: DisposalPlan; reason: string } | null>(null);
+  const plan = useMutation({
+    mutationFn: ({ caseId, why }: { caseId: string; why: string }) => api.planDisposal([caseId], why),
+    onSuccess: (p, v) => {
+      setPlanned({ plan: p, reason: v.why });
+      setTyped("");
+    },
+  });
+  const dispose = useMutation({
+    mutationFn: ({ p, why }: { p: DisposalPlan; why: string }) =>
+      api.dispose(
+        p.cases.map((c) => c.case_id),
+        why,
+        p.confirmation_token,
+        p.cases.map((c) => confirmPhrase(c.case_id)),
+      ),
+    onSuccess: (r) => {
+      const d = r.disposed[0];
+      if (d) {
+        const locked = d.retained_by_object_lock.length;
+        toast.success(
+          `${d.case_id} disposed: ${d.objects_deleted.length} objects, ${formatBytes(d.bytes_deleted)}` +
+            (locked ? `, ${locked} retained by Object Lock` : ""),
+        );
+      }
+      setPlanned(null);
+      setTyped("");
+      sweep.mutate();
+    },
+  });
+  const reasonOk = reason.trim().length >= 5;
+  const due = sweep.data
+    ? (sweep.data.cases ??
+      sweep.data.due_for_disposal.map((id) => ({ id, name: "", retention_until: null, status: "" })))
+    : [];
+  const target = planned?.plan.cases[0];
+  const totals = planned ? planTotals(planned.plan) : null;
   return (
     <Card>
-      <CardContent className="grid gap-3">
+      <CardContent className="grid gap-4">
         <p className="text-sm">
-          Lists cases past their retention date that are not on legal hold. Disposal is a separate, explicit
-          action outside this console.
+          Lists cases past their retention date that are not on legal hold. Disposal is two-step: plan it (a
+          dry run that deletes nothing), review exactly what would be destroyed, then confirm by typing the
+          case id. The custody ledger, its anchors and the audit log are kept as proof of disposal.
         </p>
         <Button className="justify-self-start" onClick={() => sweep.mutate()} disabled={sweep.isPending}>
           Run retention sweep
         </Button>
         <div role="status" aria-live="polite">
           {sweep.data ? (
-            sweep.data.due_for_disposal.length ? (
-              <Alert variant="warning">
-                Due for disposal: <span className="font-mono">{sweep.data.due_for_disposal.join(", ")}</span>
-              </Alert>
+            due.length ? (
+              <Alert variant="warning">{due.length} case(s) due for disposal.</Alert>
             ) : (
               <Alert variant="success">No cases are due for disposal.</Alert>
             )
           ) : null}
         </div>
+        {due.length ? (
+          <>
+            <Field
+              label="Disposal reason (recorded in the ledger and audit log)"
+              htmlFor="ret-reason"
+              hint="At least 5 characters."
+            >
+              <Input
+                id="ret-reason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Retention period elapsed under policy"
+              />
+            </Field>
+            <Table aria-label="Cases due for disposal">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Case</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Retention until</TableHead>
+                  <TableHead>
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {due.map((c) => (
+                  <TableRow key={c.id}>
+                    <TableCell>
+                      <Mono>{c.id}</Mono>
+                    </TableCell>
+                    <TableCell>{c.name}</TableCell>
+                    <TableCell>{formatDate(c.retention_until)}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!reasonOk || plan.isPending}
+                        onClick={() => plan.mutate({ caseId: c.id, why: reason.trim() })}
+                        aria-label={`Plan disposal of ${c.id}`}
+                      >
+                        Plan disposal
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </>
+        ) : null}
+        {plan.error ? <Alert variant="destructive">{plan.error.message}</Alert> : null}
+        {planned && target && totals ? (
+          <section aria-labelledby="ret-plan-title" className="grid gap-3 rounded-lg border p-3">
+            <h3 id="ret-plan-title" className="font-medium">
+              Disposal plan for <Mono>{target.case_id}</Mono> (dry run, nothing deleted yet)
+            </h3>
+            <ul className="grid gap-1 text-sm">
+              <li>
+                {totals.objects} evidence object(s) and {totals.derived} derived object(s),{" "}
+                {formatBytes(totals.bytes)} in total
+              </li>
+              <li>{totals.events} timeline event(s)</li>
+              <li>
+                {totals.rows} database row(s):{" "}
+                {Object.entries(target.db_rows)
+                  .filter(([, n]) => n > 0)
+                  .map(([k, n]) => `${k} ${n}`)
+                  .join(", ") || "none"}
+              </li>
+              <li>
+                {target.report_files.length} report file(s), {target.intake_sessions.length} intake
+                leftover(s), {target.pending_jobs.length} pending job(s) cancelled
+              </li>
+              {totals.kept ? (
+                <li>{totals.kept} object(s) kept because another case still references them</li>
+              ) : null}
+              {totals.objectLocked ? (
+                <li>
+                  {totals.objectLocked} object(s) under S3 Object Lock will be reported as retained until the
+                  lock expires
+                </li>
+              ) : null}
+              <li>
+                Kept: custody ledger, anchors, audit log, lead membership (
+                {target.memberships_kept.join(", ") || "none"})
+              </li>
+            </ul>
+            <Table aria-label="Objects to be destroyed">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>SHA-256</TableHead>
+                  <TableHead>Evidence</TableHead>
+                  <TableHead>Size</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...target.evidence_objects, ...target.derived_objects].map((o) => (
+                  <TableRow key={o.address}>
+                    <TableCell>
+                      <Mono title={o.sha256}>{o.sha256}</Mono>
+                    </TableCell>
+                    <TableCell>{o.evidence_id ? `${o.evidence_id} ${o.name ?? ""}` : "derived"}</TableCell>
+                    <TableCell>{formatBytes(o.size)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <p className="text-muted-foreground text-xs">
+              Plan <Mono>{planned.plan.plan_sha256}</Mono>; confirmation valid until{" "}
+              {formatDate(planned.plan.expires_at)}.
+            </p>
+            <form
+              className="flex flex-wrap items-end gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (isConfirmed(typed, target.case_id))
+                  dispose.mutate({ p: planned.plan, why: planned.reason });
+              }}
+            >
+              <Field label={`Type ${target.case_id} to confirm permanent disposal`} htmlFor="ret-confirm">
+                <Input
+                  id="ret-confirm"
+                  value={typed}
+                  onChange={(e) => setTyped(e.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="w-72 font-mono"
+                />
+              </Field>
+              <Button
+                type="submit"
+                variant="destructive"
+                disabled={!isConfirmed(typed, target.case_id) || dispose.isPending}
+              >
+                <Trash2Icon aria-hidden="true" />
+                Dispose permanently
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setPlanned(null)}>
+                Cancel
+              </Button>
+            </form>
+            {dispose.error ? <Alert variant="destructive">{dispose.error.message}</Alert> : null}
+          </section>
+        ) : null}
       </CardContent>
     </Card>
   );

@@ -42,6 +42,7 @@ const STATUS_VARIANT: Record<CaseListItem["status"], "success" | "warning" | "mu
   open: "success",
   review: "warning",
   closed: "muted",
+  disposed: "muted",
 };
 
 function MiniStat({

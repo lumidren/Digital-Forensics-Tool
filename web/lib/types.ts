@@ -50,13 +50,16 @@ export interface CaseSummary {
   id: string;
   name: string;
   description: string;
-  status: "open" | "review" | "closed";
+  status: "open" | "review" | "closed" | "disposed";
   created_by: string;
   created: string;
   timezone: string | null;
   legal_hold: boolean;
   retention_until: string | null;
   ledger_id: string;
+  disposed_at?: string | null;
+  disposed_by?: string | null;
+  disposal_reason?: string | null;
 }
 
 export interface CaseListItem extends CaseSummary {
@@ -421,4 +424,79 @@ export interface VerifyResult {
 export interface StoreVerify {
   objects: number;
   failed: { address: string; ok: boolean }[];
+}
+
+// ------------------------------------------------------------------ retention disposal
+export interface RetentionDueCase {
+  id: string;
+  name: string;
+  retention_until: string | null;
+  status: string;
+}
+
+export interface RetentionSweep {
+  due_for_disposal: string[];
+  cases?: RetentionDueCase[];
+}
+
+export interface DisposalObject {
+  address: string;
+  sha256: string;
+  md5: string | null;
+  sha3_256: string | null;
+  size: number;
+  encrypted: boolean | null;
+  present: boolean;
+  object_lock_until: string | null;
+  evidence_id?: string;
+  name?: string;
+  role?: "primary" | "segment";
+}
+
+export interface DisposalCasePlan {
+  case_id: string;
+  name: string;
+  retention_until: string | null;
+  ledger_id: string;
+  evidence_objects: DisposalObject[];
+  derived_objects: DisposalObject[];
+  kept_shared: { address: string; evidence_id: string | null; referenced_by: string[] }[];
+  timeline_events: number;
+  report_files: { file: string; size: number; sha256: string }[];
+  intake_sessions: { session_id: string; files: number; bytes: number }[];
+  pending_jobs: string[];
+  db_rows: Record<string, number>;
+  memberships_kept: string[];
+  bytes: number;
+}
+
+export interface DisposalPlan {
+  dry_run: true;
+  plan_sha256: string;
+  confirmation_token: string;
+  expires_at: string;
+  confirm_phrases: string[];
+  cases: DisposalCasePlan[];
+}
+
+export interface DisposalCaseResult {
+  case_id: string;
+  status: "disposed";
+  disposed_at: string;
+  intent_entry_hash: string;
+  completed_entry_hash: string;
+  objects_deleted: string[];
+  retained_by_object_lock: string[];
+  delete_denied: string[];
+  objects_missing: string[];
+  kept_shared: string[];
+  timeline_events_deleted: number;
+  db_rows_deleted: Record<string, number>;
+  bytes_deleted: number;
+}
+
+export interface DisposalResult {
+  dry_run: false;
+  plan_sha256: string;
+  disposed: DisposalCaseResult[];
 }

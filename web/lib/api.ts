@@ -15,6 +15,8 @@ import type {
   CaseSummary,
   CustodyPage,
   CustodyVerify,
+  DisposalPlan,
+  DisposalResult,
   Evidence,
   EvidenceBytes,
   EvidenceDetail,
@@ -42,6 +44,7 @@ import type {
   ReportCreated,
   ReportListItem,
   ReportSignature,
+  RetentionSweep,
   SavedView,
   SearchBody,
   SearchResult,
@@ -138,6 +141,13 @@ async function errorDetail(res: Response): Promise<string> {
   try {
     const data = (await res.json()) as { detail?: unknown };
     if (typeof data.detail === "string") return data.detail;
+    if (data.detail && typeof data.detail === "object" && !Array.isArray(data.detail)) {
+      // Structured refusals, e.g. {"message": "disposal refused", "refused": [{case_id, reason}]}.
+      const d = data.detail as { message?: unknown; refused?: { case_id?: string; reason?: string }[] };
+      const parts = (d.refused ?? []).map((r) => `${r.case_id ?? "?"}: ${r.reason ?? ""}`);
+      if (typeof d.message === "string")
+        return parts.length ? `${d.message} (${parts.join("; ")})` : d.message;
+    }
     if (Array.isArray(data.detail)) {
       return data.detail
         .map((d: { msg?: string; loc?: unknown[] }) => `${(d.loc ?? []).slice(1).join(".")}: ${d.msg ?? ""}`)
@@ -399,8 +409,19 @@ export function createApiClient(opts: ApiClientOptions) {
     audit: (q: { case_id?: string; actor?: string; limit?: number; offset?: number } = {}) =>
       request<AuditRow[]>("/api/v1/admin/audit", { query: q }),
     verifyAudit: () => request<VerifyResult>("/api/v1/admin/audit/verify"),
-    retentionSweep: () =>
-      request<{ due_for_disposal: string[] }>("/api/v1/admin/retention/sweep", { method: "POST" }),
+    retentionSweep: () => request<RetentionSweep>("/api/v1/admin/retention/sweep", { method: "POST" }),
+    planDisposal: (caseIds: string[], reason: string) =>
+      request<DisposalPlan>("/api/v1/admin/retention/dispose", {
+        method: "POST",
+        query: { dry_run: true },
+        body: { case_ids: caseIds, reason },
+      }),
+    dispose: (caseIds: string[], reason: string, token: string, confirm: string[]) =>
+      request<DisposalResult>("/api/v1/admin/retention/dispose", {
+        method: "POST",
+        query: { dry_run: false },
+        body: { case_ids: caseIds, reason, token, confirm },
+      }),
     verifyStore: () => request<StoreVerify>("/api/v1/admin/store/verify"),
   };
 }
