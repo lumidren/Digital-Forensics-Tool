@@ -1,4 +1,5 @@
-//! Random-access byte sources: in-memory buffers, files and sub-ranges (partitions).
+//! Random-access byte sources: in-memory buffers, files, sub-ranges (partitions) and the media
+//! of E01 and AFF4 images.
 use crate::error::{FsError, Result};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
@@ -234,16 +235,64 @@ impl ReadAt for EwfSource {
     }
 }
 
-/// Open an evidence file: E01 segment sets are read as their media; anything else as raw bytes.
+/// Media of an AFF4 (Standard v1.0 image stream) container, read through `veritas-aff4`.
+pub struct Aff4Source {
+    reader: Mutex<veritas_aff4::Aff4Reader>,
+    size: u64,
+}
+
+impl Aff4Source {
+    pub fn open(path: &Path) -> Result<Self> {
+        let r =
+            veritas_aff4::Aff4Reader::open(path).map_err(|e| FsError::Io(format!("AFF4: {e}")))?;
+        let size = r.media_size();
+        Ok(Self {
+            reader: Mutex::new(r),
+            size,
+        })
+    }
+}
+
+impl ReadAt for Aff4Source {
+    fn size(&self) -> u64 {
+        self.size
+    }
+    fn read_at(&self, offset: u64, buf: &mut [u8]) -> Result<usize> {
+        if offset >= self.size {
+            return Ok(0);
+        }
+        let mut r = self
+            .reader
+            .lock()
+            .map_err(|_| FsError::Io("AFF4 reader lock poisoned".into()))?;
+        let want = buf.len().min((self.size - offset) as usize);
+        let mut done = 0;
+        while done < want {
+            let n = r
+                .read_at(offset + done as u64, &mut buf[done..want])
+                .map_err(|e| FsError::Io(format!("AFF4: {e}")))?;
+            if n == 0 {
+                break;
+            }
+            done += n;
+        }
+        Ok(done)
+    }
+}
+
+/// Open an evidence file: E01 segment sets and AFF4 containers (a ZIP whose central directory
+/// lists `information.turtle` or `container.description`) are read as their media; anything
+/// else as raw bytes.
 pub fn open_evidence(path: &Path) -> Result<Source> {
     let mut sig = [0u8; 8];
-    let is_ewf = File::open(path)
+    let head_ok = File::open(path)
         .and_then(|mut f| f.read_exact(&mut sig))
-        .is_ok()
-        && &sig == b"EVF\x09\x0d\x0a\xff\x00";
-    if is_ewf {
-        Ok(Arc::new(EwfSource::open(path)?))
-    } else {
-        FileSource::source(path)
+        .is_ok();
+    if head_ok && &sig == b"EVF\x09\x0d\x0a\xff\x00" {
+        return Ok(Arc::new(EwfSource::open(path)?));
     }
+    if head_ok && sig.starts_with(b"PK\x03\x04") && veritas_aff4::is_aff4_file(path) {
+        return Ok(Arc::new(Aff4Source::open(path)?));
+    }
+    FileSource::source(path)
 }

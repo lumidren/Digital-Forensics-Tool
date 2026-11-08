@@ -24,10 +24,10 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// MD5 + SHA-256 + SHA3-256 of a file (or an E01 image's media with --media).
+    /// MD5 + SHA-256 + SHA3-256 of a file (or the media of an E01 / AFF4 image with --media).
     Hash {
         path: PathBuf,
-        /// Hash the media inside an E01/raw-segmented image instead of the container file.
+        /// Hash the media inside an E01, AFF4 or raw-segmented image instead of the container file.
         #[arg(long)]
         media: bool,
     },
@@ -184,19 +184,28 @@ fn main() -> ExitCode {
     }
 }
 
+/// Hashes of the media inside an image: E01 segment sets (`.E01`), AFF4 containers (`.aff4`, or
+/// any ZIP whose central directory lists `information.turtle`) and split raw sets.
+fn media_hashes(path: &Path) -> Result<veritas_hash::Hashes> {
+    let lower = path.to_string_lossy().to_lowercase();
+    Ok(if lower.ends_with(".e01") {
+        let r = veritas_ewf::reader::EwfReader::open(path)?;
+        veritas_hash::hash_reader(r, |_| {})?
+    } else if lower.ends_with(".aff4") || veritas_aff4::is_aff4_file(path) {
+        let r = veritas_aff4::Aff4Reader::open(path)?;
+        veritas_hash::hash_reader(r, |_| {})?
+    } else {
+        let r = veritas_ewf::raw::RawSegmented::open(path)?;
+        veritas_hash::hash_reader(r, |_| {})?
+    })
+}
+
 fn real_main() -> Result<i32> {
     let cli = Cli::parse();
     match cli.cmd {
         Cmd::Hash { path, media } => {
             let h = if media {
-                let lower = path.to_string_lossy().to_lowercase();
-                if lower.ends_with(".e01") {
-                    let r = veritas_ewf::reader::EwfReader::open(&path)?;
-                    veritas_hash::hash_reader(r, |_| {})?
-                } else {
-                    let r = veritas_ewf::raw::RawSegmented::open(&path)?;
-                    veritas_hash::hash_reader(r, |_| {})?
-                }
+                media_hashes(&path)?
             } else {
                 veritas_hash::hash_reader(std::fs::File::open(&path)?, |_| {})?
             };
@@ -372,5 +381,28 @@ fn row(p: &Path, bytes: u64, op: &str, secs: f64, events: Option<u64>) -> BenchR
         mb_per_s: mbs,
         gb_per_hour: mbs * 3600.0 / 1000.0,
         events,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn media_hashes_reads_aff4() {
+        let dir = tempfile::tempdir().unwrap();
+        let data: Vec<u8> = (0..200_000u32).map(|i| (i % 253) as u8).collect();
+        let expected = veritas_hash::hash_bytes(&data);
+        for name in ["img.aff4", "img.bin"] {
+            let p = dir.path().join(name);
+            let mut w =
+                veritas_aff4::Aff4Writer::create(&p, veritas_aff4::Aff4Options::default()).unwrap();
+            w.write(&data).unwrap();
+            w.finish().unwrap();
+            assert_eq!(media_hashes(&p).unwrap(), expected, "{}", name);
+        }
+        let raw = dir.path().join("plain.raw");
+        std::fs::write(&raw, &data).unwrap();
+        assert_eq!(media_hashes(&raw).unwrap(), expected);
     }
 }

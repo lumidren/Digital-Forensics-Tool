@@ -15,6 +15,7 @@ veritas-hash = { path = "../veritas-hash" }
 veritas-ledger = { path = "../veritas-ledger" }
 veritas-store = { path = "../veritas-store" }
 veritas-ewf = { path = "../veritas-ewf" }
+veritas-aff4 = { path = "../veritas-aff4" }
 veritas-fs = { path = "../veritas-fs" }
 veritas-artifacts = { path = "../veritas-artifacts" }
 veritas-timeline = { path = "../veritas-timeline" }
@@ -27,3 +28,6 @@ chrono.workspace = true
 hex.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
