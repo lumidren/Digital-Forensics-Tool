@@ -216,7 +216,7 @@ def test_subprocess_backend_is_deterministic(fake_vol):
 
 def test_subprocess_timeout_is_warning(fake_vol):
     cfg = _cfg(fake_vol, plugins=[PluginSpec.of("windows.sleepy"), PluginSpec.of("windows.pslist")])
-    cfg.timeout_s = 1
+    cfg.timeout_s = 8  # sleepy sleeps 30 s; generous margin for a loaded CI runner
     report = VolatilityDriver(cfg).run(str(fake_vol["image"]))
     assert any("timeout" in w for w in report.warnings)
     assert report.results["windows.pslist"].ok
@@ -305,3 +305,17 @@ def test_parse_vol_json_only_valueerror(text):
         parse_vol_json(text)
     except ValueError:
         pass
+
+
+def test_to_jsonable_normalises_str_subclasses():
+    import copy
+
+    from veritas.memory.volatility import _to_jsonable
+
+    class Wrapped(str):
+        def __reduce_ex__(self, protocol):  # mimics volatility3 objects.String
+            raise AttributeError("not copyable")
+
+    out = _to_jsonable(Wrapped("ntdll.dll"))
+    assert type(out) is str and out == "ntdll.dll"
+    assert copy.deepcopy(out) == "ntdll.dll"

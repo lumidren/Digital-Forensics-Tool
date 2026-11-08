@@ -1,0 +1,24 @@
+{
+  "parser": "volatility3",
+  "reference": "vol CLI -r json (same Volatility build)",
+  "samples": [
+    "pat-2009-12-06.mddramimage"
+  ],
+  "records_ours": 1199,
+  "records_reference": 1199,
+  "fields": {
+    "windows.info": {
+      "agree": 23,
+      "total": 23
+    },
+    "windows.pslist": {
+      "agree": 28,
+      "total": 28
+    },
+    "windows.dlllist": {
+      "agree": 1148,
+      "total": 1148
+    }
+  },
+  "notes": "windows.netscan: inprocess=['windows.netscan: NotImplementedError: This version of Windows is not supported: 5.1 15.2600!'] cli=['windows.netscan: RuntimeError: vol exited 1:   File \"C:\\\\Users\\\\mgoma\\\\Desktop\\\\Security Assignments\\\\Digital-Forensics-Tool\\\\.venv\\\\Lib\\\\site-packages\\\\volatility3\\\\framework\\\\plugins\\\\windows\\\\netscan.py\", line 318, in determine_tcpip_version |     raise NotImplementedError( | NotImplementedError: This version of Windows is not supported: 5.1 15.2600!']"
+}

@@ -402,8 +402,11 @@ def _to_jsonable(value: Any) -> Any:
 
     if isinstance(value, interfaces.renderers.BaseAbsentValue):
         return None
-    if isinstance(value, bool) or value is None or isinstance(value, str):
+    if isinstance(value, bool) or value is None:
         return value
+    if isinstance(value, str):
+        # Volatility's objects.String subclasses str but cannot be copied or pickled; normalise.
+        return str.__str__(value)
     if isinstance(value, int):
         return int(value)
     if isinstance(value, float):
@@ -508,14 +511,16 @@ def _run_inprocess(image: str, plugin_name: str, args: dict[str, Any], cfg: Vola
 
 # --------------------------------------------------------------------------- subprocess backend
 def default_vol_command() -> list[str]:
-    exe = shutil.which("vol")
-    if exe:
-        return [exe]
+    """The ``vol`` of this interpreter's environment first, so the CLI and in-process backends run
+    the same Volatility build; a ``vol`` elsewhere on PATH may be a different version."""
     scripts = Path(sys.executable).parent
     for cand in ("vol.exe", "vol"):
         p = scripts / cand
         if p.is_file():
             return [str(p)]
+    exe = shutil.which("vol")
+    if exe:
+        return [exe]
     return [sys.executable, "-c", "from volatility3.cli import main; main()"]
 
 
