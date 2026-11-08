@@ -170,8 +170,15 @@ impl UploadClient {
             let cert = std::fs::read(&tls.client_cert)?;
             let key = std::fs::read(&tls.client_key)?;
             let ca = std::fs::read(&tls.ca)?;
-            let identity = native_tls::Identity::from_pkcs8(&cert, &key)
-                .map_err(|e| AgentError::Tls(format!("client identity: {}", e)))?;
+            let identity = native_tls::Identity::from_pkcs8(&cert, &key).map_err(|e| {
+                // SChannel imports only RSA PKCS#8 keys; OpenSSL and Secure Transport also take EC.
+                let hint = if cfg!(windows) {
+                    " (on Windows the client key must be RSA)"
+                } else {
+                    ""
+                };
+                AgentError::Tls(format!("client identity: {}{}", e, hint))
+            })?;
             let ca = native_tls::Certificate::from_pem(&ca)
                 .map_err(|e| AgentError::Tls(format!("CA certificate: {}", e)))?;
             let connector = native_tls::TlsConnector::builder()
