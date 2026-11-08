@@ -2,6 +2,27 @@
 
 All notable changes are listed here. The format follows Keep a Changelog; versions follow SemVer.
 
+## [Unreleased]
+
+### Added
+- AFF4 v1.0 imaging and reading (`veritas-aff4`, `veritas-agent image --format aff4`, AFF4 evidence
+  in `fs-tool` and `veritas hash`), two-way parity with pyaff4 0.34 on 10 samples.
+- Retention disposal: `POST /api/v1/admin/retention/dispose` with a dry-run plan, a short-lived
+  confirmation token, legal-hold and retention-date refusals, signed custody notes before and after,
+  audit entries, and an admin page to plan and confirm it. The ledger and audit log are kept.
+- Real mutual-TLS upload test: the release agent against a TLS server that requires client
+  certificates, including wrong-CA and missing-identity cases.
+- Rust coverage measurement (79.7% of lines) with a 78% CI gate; see `docs/COVERAGE.md`.
+- Memory analysis checked against the public M57 Windows XP image: 1199/1199 records agree with
+  the Volatility 3 CLI.
+
+### Fixed
+- Volatility `String` values are normalised before serialisation; the Volatility CLI is taken
+  from the same environment as the library.
+- CI: Node 22 with npm 11, corpus fetched for unit tests, Trivy action v0.33.1, pullable MinIO
+  images, macOS 14 runners, deploy action inputs passed through the environment, Semgrep clean.
+- Clippy MSRV pinned to 1.80; lints from the current stable toolchain cleared.
+
 ## [0.1.0] - 2026-11-04
 
 First complete release.
