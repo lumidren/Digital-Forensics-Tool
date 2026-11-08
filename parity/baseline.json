@@ -1,4 +1,14 @@
 {
+ "aff4": {
+  "chunk_layout": 1.0,
+  "compression_method": 1.0,
+  "md5": 1.0,
+  "media_bytes": 1.0,
+  "media_size": 1.0,
+  "sha1": 1.0,
+  "sha256": 1.0,
+  "verify": 1.0
+ },
  "evtx": {
   "computer_name": 1.0,
   "event_identifier": 1.0,

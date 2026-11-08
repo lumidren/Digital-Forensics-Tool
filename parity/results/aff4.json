@@ -1,0 +1,53 @@
+{
+  "parser": "aff4",
+  "reference": "pyaff4 0.34",
+  "samples": [
+    "ours:dfvfs/ntfs.raw:deflate:cis=2048",
+    "ours:dfvfs/ext2.raw:snappy:cis=16",
+    "ours:dfvfs/fat12.raw:stored:cis=64",
+    "ours:random:deflate:cis=8",
+    "ours:tiny:snappy:cis=2048",
+    "reference:pyaff4:dfvfs/ntfs.raw:zlib:chunk=32768:cis=1024",
+    "reference:pyaff4:dfvfs/ext2.raw:snappy:chunk=32768:cis=8",
+    "reference:pyaff4:random:stored:chunk=32768:cis=16",
+    "reference:pyaff4:random:zlib:chunk=65536:cis=3",
+    "reference:pyaff4:tiny:zlib:chunk=32768:cis=1024"
+  ],
+  "records_ours": 10,
+  "records_reference": 10,
+  "fields": {
+    "media_size": {
+      "agree": 10,
+      "total": 10
+    },
+    "md5": {
+      "agree": 10,
+      "total": 10
+    },
+    "sha1": {
+      "agree": 10,
+      "total": 10
+    },
+    "sha256": {
+      "agree": 5,
+      "total": 5
+    },
+    "compression_method": {
+      "agree": 5,
+      "total": 5
+    },
+    "chunk_layout": {
+      "agree": 10,
+      "total": 10
+    },
+    "media_bytes": {
+      "agree": 10,
+      "total": 10
+    },
+    "verify": {
+      "agree": 5,
+      "total": 5
+    }
+  },
+  "notes": "Direction 1: AFF4 Standard v1.0 containers written by veritas-aff4 (ImageStream behind a linear aff4:Map, deflate/zlib, snappy and stored chunks) opened with pyaff4. Direction 2: containers written with pyaff4's API (zlib, snappy and stored ImageStreams, aff4:Map, aff4:Image with MD5/SHA-1 aff4:hash literals) read by veritas-aff4. raw-deflate (RFC 1951, Evimetry) is not compared because pyaff4 cannot read it; LZ4 is read-only in veritas-aff4 and pyaff4's LZ4 writer prefixes a size header that the AFF4 convention does not use. pyaff4 0.34 was installed without its exact pins (rdflib 7, pycryptodome 3, python-snappy)."
+}

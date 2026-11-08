@@ -39,6 +39,8 @@ TARGETS: dict[tuple[str, str], list[str]] = {
     ("veritas-fs", "logfile"): [],
     ("veritas-fs", "vss"): [],
     ("veritas-fs", "carve"): ["plaso/test_pe.exe", "plaso/Document.docx"],
+    ("veritas-aff4", "container"): [],
+    ("veritas-aff4", "turtle"): [],
 }
 MAX_SEED = 1 << 20  # libFuzzer handles small inputs best; larger seeds are truncated copies
 
@@ -62,6 +64,22 @@ def seed(crate: str, target: str, patterns: list[str]) -> pathlib.Path:
                 (d / f.name).write_bytes(f.read_bytes()[:MAX_SEED])
     if target == "mft" and (C / "plaso" / "MFT").exists():
         (d / "mft_head").write_bytes((C / "plaso" / "MFT").read_bytes()[: 1024 * 64])
+    if crate == "veritas-aff4":
+        # AFF4 seeds are generated: a small container written by our own writer, and its Turtle.
+        seed_img = d / "fat12.aff4"
+        if not seed_img.exists():
+            subprocess.run(
+                ["cargo", "run", "-q", "-p", "veritas-aff4", "--bin", "aff4-tool", "--", "write",
+                 str(C / "dfvfs" / "fat12.raw"), str(seed_img), "--chunk-size", "4096",
+                 "--chunks-per-segment", "4", "--fixed-time", "2026-01-01T00:00:00Z"],
+                cwd=ROOT, check=True, stdout=subprocess.DEVNULL,
+            )
+        if target == "turtle":
+            data = seed_img.read_bytes()
+            start = data.rfind(b"@prefix rdf:")
+            end = data.find(b"PK\x01\x02", start)
+            seed_img.unlink()
+            (d / "information.turtle").write_bytes(data[start:end])
     return d
 
 
