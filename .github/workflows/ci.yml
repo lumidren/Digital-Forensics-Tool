@@ -39,6 +39,21 @@ jobs:
       - name: cargo test
         run: cargo test --workspace --locked
 
+  rust-coverage:
+    name: Rust coverage (lines >= 78%)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      - run: cargo llvm-cov --workspace --locked --summary-only --fail-under-lines 78
+
   cargo-audit:
     name: cargo-audit
     runs-on: ubuntu-latest
