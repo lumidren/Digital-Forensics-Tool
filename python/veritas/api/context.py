@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import logging
 import os
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -82,6 +84,9 @@ class AppContext:
             d.mkdir(parents=True, exist_ok=True)
         master = self._master_key()
         self.keyring = CaseKeyring(master)
+        # HMAC key for retention-disposal confirmation tokens; derived, never stored or returned.
+        self._disposal_key = hashlib.sha256(master + b"veritas-retention-disposal-token").digest()
+        self.disposal_token_ttl_s = int(os.environ.get("VERITAS_DISPOSAL_TOKEN_TTL_S", "900"))
         self.engine = make_engine(settings.database_url)
         self.Session = make_sessionmaker(self.engine)
         self.store: LocalStore | S3Store
@@ -152,3 +157,24 @@ class AppContext:
 
     def verify_custody(self, case_id: str) -> tuple[bool, list[str]]:
         return verify_entries(self.ledger(case_id).entries(), self.vault.registry())
+
+    # --- retention disposal ---------------------------------------------------------------------
+    def _disposal_mac(self, actor: str, case_ids: list[str], plan_hash: str, reason: str, expires: int) -> str:
+        msg = json.dumps(["veritas-disposal-v1", actor, sorted(case_ids), plan_hash, reason, expires], separators=(",", ":"))
+        return hmac.new(self._disposal_key, msg.encode("utf-8"), hashlib.sha256).hexdigest()
+
+    def disposal_token(self, actor: str, case_ids: list[str], plan_hash: str, reason: str, now: float | None = None) -> tuple[str, int]:
+        """Short-lived confirmation token bound to the actor, the case ids, the reason and the plan hash."""
+        expires = int((time.time() if now is None else now) + self.disposal_token_ttl_s)
+        return f"{expires}.{self._disposal_mac(actor, case_ids, plan_hash, reason, expires)}", expires
+
+    def check_disposal_token(self, token: str, actor: str, case_ids: list[str], plan_hash: str, reason: str) -> str | None:
+        """None when valid, otherwise why it is not."""
+        exp_s, _, mac = (token or "").partition(".")
+        if not exp_s.isdigit() or len(mac) != 64:
+            return "malformed confirmation token"
+        if not hmac.compare_digest(mac, self._disposal_mac(actor, case_ids, plan_hash, reason, int(exp_s))):
+            return "confirmation token does not match this plan (run the dry run again)"
+        if int(exp_s) < time.time():
+            return "confirmation token expired (run the dry run again)"
+        return None

@@ -33,13 +33,18 @@ class Case(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     name: Mapped[str] = mapped_column(String(300))
     description: Mapped[str] = mapped_column(Text, default="")
-    status: Mapped[str] = mapped_column(String(32), default="open")  # open | review | closed
+    status: Mapped[str] = mapped_column(String(32), default="open")  # open | review | closed | disposed
     created_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
     created: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     timezone: Mapped[str | None] = mapped_column(String(64), nullable=True)
     legal_hold: Mapped[bool] = mapped_column(Boolean, default=False)
     retention_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ledger_id: Mapped[str] = mapped_column(String(64))
+    # Retention disposal (set once, by POST /api/v1/admin/retention/dispose). The case row, its custody
+    # ledger, anchors and the audit log are kept forever as proof of what existed and that it was destroyed.
+    disposed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    disposed_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    disposal_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     members: Mapped[list["Membership"]] = relationship(back_populates="case", cascade="all, delete-orphan")
 
 
@@ -221,7 +226,7 @@ def _add_missing_columns(engine) -> None:
             if col.name not in have:
                 ddl = col.type.compile(dialect=engine.dialect)
                 with engine.begin() as c:
-                    c.execute(text(f'ALTER TABLE {table.name} ADD COLUMN {col.name} {ddl}'))
+                    c.execute(text(f'ALTER TABLE {table.name} ADD COLUMN {col.name} {ddl}'))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text - additive DDL built from the ORM model metadata, no user input
 
 
 def make_sessionmaker(engine):

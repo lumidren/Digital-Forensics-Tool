@@ -49,6 +49,7 @@ from .config import Settings, load
 from .context import AppContext
 from .db import ROLES, Bookmark, Case, Evidence, FindingRow, Hypothesis, IocRow, Membership, Note, Report, SavedView, Task, User
 from .findings import row_to_dict, run_rules, transition
+from .retention import DISPOSED, build_plan, counts, execute_case, plan_hash
 
 log = logging.getLogger("veritas.api")
 
@@ -161,6 +162,14 @@ class ReportIn(BaseModel):
     limitations: list[str] = []
 
 
+class DisposeIn(BaseModel):
+    case_ids: list[str] = Field(min_length=1, max_length=100)
+    reason: str = Field(min_length=5, max_length=2000)
+    # Real run only: the token returned by the dry run, and one "DISPOSE <case_id>" per case.
+    token: str | None = None
+    confirm: list[str] = []
+
+
 class IntakeIn(BaseModel):
     evidence_name: str
     kind: str = "disk"
@@ -197,7 +206,32 @@ def create_app(settings: Settings | None = None, start_processor: bool | None = 
     obs.install(app, ctx, jobs)
 
     get_principal = get_principal_factory(lambda: ctx.tokens, ctx.Session)
-    need = case_access_factory(get_principal, ctx.Session)
+    _need = case_access_factory(get_principal, ctx.Session)
+    intake_dir = settings.data_dir / "intake"
+    intake_dir.mkdir(exist_ok=True)
+    # POST routes that only read; everything else that is not GET/HEAD mutates the case.
+    read_only_posts = {"/api/v1/cases/{case_id}/timeline/search", "/api/v1/cases/{case_id}/timeline/histogram", "/api/v1/cases/{case_id}/timeline/facets/{column}"}
+
+    def _disposed(case_id: str) -> bool:
+        with ctx.Session() as s:
+            c = s.get(Case, case_id)
+            return c is not None and c.status == DISPOSED
+
+    def need(role: str):
+        """Case access (RBAC) plus the disposed-case rule: evidence is 410 Gone, mutations are 409."""
+        base = _need(role)
+
+        def dep(request: Request, a: CaseAccess = Depends(base)) -> CaseAccess:
+            if _disposed(a.case_id):
+                route = request.scope.get("route")
+                path = getattr(route, "path", request.url.path)
+                if "/evidence" in path:
+                    raise HTTPException(410, "case disposed: evidence destroyed under retention policy")
+                if request.method not in ("GET", "HEAD") and path not in read_only_posts:
+                    raise HTTPException(409, "case disposed")
+            return a
+
+        return dep
 
     @app.middleware("http")
     async def audit_mw(request: Request, call_next):
@@ -303,8 +337,38 @@ def create_app(settings: Settings | None = None, start_processor: bool | None = 
         """List cases past retention that are not on legal hold. Deletion is a separate, explicit action."""
         now = datetime.now(timezone.utc)
         with ctx.Session() as s:
-            due = [c.id for c in s.query(Case) if c.retention_until and _aware(c.retention_until) < now and not c.legal_hold]
+            due = [c.id for c in s.query(Case).order_by(Case.retention_until) if c.retention_until and _aware(c.retention_until) < now and not c.legal_hold and c.status != DISPOSED]
         return {"due_for_disposal": due}
+
+    @app.post("/api/v1/admin/retention/dispose")
+    def retention_dispose(body: DisposeIn, dry_run: bool = Q(True), p: Principal = Depends(admin)):
+        """Two-step disposal. The dry run (default) returns the exact plan and a short-lived token bound to
+        it; the real run (``dry_run=false``) needs that token and ``"DISPOSE <case_id>"`` for every case."""
+        ids = list(dict.fromkeys(body.case_ids))
+        plan = build_plan(ctx, jobs, intake_dir, ids)
+        phash = plan_hash(plan)
+        if dry_run:
+            token, expires = ctx.disposal_token(p.user_id, ids, phash, body.reason)
+            for cp in plan["cases"]:
+                ctx.audit.append(p.user_id, "retention.dispose.dry_run", cp["case_id"], None, {"counts": counts(cp), "bytes": cp["bytes"], "reason": body.reason, "plan_sha256": phash})
+            return {"dry_run": True, "plan_sha256": phash, "confirmation_token": token, "expires_at": datetime.fromtimestamp(expires, timezone.utc).isoformat(),
+                    "confirm_phrases": [f"DISPOSE {c}" for c in ids], **plan}
+        missing = [c for c in ids if f"DISPOSE {c}" not in body.confirm]
+        if missing:
+            raise HTTPException(422, {"message": "confirmation phrase missing", "expected": [f"DISPOSE {c}" for c in missing]})
+        if not body.token:
+            raise HTTPException(403, "confirmation token required: run the dry run first")
+        why = ctx.check_disposal_token(body.token, p.user_id, ids, phash, body.reason)
+        if why:
+            raise HTTPException(403, why)
+        results = []
+        for cp in plan["cases"]:
+            res = execute_case(ctx, jobs, intake_dir, cp, phash, p.user_id, body.reason)
+            ctx.audit.append(p.user_id, "retention.dispose", cp["case_id"], None,
+                             {"counts": counts(cp), "bytes": res["bytes_deleted"], "reason": body.reason, "plan_sha256": phash,
+                              "retained_by_object_lock": len(res["retained_by_object_lock"]), "delete_denied": len(res["delete_denied"]), "intent_entry_hash": res["intent_entry_hash"]})
+            results.append(res)
+        return {"dry_run": False, "plan_sha256": phash, "disposed": results}
 
     @app.get("/api/v1/admin/store/verify")
     def store_verify(p: Principal = Depends(admin)):
@@ -491,8 +555,6 @@ def create_app(settings: Settings | None = None, start_processor: bool | None = 
         return {"job_id": processor.enqueue(a.case_id, e, kind or classify(head, e.kind, e.name))}
 
     # ------------------------------------------------------------------ agent intake (resumable)
-    intake_dir = settings.data_dir / "intake"
-    intake_dir.mkdir(exist_ok=True)
 
     @app.post("/api/v1/intake/sessions", status_code=201)
     def intake_create(body: IntakeIn, case_id: str = Q(...), a: CaseAccess = Depends(need("examiner"))):
@@ -522,6 +584,8 @@ def create_app(settings: Settings | None = None, start_processor: bool | None = 
     @app.put("/api/v1/intake/sessions/{sid}/segments/{n}")
     async def intake_segment(sid: str, n: int, request: Request, x_segment_sha256: str = Header(...), p: Principal = Depends(get_principal)):
         d, m = _intake(sid, p)
+        if _disposed(m["case_id"]):
+            raise HTTPException(409, "case disposed")
         segs = {s["index"]: s for s in m["segments"]}
         if n not in segs or segs[n]["sha256"] != x_segment_sha256.lower():
             raise HTTPException(409, "segment not in manifest or hash differs from manifest")
@@ -540,6 +604,8 @@ def create_app(settings: Settings | None = None, start_processor: bool | None = 
     @app.post("/api/v1/intake/sessions/{sid}/complete", status_code=201)
     def intake_complete(sid: str, p: Principal = Depends(get_principal)):
         d, m = _intake(sid, p)
+        if _disposed(m["case_id"]):
+            raise HTTPException(409, "case disposed")
         missing = [s["index"] for s in m["segments"] if not (d / f"{s['index']}.seg").exists()]
         if missing:
             raise HTTPException(409, f"missing segments {missing[:20]}")
@@ -996,7 +1062,8 @@ def _aware(dt: datetime) -> datetime:
 
 def _case(c: Case) -> dict[str, Any]:
     return {"id": c.id, "name": c.name, "description": c.description, "status": c.status, "created_by": c.created_by, "created": _aware(c.created).isoformat(),
-            "timezone": c.timezone, "legal_hold": c.legal_hold, "retention_until": _aware(c.retention_until).isoformat() if c.retention_until else None, "ledger_id": c.ledger_id}
+            "timezone": c.timezone, "legal_hold": c.legal_hold, "retention_until": _aware(c.retention_until).isoformat() if c.retention_until else None, "ledger_id": c.ledger_id,
+            "disposed_at": _aware(c.disposed_at).isoformat() if c.disposed_at else None, "disposed_by": c.disposed_by, "disposal_reason": c.disposal_reason}
 
 
 def ewf_segment_set(first: Path) -> list[Path]:
