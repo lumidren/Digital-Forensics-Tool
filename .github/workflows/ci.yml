@@ -16,7 +16,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   PYTHON_VERSION: "3.12"
-  NODE_VERSION: "20"
+  NODE_VERSION: "22"
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
 jobs:
@@ -71,6 +71,8 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e "python[dev,cluster]"
+      - name: Fetch the pinned test corpus (sha256-verified)
+        run: python testdata/fetch.py
       - name: ruff
         run: ruff check python scripts
       - name: mypy
@@ -236,6 +238,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: web/package-lock.json
+      # The lockfile is written by npm 11; Node 22 ships npm 10, so pin npm to match.
+      - run: npm install -g npm@11
       # THREAT:T7.4 npm ci installs exactly package-lock.json and fails if it is out of date.
       - run: npm ci --no-fund
       # THREAT:T7.1 npm audit fails on HIGH or CRITICAL advisories in production dependencies.
@@ -322,7 +326,7 @@ jobs:
       # THREAT:T7.1 Vulnerable dependencies (fs) and misconfigurations (Dockerfiles, Helm, Kubernetes,
       # Terraform) of severity HIGH or CRITICAL fail the build; accepted risks live in .trivyignore.
       - name: Trivy fs (dependencies and secrets)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           scan-type: fs
           scan-ref: .
@@ -333,7 +337,7 @@ jobs:
           trivyignores: .trivyignore
           skip-dirs: testdata/corpus,target,web/node_modules
       - name: Trivy config (IaC)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           scan-type: config
           scan-ref: .
@@ -426,15 +430,6 @@ jobs:
         options: >-
           --health-cmd "wget -qO- http://127.0.0.1:8123/ping"
           --health-interval 5s --health-timeout 5s --health-retries 20
-      minio:
-        image: bitnami/minio:2024.10.13
-        env:
-          MINIO_ROOT_USER: ci-minio-root
-          MINIO_ROOT_PASSWORD: ci-minio-root-password
-        ports: ["9000:9000"]
-        options: >-
-          --health-cmd "curl -fsS http://127.0.0.1:9000/minio/health/live"
-          --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       VERITAS_DATABASE_URL: postgresql+psycopg://veritas:ci-postgres-password@127.0.0.1:5432/veritas
       VERITAS_TIMELINE_URL: clickhouse://veritas:ci-clickhouse-password@127.0.0.1:8123/veritas
@@ -454,6 +449,18 @@ jobs:
           cache: pip
           cache-dependency-path: python/pyproject.toml
       - run: pip install -e "python[dev,cluster]"
+      # MinIO needs a "server /data" command, which service containers cannot pass, so it runs here.
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER="$AWS_ACCESS_KEY_ID" -e MINIO_ROOT_PASSWORD="$AWS_SECRET_ACCESS_KEY" \
+            alpine/minio:RELEASE.2025-10-15T17-29-55Z server /data
+          for i in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:9000/minio/health/live && exit 0
+            sleep 2
+          done
+          docker logs minio
+          exit 1
       - name: Create the Object Lock (COMPLIANCE) evidence bucket
         run: |
           python - <<'PY'
