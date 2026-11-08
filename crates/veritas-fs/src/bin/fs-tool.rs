@@ -170,7 +170,7 @@ fn ntfs_volume(src: Source, partition: Option<usize>) -> R<(ImageVolume, Ntfs)> 
     let vols = image::volumes(src)?;
     let v = vols
         .into_iter()
-        .find(|v| v.fs == FsKind::Ntfs && partition.is_none_or(|p| p == v.index))
+        .find(|v| v.fs == FsKind::Ntfs && partition.map_or(true, |p| p == v.index))
         .ok_or_else(|| FsError::NotFound("NTFS volume".into()))?;
     let n = Ntfs::open(v.src.clone())?;
     Ok((v, n))
@@ -437,7 +437,7 @@ fn run(cli: Cli) -> R<()> {
             let vols = image::volumes(open(&image)?)?;
             let v = vols
                 .into_iter()
-                .find(|v| partition.is_none_or(|p| p == v.index) && vss::probe(v.src.as_ref()))
+                .find(|v| partition.map_or(true, |p| p == v.index) && vss::probe(v.src.as_ref()))
                 .ok_or_else(|| FsError::NotFound("VSS volume header".into()))?;
             let vs = Arc::new(vss::Vss::open(v.src.clone())?);
             for s in &vs.stores {

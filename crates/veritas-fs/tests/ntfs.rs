@@ -282,7 +282,7 @@ fn timestomp_rules() {
         },
         fname.clone(),
     );
-    assert!(timestomp::detect(&[clean.clone()], &[]).is_empty());
+    assert!(timestomp::detect(std::slice::from_ref(&clean), &[]).is_empty());
     // Backdated SI with whole-second precision.
     let stomped = entry_with(
         StdInfo {

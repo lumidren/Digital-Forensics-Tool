@@ -31,6 +31,7 @@ impl Ctx {
     }
 }
 
+#[allow(clippy::too_many_arguments)] // one call site per event kind; a builder would only add noise
 fn ev(
     ctx: &Ctx,
     data_type: &str,

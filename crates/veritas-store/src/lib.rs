@@ -326,6 +326,8 @@ mod tests {
         // Corrupt the metadata to claim another case: decryption must fail, not leak.
         let mp = store.meta_path(&meta.address);
         let mut perms = fs::metadata(&mp).unwrap().permissions();
+        #[allow(clippy::permissions_set_readonly_false)]
+        // test fixture: temp file, make it writable to tamper with it
         perms.set_readonly(false);
         fs::set_permissions(&mp, perms).unwrap();
         let mut m = store.meta(&meta.address).unwrap();
@@ -343,6 +345,8 @@ mod tests {
         let meta = store.put("CASE-1", &mut &b"original"[..], None).unwrap();
         let path = store.object_path(&meta.address);
         let mut perms = fs::metadata(&path).unwrap().permissions();
+        #[allow(clippy::permissions_set_readonly_false)]
+        // test fixture: temp file, make it writable to tamper with it
         perms.set_readonly(false);
         fs::set_permissions(&path, perms).unwrap();
         fs::write(&path, b"altered!").unwrap();

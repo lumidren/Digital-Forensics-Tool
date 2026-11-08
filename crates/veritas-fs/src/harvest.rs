@@ -625,7 +625,7 @@ mod xp_layout_tests {
             ("/Documents and Settings/Mr. Evil/My Documents/notes.txt", None),
         ];
         for (p, want) in cases {
-            assert_eq!(m.classify(p).as_deref(), *want, "{p}");
+            assert_eq!(m.classify(p), *want, "{p}");
         }
     }
 }

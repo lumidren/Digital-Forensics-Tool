@@ -89,7 +89,7 @@ fn plausible_time(t: u64) -> bool {
 fn carve_entry(buf: &[u8], p: usize, end: usize) -> Option<(IndexEntry, usize)> {
     let fref = u64_at(buf, p).ok()?;
     let klen = u16_at(buf, p + 10).ok()? as usize;
-    if klen < 0x42 || klen > 0x242 {
+    if !(0x42..=0x242).contains(&klen) {
         return None;
     }
     let key = need(buf, p + 16, 0x42).ok()?;
@@ -147,7 +147,7 @@ pub fn parse_index_allocation(
     rec_size: usize,
     sector: usize,
 ) -> Result<Vec<IndexEntry>> {
-    if rec_size < 512 || rec_size > 65536 {
+    if !(512..=65536).contains(&rec_size) {
         return Err(FsError::invalid(0, "index record size"));
     }
     let mut out = Vec::new();

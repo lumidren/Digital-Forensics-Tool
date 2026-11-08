@@ -18,7 +18,7 @@ fn hot(name: &str) -> Vec<(usize, usize)> {
         "plaso/syslog_image.dd" => vec![(0, 102400)],
         "dfvfs/apfs.raw" => vec![
             (0, 4096),
-            (1 * 4096, 120 * 4096),
+            (4096, 120 * 4096),
             (1026 * 4096, 4096),
             (1028 * 4096, 4096),
         ],
@@ -37,6 +37,7 @@ fn hot(name: &str) -> Vec<(usize, usize)> {
 }
 
 fn base(name: &'static str) -> Arc<Vec<u8>> {
+    #[allow(clippy::type_complexity)]
     static CACHE: OnceLock<
         std::sync::Mutex<std::collections::BTreeMap<&'static str, Arc<Vec<u8>>>>,
     > = OnceLock::new();

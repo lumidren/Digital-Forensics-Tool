@@ -62,7 +62,7 @@ fn parse_with_sector(src: &dyn ReadAt, ss: u64) -> Result<VolumeSystem> {
     let num_entries = u32_at(&hdr, 80)? as u64;
     let entry_size = u32_at(&hdr, 84)? as u64;
     let entries_crc = u32_at(&hdr, 88)?;
-    if entry_size < 128 || entry_size > 4096 || entry_size % 8 != 0 {
+    if !(128..=4096).contains(&entry_size) || entry_size % 8 != 0 {
         return Err(FsError::invalid(ss + 84, "GPT entry size out of range"));
     }
     let total = num_entries

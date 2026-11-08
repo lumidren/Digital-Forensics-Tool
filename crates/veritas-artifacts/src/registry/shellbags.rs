@@ -49,6 +49,7 @@ pub struct ShellBagEntry {
     pub decode_error: Option<String>,
 }
 
+#[allow(clippy::type_complexity)] // private helper returning the decoded fields as one tuple
 fn decode(
     raw: &[u8],
 ) -> (

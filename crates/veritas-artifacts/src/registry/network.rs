@@ -59,6 +59,7 @@ pub struct NetworkProfile {
     pub last_written_ns: Option<i64>,
 }
 
+#[allow(clippy::type_complexity)] // a local accumulator tuple, read once below
 pub fn profiles(hive: &Hive) -> Vec<NetworkProfile> {
     let mut sigs: BTreeMap<String, (Option<String>, Option<String>, Option<String>, String)> =
         BTreeMap::new();
