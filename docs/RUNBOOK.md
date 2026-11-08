@@ -60,8 +60,11 @@ ingest: confirm with the case leads (audit log: `GET /api/v1/admin/audit?actor=.
 are a security event: identify the actor in the audit log, disable the account (section 4).
 
 ### VeritasStoreShrank
-The object count of the WORM store decreased. This cannot happen through the application; S3 Object Lock
-COMPLIANCE forbids deletion. Treat as an integrity incident: preserve CloudTrail and S3 access logs
+The object count of the WORM store decreased. The only application path that deletes objects is
+retention disposal (section 6): first check the audit log for `retention.dispose` rows
+(`GET /api/v1/admin/audit?limit=...`) and the case ledgers' `retention disposal` notes, whose object
+lists must account for every missing address. Otherwise S3 Object Lock COMPLIANCE forbids deletion
+before the lock date. Treat any unexplained drop as an integrity incident: preserve CloudTrail and S3 access logs
 (`s3://veritas-<env>-logs-<account>/s3/`), run `python -m veritas.api.manage verify-store` from an API
 pod, compare the object list with the latest backup manifest (`restore.py` prints missing objects), and
 escalate to security.
@@ -156,14 +159,46 @@ the public key and validity window are in the key registry used by every verifie
 
 ## 6. Retention and disposal
 
-1. `POST /api/v1/admin/retention/sweep` lists cases past `retention_until` and not on legal hold. It
-   deletes nothing.
+1. `POST /api/v1/admin/retention/sweep` (admin) lists cases past `retention_until`, not on legal hold
+   and not already disposed. It deletes nothing. The admin console (Admin, Retention tab) shows the
+   same list.
 2. Disposal needs written approval from the case lead and records management. Export first:
    custody export, final report, timeline export, audit-log extract for the case.
-3. Timeline rows: `TimelineStore.delete_case` (SQLite/ClickHouse) from an API pod. Case database rows:
-   database change under change control. Evidence objects in S3 cannot be deleted before their Object
-   Lock retention date (COMPLIANCE); after it, delete through a separately authorised role (no Veritas
-   role has `s3:DeleteObject`), and record a final `note` custody entry and the deletion manifest.
+3. Plan (dry run, deletes nothing):
+   `POST /api/v1/admin/retention/dispose?dry_run=true` with
+   `{"case_ids": ["<case>"], "reason": "<approval reference>"}`. The response lists every evidence
+   object (address, MD5/SHA-256/SHA3-256, size, evidence id), derived objects, objects **kept** because
+   another live case references the same content address (`kept_shared`), timeline event count, report
+   files, intake leftovers, pending jobs, database row counts, a `plan_sha256` and a
+   `confirmation_token` (HMAC over admin, case ids, reason and plan hash; valid
+   `VERITAS_DISPOSAL_TOKEN_TTL_S`, default 900 s). The whole request is refused with 409 if any case is
+   on legal hold, has no `retention_until` or one in the future, is already disposed, or has a running
+   processing job.
+4. Dispose: the same call with `dry_run=false`, the same `case_ids` and `reason`, `"token": "<token>"`
+   and `"confirm": ["DISPOSE <case>", ...]` (one phrase per case). The token is rejected (403) if it
+   expired, was tampered with, was issued to another admin, or if anything in the plan changed since
+   the dry run (new evidence, new events): run the dry run again. In the console the operator must type
+   the case id before the button is enabled.
+5. What happens, per case, in order: a signed custody `note` (purpose `retention disposal`, phase
+   `intent`) listing every address and hash to be destroyed; ledger head anchored; pending jobs
+   cancelled; timeline events deleted; store objects not shared with a live case deleted (LocalStore:
+   read-only bit cleared, object and meta removed; S3: every version deleted); report files and intake
+   leftovers removed; evidence, findings, bookmarks, notes, hypotheses, tasks, IOCs, views, reports and
+   non-lead memberships deleted; case row set to `status="disposed"` with `disposed_at`, `disposed_by`,
+   `disposal_reason`; a closing `note` (phase `completed`) with the per-object outcome; ledger anchored
+   again. The audit log gets `retention.dispose.dry_run` and `retention.dispose` rows with counts,
+   bytes and reason.
+6. Kept forever: the case row, the custody ledger (`ledgers/<case>.jsonl`), its anchors and the audit
+   log, plus lead memberships so that `GET /cases/<case>/custody`, `/custody/verify` and
+   `/custody/export` keep working (lead or admin); the export still verifies with
+   `veritas-verify export`. A disposed case is read-only: mutating routes return 409 `case disposed`,
+   evidence routes 410 Gone.
+7. S3: objects still under COMPLIANCE Object Lock (or an S3 legal hold) cannot be deleted by anyone;
+   they are reported as `retained_by_object_lock` and are not an error. Delete them after the lock
+   expires through the separately authorised role, and record a `note` with the addresses. If the API
+   role lacks `s3:DeleteObjectVersion`, objects are reported as `delete_denied`; handle them the same
+   way. Each such deletion makes the store object count drop (see `VeritasStoreShrank`): correlate with
+   the `retention.dispose` audit rows before treating it as an incident.
 
 ## 7. Restoring
 
