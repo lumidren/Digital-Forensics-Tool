@@ -165,8 +165,8 @@ target/release/veritas-verify export var/bootstrap/<case>-custody.json
 
 | Area | Components |
 |---|---|
-| 🧲 Acquisition | `veritas-agent`: live triage, raw NTFS `$MFT`/`$LogFile`/`$UsnJrnl`, E01 imaging with triple hashing and bad-sector maps, write-block check, WinPmem/LiME/osxpmem, resumable mTLS upload |
-| 💽 File systems | NTFS (ADS, `$I30` slack, USN, `$LogFile`, timestomp), FAT/exFAT, ext2/3/4, APFS, VSS, MBR/GPT, carving, BitLocker/LUKS/APFS decryption, E01 and split raw |
+| 🧲 Acquisition | `veritas-agent`: live triage, raw NTFS `$MFT`/`$LogFile`/`$UsnJrnl`, E01 and AFF4 imaging with triple hashing and bad-sector maps, write-block check, WinPmem/LiME/osxpmem, resumable mTLS upload |
+| 💽 File systems | NTFS (ADS, `$I30` slack, USN, `$LogFile`, timestomp), FAT/exFAT, ext2/3/4, APFS, VSS, MBR/GPT, carving, BitLocker/LUKS/APFS decryption, E01, AFF4 and split raw |
 | 🪟 Windows | registry with log replay and deleted cells, UserAssist, ShellBags, MRUs, USB, ShimCache, Amcache, BAM, autoruns, EVTX/EVT, prefetch to Win11, LNK, jump lists, SRUM, browsers, PST, Office, Recycle Bin, WMI |
 | 🐧 Linux / 🍎 macOS | journald, syslog, auditd, utmp, shell history, cron, systemd, SSH; unified logs, FSEvents, KnowledgeC, plists, quarantine, TCC, launch agents, ASL, BSM |
 | 🧠 Memory · 🌐 Network · 🦠 Malware | Volatility 3 with injection, hollowing and credential-access heuristics; pcap flows, DNS, HTTP, TLS JA3, Zeek; PE/ELF/Mach-O, Authenticode, YARA, VirusTotal, MalwareBazaar, CAPE/Cuckoo |
@@ -190,12 +190,12 @@ docs/              architecture, threat model, compliance, parsers, runbooks, pa
 
 | Suite | Count |
 |---|---|
-| Rust unit, corpus and property tests | 243 |
-| Python tests (91% line coverage) | 713 |
-| Parity result sets | 68 |
-| Web unit tests | 106 |
+| Rust unit, corpus and property tests (79.7% line coverage) | 268 |
+| Python tests (91% line coverage) | 743 |
+| Parity result sets | 70 |
+| Web unit tests | 126 |
 | Browser end-to-end tests with axe | 26 |
-| Fuzz targets | 14 |
+| Fuzz targets | 16 |
 
 ```bash
 python testdata/fetch.py && cargo test --workspace --locked
@@ -210,12 +210,16 @@ cd web && npm test && npx playwright test
 |---|---|---|---|
 | [Architecture](docs/ARCHITECTURE.md) | [Parity results](docs/PARITY.md) | [Runbook](docs/RUNBOOK.md) | [Examiner guide](docs/EXAMINER_GUIDE.md) |
 | [Threat model](docs/THREAT_MODEL.md) | [Parsers](docs/PARSERS.md) | [Disaster recovery](docs/DR.md) | [Technical paper (PDF)](docs/paper/veritas-dfir.pdf) |
-| [Standards matrix](docs/COMPLIANCE_MATRIX.md) | [Benchmarks](docs/BENCHMARKS.md) | [Security policy](SECURITY.md) | [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) |
+| [Standards matrix](docs/COMPLIANCE_MATRIX.md) | [Benchmarks](docs/BENCHMARKS.md) · [Coverage](docs/COVERAGE.md) | [Security policy](SECURITY.md) | [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) |
 
 ## Known limitations
 
 * A 500 GB image was not processed end to end on the development machine; the 500 GB figure is modelled from measured stages and one measured 4.87 GB run.
-* Memory-forensics parity needs a memory image supplied through `VERITAS_MEM_IMAGE`.
+* Memory analysis is checked against one real image (the public M57 Windows XP capture, 1199/1199 records); newer Windows builds are untested, and `windows.netscan` does not support XP.
+* The agent and the intake API do not yet agree on authentication or the manifest shape: the agent authenticates by client certificate only and sends `evidence_id` + `segments`, while the API expects a bearer token and `evidence_name`/`kind`/`total_size`/`sha256`. mTLS itself is tested for real against a TLS server; end-to-end agent-to-API upload needs a certificate-to-user mapping at the ingress.
+* On Windows the agent's client key must be RSA (SChannel cannot import EC PKCS#8 keys).
+* AFF4 covers physical images (`aff4:ImageStream` + `aff4:Map`); logical, encrypted and multi-part containers are not supported.
+* Retention disposal against real S3 needs `s3:DeleteObjectVersion` in the IAM policy, which the Terraform does not grant yet.
 * Linux and macOS acquisition collectors compile and are unit-tested but have not run on real hosts.
 * Encrypted mobile backups, tracev3 unified logs and `$LogFile` replay are out of scope.
 * Cluster deployment files are validated statically; applying them needs cloud credentials.
