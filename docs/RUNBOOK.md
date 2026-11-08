@@ -200,6 +200,15 @@ the public key and validity window are in the key registry used by every verifie
    way. Each such deletion makes the store object count drop (see `VeritasStoreShrank`): correlate with
    the `retention.dispose` audit rows before treating it as an incident.
 
+## 6a. Issuing agent client certificates
+
+Each engagement gets its own CA; the intake ingress trusts only that CA and requires a client
+certificate on every connection. Issue client keys as **RSA 2048 or larger** in PKCS#8 PEM: on
+Windows the agent uses SChannel, which cannot import EC PKCS#8 keys and fails with
+`client identity: ... (on Windows the client key must be RSA)`. Linux and macOS agents accept EC
+keys too. `python/tests/unit/test_agent_mtls.py` shows the full certificate profile (CA with
+`pathlen:0`, server leaf with an IP/DNS SAN and `serverAuth`, client leaf with `clientAuth`).
+
 ## 7. Restoring
 
 See `docs/DR.md` section 3 for the case-database PITR, data-directory, regional and native procedures,
