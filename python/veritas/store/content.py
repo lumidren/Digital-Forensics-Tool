@@ -299,6 +299,31 @@ class LocalStore:
         for a in self.list():
             yield a, self.verify(a)
 
+    def locked_until(self, address: str) -> None:
+        """Local objects have no time-based lock; WORM is the read-only bit."""
+        return None
+
+    def delete(self, address: str) -> str:
+        """Retention disposal only: remove a committed object and its metadata.
+
+        The object and meta files are read-only (WORM); the read-only bit is cleared first so the
+        unlink also succeeds on Windows. Returns ``"deleted"`` or ``"missing"``.
+        """
+        if not re.fullmatch(r"[0-9a-f]{64}", address):
+            raise StoreError(f"invalid address {address!r}")
+        found = False
+        for p in (self._obj(address), self._meta(address)):
+            if p.exists():
+                os.chmod(p, stat.S_IREAD | stat.S_IWRITE)
+                p.unlink()
+                found = True
+        for d in (self._obj(address).parent, self._obj(address).parent.parent):
+            try:
+                d.rmdir()  # only succeeds when empty
+            except OSError:
+                break
+        return "deleted" if found else "missing"
+
 
 class S3Store:
     """S3 / MinIO backend. Requires Object Lock (compliance mode) on the bucket."""
@@ -398,3 +423,61 @@ class S3Store:
     def iter_verify(self) -> Iterator[tuple[str, bool]]:
         for a in self.list():
             yield a, self.verify(a)
+
+    def locked_until(self, address: str):
+        """Object Lock retain-until date of the object, or None when unlocked or unknown."""
+        try:
+            r = self.s3.get_object_retention(Bucket=self.bucket, Key=self._key(address))
+            return r.get("Retention", {}).get("RetainUntilDate")
+        except Exception:  # noqa: BLE001 - no retention configured or no permission: report unknown
+            return None
+
+    def delete(self, address: str) -> str:
+        """Retention disposal only: delete every version of the object and its metadata.
+
+        Compliance-mode Object Lock cannot be shortened or bypassed, so a version still under
+        retention (or legal hold) makes S3 refuse the delete; that is reported as
+        ``"retained_by_object_lock"`` (S3 lets it be deleted after the lock expires) instead of failing
+        the disposal. A refusal for any other reason (typically the role lacks
+        ``s3:DeleteObjectVersion``) is ``"delete_denied"``. Returns ``"deleted"``,
+        ``"retained_by_object_lock"``, ``"delete_denied"`` or ``"missing"``.
+        """
+        from datetime import datetime, timezone
+
+        if not re.fullmatch(r"[0-9a-f]{64}", address):
+            raise StoreError(f"invalid address {address!r}")
+        found = locked = denied = False
+        for key in (self._key(address), f"meta/{address}.json"):
+            versions: list[dict] = []
+            for page in self.s3.get_paginator("list_object_versions").paginate(Bucket=self.bucket, Prefix=key):
+                versions += [v for v in page.get("Versions", []) + page.get("DeleteMarkers", []) if v.get("Key") == key]
+            for v in versions:
+                found = True
+                try:
+                    self.s3.delete_object(Bucket=self.bucket, Key=key, VersionId=v["VersionId"])
+                except Exception as exc:  # noqa: BLE001 - botocore ClientError; boto3 is an optional extra
+                    code = (getattr(exc, "response", None) or {}).get("Error", {}).get("Code", "")
+                    if code not in ("AccessDenied", "InvalidRequest", "ObjectLocked"):
+                        raise
+                    if self._version_locked(key, v["VersionId"], datetime.now(timezone.utc)):
+                        locked = True
+                    else:
+                        denied = True
+        if locked:
+            return "retained_by_object_lock"
+        if denied:
+            return "delete_denied"
+        return "deleted" if found else "missing"
+
+    def _version_locked(self, key: str, version_id: str, now) -> bool:
+        try:
+            r = self.s3.get_object_retention(Bucket=self.bucket, Key=key, VersionId=version_id)
+            until = r.get("Retention", {}).get("RetainUntilDate")
+            if until is not None and (until if until.tzinfo else until.replace(tzinfo=now.tzinfo)) > now:
+                return True
+        except Exception:  # noqa: BLE001 - no retention on this version, or not permitted to read it
+            pass
+        try:
+            return self.s3.get_object_legal_hold(Bucket=self.bucket, Key=key, VersionId=version_id).get("LegalHold", {}).get("Status") == "ON"
+        except Exception:  # noqa: BLE001
+            return False
