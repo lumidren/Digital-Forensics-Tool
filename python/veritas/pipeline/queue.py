@@ -54,6 +54,37 @@ MAGIC: list[tuple[int, bytes, str]] = [
 ]
 
 
+#: Members of an AFF4 volume; any of them in a ZIP local header marks the ZIP as an AFF4 image.
+AFF4_MEMBERS = (b"information.turtle", b"container.description", b"version.txt")
+
+
+def is_aff4(head: bytes, name: str = "") -> bool:
+    """True for an AFF4 container (a ZIP holding ``information.turtle``), judged from its head.
+
+    The central directory sits at the end of the file, so the head is searched for the local
+    headers of the AFF4 volume members (pyaff4, Evimetry and veritas-aff4 all write
+    ``container.description`` / ``version.txt`` first) and of escaped ``aff4://`` stream members;
+    a ``.aff4`` name on a ZIP is accepted as well.
+    """
+    if head[:4] != b"PK\x03\x04":
+        return False
+    pos = 0
+    while 0 <= pos <= len(head) - 30:
+        if head[pos:pos + 4] != b"PK\x03\x04":
+            break
+        n = int.from_bytes(head[pos + 26:pos + 28], "little")
+        x = int.from_bytes(head[pos + 28:pos + 30], "little")
+        member = head[pos + 30:pos + 30 + n]
+        if member in AFF4_MEMBERS or member.startswith(b"aff4%3A%2F%2F"):
+            return True
+        # Only metadata members are small enough for the next header to be within the head.
+        size = int.from_bytes(head[pos + 18:pos + 22], "little")
+        if size == 0xFFFFFFFF and x >= 20:
+            size = int.from_bytes(head[pos + 30 + n + 12:pos + 30 + n + 20], "little")
+        pos += 30 + n + x + size
+    return Path(name).suffix.lower() == ".aff4"
+
+
 def classify(head: bytes, declared_kind: str | None, name: str = "") -> str:
     if declared_kind == "memory":
         return "memory"
@@ -61,6 +92,9 @@ def classify(head: bytes, declared_kind: str | None, name: str = "") -> str:
         return "cloud"
     if declared_kind == "mobile" and Path(name).suffix.lower() != ".ab":
         return "ios_backup"
+    if is_aff4(head, name):
+        # A disk image in a ZIP64 volume: never a triage bundle; fs-tool reads its media.
+        return "disk"
     for off, sig, kind in MAGIC:
         if head[off:off + len(sig)] == sig:
             if kind == "olecf":
