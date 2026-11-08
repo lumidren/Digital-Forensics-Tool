@@ -5,6 +5,7 @@ members = [
     "crates/veritas-ledger",
     "crates/veritas-store",
     "crates/veritas-ewf",
+    "crates/veritas-aff4",
     "crates/veritas-agent",
     "crates/veritas-fs",
     "crates/veritas-artifacts",

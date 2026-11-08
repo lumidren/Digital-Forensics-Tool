@@ -1,0 +1,28 @@
+[package]
+name = "veritas-aff4-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+license = "Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+veritas-aff4 = { path = ".." }
+
+# Keep the fuzz crate out of the main workspace (it needs nightly + libFuzzer).
+[workspace]
+
+[[bin]]
+name = "container"
+path = "fuzz_targets/container.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "turtle"
+path = "fuzz_targets/turtle.rs"
+test = false
+doc = false
