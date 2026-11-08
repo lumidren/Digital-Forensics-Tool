@@ -1,8 +1,9 @@
-//! Physical / logical imaging to E01 or raw with streaming hashes and bad-sector handling.
+//! Physical / logical imaging to E01, AFF4 or raw with streaming hashes and bad-sector handling.
 //!
 //! Reads are sequential in blocks (default 1 MiB). A block that fails after `retries` attempts
 //! is re-read sector by sector; sectors that still fail are zero-filled and recorded in the
-//! bad-sector map (and in the E01 `error2` section). The source stream is hashed with
+//! bad-sector map (and in the E01 `error2` section, or as `veritas:badSectors` on the AFF4
+//! image). The source stream is hashed with
 //! [`MultiHasher`] as it is read, so the reported hashes are of exactly what was stored.
 //!
 //! Resume: a JSON state file next to the output records the completed segments (path, size,
@@ -12,7 +13,8 @@
 //! segment is discarded, and the source is re-read from the start of that segment. Resume is
 //! implemented for raw output. E01 segments depend on writer state (chunk tables, running
 //! counts) that is not persisted, so an interrupted E01 acquisition restarts from offset 0 after
-//! the partial segments are removed.
+//! the partial segments are removed. AFF4 output (a single `<base>.aff4` container whose central
+//! directory is written last) behaves the same way.
 //!
 //! Device size: files report their length; devices are sized by seeking to the end, which works
 //! for Linux block devices and Windows volume handles. Windows `\\.\PhysicalDriveN` handles do not
@@ -25,6 +27,7 @@ use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+use veritas_aff4::{Aff4Options, Aff4Summary, Aff4Writer};
 use veritas_ewf::{BadSectorRange, Compression, EwfOptions, EwfSummary, EwfWriter, MediaType};
 use veritas_hash::{Hashes, MultiHasher};
 
@@ -32,6 +35,7 @@ use veritas_hash::{Hashes, MultiHasher};
 #[serde(rename_all = "snake_case")]
 pub enum OutputFormat {
     E01,
+    Aff4,
     Raw,
 }
 
@@ -39,8 +43,17 @@ impl OutputFormat {
     pub fn parse(s: &str) -> Option<Self> {
         match s.to_ascii_lowercase().as_str() {
             "e01" | "ewf" => Some(Self::E01),
+            "aff4" => Some(Self::Aff4),
             "raw" | "dd" => Some(Self::Raw),
             _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::E01 => "e01",
+            Self::Aff4 => "aff4",
+            Self::Raw => "raw",
         }
     }
 }
@@ -120,6 +133,8 @@ pub struct ImageResult {
     pub sector_size: u32,
     pub bad_sectors: Vec<BadSectorRange>,
     pub ewf: Option<EwfSummary>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aff4: Option<Aff4Summary>,
     pub resumed_from: Option<u64>,
     pub started_at: DateTime<Utc>,
     pub finished_at: DateTime<Utc>,
@@ -319,9 +334,19 @@ impl RawSink {
     }
 }
 
+#[allow(clippy::large_enum_variant)] // one Sink per imaging run; boxing the raw sink buys nothing
 enum Sink {
     Ewf(Box<EwfWriter>),
+    Aff4(Box<Aff4Writer>),
     Raw(RawSink),
+}
+
+/// `<base>.aff4` (the extension is not doubled when `base` already ends in `.aff4`).
+pub fn aff4_path(base: &Path) -> PathBuf {
+    match base.extension().and_then(|e| e.to_str()) {
+        Some(e) if e.eq_ignore_ascii_case("aff4") => base.to_path_buf(),
+        _ => PathBuf::from(format!("{}.aff4", base.display())),
+    }
 }
 
 /// Image an already-open source. `total` is the number of bytes to read (`None`: until end of
@@ -387,6 +412,41 @@ pub fn image_reader<R: Read + Seek>(
             eo.header.acquiry_software_version =
                 format!("{} {}", crate::AGENT_NAME, crate::AGENT_VERSION);
             Sink::Ewf(Box::new(EwfWriter::create(&opts.out_base, eo)?))
+        }
+        OutputFormat::Aff4 => {
+            let path = aff4_path(&opts.out_base);
+            if let Some(st) = previous.filter(|s| !s.complete) {
+                // Like E01, AFF4 cannot resume (the central directory is written at the end);
+                // remove the partial container of the interrupted run.
+                for seg in &st.completed_segments {
+                    let _ = std::fs::remove_file(&seg.path);
+                }
+            }
+            let ao = Aff4Options {
+                compression: match opts.compression {
+                    Compression::None => veritas_aff4::Compression::Stored,
+                    _ => veritas_aff4::Compression::Deflate,
+                },
+                level: match opts.compression {
+                    Compression::Best => 9,
+                    _ => 1,
+                },
+                sector_size: opts.sector_size,
+                tool: format!("{} {}", crate::AGENT_NAME, crate::AGENT_VERSION),
+                case: veritas_aff4::CaseDetails {
+                    case_number: opts.case_number.clone(),
+                    evidence_number: opts.evidence_number.clone(),
+                    examiner: opts.examiner.clone(),
+                    description: if opts.description.is_empty() {
+                        source_label.to_string()
+                    } else {
+                        opts.description.clone()
+                    },
+                    notes: opts.notes.clone(),
+                },
+                ..Default::default()
+            };
+            Sink::Aff4(Box::new(Aff4Writer::create(&path, ao)?))
         }
         OutputFormat::Raw => {
             let mut raw = RawSink {
@@ -455,6 +515,14 @@ pub fn image_reader<R: Read + Seek>(
             };
             let (completed, start) = match sink {
                 Sink::Raw(r) => (r.completed.clone(), r.segment_start),
+                Sink::Aff4(w) => (
+                    vec![SegmentInfo {
+                        path: w.path().to_path_buf(),
+                        size: 0,
+                        sha256: String::new(),
+                    }],
+                    0,
+                ),
                 Sink::Ewf(w) => (
                     w.segments()
                         .iter()
@@ -510,6 +578,10 @@ pub fn image_reader<R: Read + Seek>(
                 w.write(data)?;
                 false
             }
+            Sink::Aff4(w) => {
+                w.write(data)?;
+                false
+            }
             Sink::Raw(r) => r.write(data)?,
         };
         offset += got as u64;
@@ -519,6 +591,7 @@ pub fn image_reader<R: Read + Seek>(
         }
         let segment = match &sink {
             Sink::Ewf(w) => w.segments().len(),
+            Sink::Aff4(_) => 1,
             Sink::Raw(r) => r.completed.len() + 1,
         };
         let bad_count = bad.iter().map(|b| b.sector_count).sum();
@@ -541,7 +614,7 @@ pub fn image_reader<R: Read + Seek>(
         }
     }
 
-    let (segments, ewf) = match sink {
+    let (segments, ewf, aff4) = match sink {
         Sink::Ewf(mut w) => {
             for b in &bad {
                 w.record_bad_sectors(b.first_sector, b.sector_count);
@@ -555,7 +628,19 @@ pub fn image_reader<R: Read + Seek>(
                     sha256: crate::sha256_file(p)?,
                 });
             }
-            (segs, Some(summary))
+            (segs, Some(summary), None)
+        }
+        Sink::Aff4(mut w) => {
+            for b in &bad {
+                w.record_bad_sectors(b.first_sector, b.sector_count);
+            }
+            let summary = w.finish()?;
+            let segs = vec![SegmentInfo {
+                path: summary.path.clone(),
+                size: summary.container_size,
+                sha256: crate::sha256_file(&summary.path)?,
+            }];
+            (segs, None, Some(summary))
         }
         Sink::Raw(mut r) => {
             if r.file.is_none() && r.completed.is_empty() {
@@ -565,10 +650,10 @@ pub fn image_reader<R: Read + Seek>(
             let segs = r.completed.clone();
             let tmp = Sink::Raw(r);
             save_state(&tmp, &bad, offset, true)?;
-            (segs, None)
+            (segs, None, None)
         }
     };
-    if ewf.is_some() {
+    if ewf.is_some() || aff4.is_some() {
         if let Some(p) = &opts.state_file {
             let _ = std::fs::remove_file(p);
         }
@@ -582,6 +667,7 @@ pub fn image_reader<R: Read + Seek>(
         sector_size: opts.sector_size,
         bad_sectors: bad,
         ewf,
+        aff4,
         resumed_from,
         started_at,
         finished_at: Utc::now(),
@@ -664,6 +750,12 @@ mod tests {
     fn formats_parse() {
         assert_eq!(OutputFormat::parse("E01"), Some(OutputFormat::E01));
         assert_eq!(OutputFormat::parse("dd"), Some(OutputFormat::Raw));
+        assert_eq!(OutputFormat::parse("AFF4"), Some(OutputFormat::Aff4));
+        assert_eq!(aff4_path(Path::new("x/img")), PathBuf::from("x/img.aff4"));
+        assert_eq!(
+            aff4_path(Path::new("x/img.AFF4")),
+            PathBuf::from("x/img.AFF4")
+        );
         assert_eq!(OutputFormat::parse("vmdk"), None);
     }
 }

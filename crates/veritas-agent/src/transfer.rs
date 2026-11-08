@@ -36,6 +36,9 @@ pub struct UploadManifest {
     pub evidence_id: String,
     pub case_id: Option<String>,
     pub segments: Vec<UploadSegment>,
+    /// Image format of the segments (`e01`, `aff4` or `raw`), when written by `image`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<String>,
 }
 
 impl UploadManifest {
@@ -62,6 +65,7 @@ impl UploadManifest {
                     sha256: s.sha256.clone(),
                 })
                 .collect(),
+            format: None,
         }
     }
 

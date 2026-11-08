@@ -17,6 +17,7 @@ path = "src/main.rs"
 [dependencies]
 veritas-hash = { path = "../veritas-hash" }
 veritas-ewf = { path = "../veritas-ewf" }
+veritas-aff4 = { path = "../veritas-aff4" }
 veritas-ledger = { path = "../veritas-ledger" }
 serde.workspace = true
 serde_json.workspace = true

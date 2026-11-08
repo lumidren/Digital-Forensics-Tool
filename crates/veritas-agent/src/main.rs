@@ -69,13 +69,14 @@ enum Cmd {
         #[command(flatten)]
         ledger: LedgerArgs,
     },
-    /// Image a device or file to E01 or raw.
+    /// Image a device or file to E01, AFF4 or raw.
     Image {
         #[arg(long)]
         source: PathBuf,
         /// Output path without extension.
         #[arg(long)]
         out: PathBuf,
+        /// e01 | aff4 | raw
         #[arg(long, default_value = "e01")]
         format: String,
         #[arg(long)]
@@ -254,8 +255,8 @@ fn run(cli: Cli) -> Result<()> {
             resume,
             ledger,
         } => {
-            let format =
-                OutputFormat::parse(&format).ok_or_else(|| anyhow!("format must be e01 or raw"))?;
+            let format = OutputFormat::parse(&format)
+                .ok_or_else(|| anyhow!("format must be e01, aff4 or raw"))?;
             let wb = writeblock::check(&source);
             progress_line(json!({ "event": "writeblock", "status": wb }));
             let mut opts = ImageOptions::new(format, &out);
@@ -294,7 +295,7 @@ fn run(cli: Cli) -> Result<()> {
             } else {
                 ledger.evidence.clone()
             };
-            let manifest = UploadManifest::from_segments(
+            let mut manifest = UploadManifest::from_segments(
                 &evidence_id,
                 if ledger.case.is_empty() {
                     None
@@ -303,6 +304,7 @@ fn run(cli: Cli) -> Result<()> {
                 },
                 &result.segments,
             );
+            manifest.format = Some(format.as_str().to_string());
             let manifest_path = PathBuf::from(format!("{}.manifest.json", out.display()));
             std::fs::write(&manifest_path, serde_json::to_vec_pretty(&manifest)?)?;
             let device = DeviceInfo {
@@ -322,6 +324,11 @@ fn run(cli: Cli) -> Result<()> {
             if let Some(e) = &result.ewf {
                 details.insert("ewf_sha1".into(), json!(e.sha1));
                 details.insert("ewf_media_md5".into(), json!(e.hashes.md5));
+            }
+            if let Some(a) = &result.aff4 {
+                details.insert("aff4_sha1".into(), json!(a.sha1));
+                details.insert("aff4_media_md5".into(), json!(a.hashes.md5));
+                details.insert("aff4_image_urn".into(), json!(a.image_urn));
             }
             let mut largs = ledger.clone();
             largs.evidence = evidence_id;

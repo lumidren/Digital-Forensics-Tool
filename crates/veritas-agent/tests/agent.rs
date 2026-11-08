@@ -3,6 +3,7 @@ use std::io::{self, Read, Seek, SeekFrom};
 use std::ops::Range;
 use std::path::Path;
 use std::time::Duration;
+use veritas_aff4::Aff4Reader;
 use veritas_agent::image::{self, ImageOptions, OutputFormat};
 use veritas_agent::ledger_hook::{self, Acquisition};
 use veritas_agent::triage::{self, bundle, Profile, TriageOptions};
@@ -28,6 +29,42 @@ fn source_file(dir: &Path, len: usize) -> (std::path::PathBuf, Vec<u8>) {
     let p = dir.join("source.bin");
     std::fs::write(&p, &data).unwrap();
     (p, data)
+}
+
+#[test]
+fn aff4_image_matches_source_hashes() {
+    let dir = tempfile::tempdir().unwrap();
+    let (src, data) = source_file(dir.path(), 3 * 1024 * 1024 + 300);
+    let expected = veritas_hash::hash_reader(std::fs::File::open(&src).unwrap(), |_| {}).unwrap();
+    let mut opts = ImageOptions::new(OutputFormat::Aff4, dir.path().join("img"));
+    opts.case_number = "C-9".into();
+    opts.examiner = "Examiner".into();
+    opts.state_file = Some(dir.path().join("img.state.json"));
+    let r = image::image_path(&src, &opts, &mut |_| true).unwrap();
+    assert_eq!(r.format, OutputFormat::Aff4);
+    assert_eq!(r.hashes, expected);
+    assert_eq!(r.bytes, data.len() as u64);
+    assert_eq!(r.segments.len(), 1);
+    assert_eq!(r.segments[0].path, dir.path().join("img.aff4"));
+    assert_eq!(
+        r.segments[0].sha256,
+        veritas_agent::sha256_file(&r.segments[0].path).unwrap()
+    );
+    assert!(!dir.path().join("img.state.json").exists());
+    let summary = r.aff4.as_ref().unwrap();
+    assert_eq!(summary.hashes, expected);
+    assert!(r.ewf.is_none());
+    let json = serde_json::to_value(&r).unwrap();
+    assert_eq!(json["format"], "aff4");
+    let mut reader = Aff4Reader::open(&r.segments[0].path).unwrap();
+    assert_eq!(reader.case().case_number, "C-9");
+    assert_eq!(reader.case().description, src.display().to_string());
+    let mut back = Vec::new();
+    reader.read_to_end(&mut back).unwrap();
+    assert_eq!(back, data);
+    assert!(reader.verify().unwrap().verified);
+    // The output is never overwritten.
+    assert!(image::image_path(&src, &opts, &mut |_| true).is_err());
 }
 
 #[test]
@@ -122,7 +159,7 @@ fn bad_sectors_are_zero_filled_and_mapped() {
         512 * 2000..512 * 2000 + 1,
         512 * 4095..512 * 4096,
     ];
-    for format in [OutputFormat::E01, OutputFormat::Raw] {
+    for format in [OutputFormat::E01, OutputFormat::Aff4, OutputFormat::Raw] {
         let mut dev = FaultyDevice {
             data: data.clone(),
             pos: 0,
@@ -160,6 +197,23 @@ fn bad_sectors_are_zero_filled_and_mapped() {
             let mut back = Vec::new();
             er.read_to_end(&mut back).unwrap();
             assert_eq!(back, expected);
+        }
+        if format == OutputFormat::Aff4 {
+            let mut ar = Aff4Reader::open(&r.segments[0].path).unwrap();
+            assert_eq!(
+                ar.acquisition_errors(),
+                &r.aff4.as_ref().unwrap().bad_sectors[..]
+            );
+            let runs: Vec<(u64, u64)> = ar
+                .acquisition_errors()
+                .iter()
+                .map(|b| (b.first_sector, b.sector_count))
+                .collect();
+            assert_eq!(runs, ranges);
+            let mut back = Vec::new();
+            ar.read_to_end(&mut back).unwrap();
+            assert_eq!(back, expected);
+            assert!(ar.verify().unwrap().verified);
         }
     }
 }

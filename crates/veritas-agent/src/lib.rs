@@ -2,7 +2,7 @@
 //!
 //! - [`triage`]: live-response collectors and a ZIP bundle writer with a hashed manifest.
 //! - [`memory`]: WinPmem / LiME / osxpmem orchestration.
-//! - [`image`]: physical or logical imaging to E01 or split raw with bad-sector handling.
+//! - [`image`]: physical or logical imaging to E01, AFF4 or split raw with bad-sector handling.
 //! - [`writeblock`]: write-blocker verification before imaging.
 //! - [`transfer`]: resumable mTLS upload of evidence segments.
 //! - [`ledger_hook`]: signed custody-ledger entry for each acquisition, with SNTP time.
@@ -27,6 +27,8 @@ pub enum AgentError {
     Io(#[from] std::io::Error),
     #[error("ewf: {0}")]
     Ewf(#[from] veritas_ewf::EwfError),
+    #[error("aff4: {0}")]
+    Aff4(#[from] veritas_aff4::Aff4Error),
     #[error("ledger: {0}")]
     Ledger(#[from] veritas_ledger::LedgerError),
     #[error("key: {0}")]

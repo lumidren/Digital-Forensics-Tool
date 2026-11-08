@@ -221,6 +221,7 @@ fn make_manifest(dir: &Path, n: u32, size: usize) -> UploadManifest {
         evidence_id: "EV-1".into(),
         case_id: Some("CASE-1".into()),
         segments,
+        format: None,
     }
 }
 
