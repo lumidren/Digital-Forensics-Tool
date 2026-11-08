@@ -63,16 +63,21 @@ runs:
         echo "CLUSTER_NAME=$(terraform output -json stack | python3 -c 'import json,sys; print(json.load(sys.stdin)["cluster_name"])')" >> "$GITHUB_ENV"
     - name: Kubeconfig
       shell: bash
-      run: aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "${{ inputs.aws-region }}"
+      env:
+        AWS_REGION_INPUT: ${{ inputs.aws-region }}
+      run: aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_REGION_INPUT"
     - name: helm upgrade --atomic
       shell: bash
       env:
         TAG: ${{ inputs.image-tag }}
+        RELEASE: ${{ inputs.release }}
+        NAMESPACE: ${{ inputs.namespace }}
+        DEPLOY_ENV: ${{ inputs.environment }}
       run: |
         set -euo pipefail
-        helm upgrade --install "${{ inputs.release }}" deploy/helm/veritas \
-          --namespace "${{ inputs.namespace }}" \
-          -f "deploy/helm/veritas/values-${{ inputs.environment }}.yaml" \
+        helm upgrade --install "$RELEASE" deploy/helm/veritas \
+          --namespace "$NAMESPACE" \
+          -f "deploy/helm/veritas/values-${DEPLOY_ENV}.yaml" \
           -f "$RUNNER_TEMP/account-values.yaml" \
           --set image.tag="$TAG" \
           --set global.imageRegistry="ghcr.io/${GITHUB_REPOSITORY_OWNER}" \
@@ -80,12 +85,20 @@ runs:
     - name: Smoke test
       id: smoke
       shell: bash
-      run: bash deploy/scripts/smoke.sh "${{ inputs.namespace }}" "${{ inputs.release }}" "${{ inputs.host }}"
+      env:
+        RELEASE: ${{ inputs.release }}
+        NAMESPACE: ${{ inputs.namespace }}
+        HOST: ${{ inputs.host }}
+      run: bash deploy/scripts/smoke.sh "$NAMESPACE" "$RELEASE" "$HOST"
     - name: Roll back on failed smoke test
       if: failure() && steps.smoke.outcome == 'failure'
       shell: bash
+      env:
+        RELEASE: ${{ inputs.release }}
+        NAMESPACE: ${{ inputs.namespace }}
+        DEPLOY_ENV: ${{ inputs.environment }}
       run: |
-        helm rollback "${{ inputs.release }}" --namespace "${{ inputs.namespace }}" --wait --timeout 10m
-        helm history "${{ inputs.release }}" --namespace "${{ inputs.namespace }}" --max 5
-        echo "::error title=deploy::smoke test failed on ${{ inputs.environment }}; rolled back to the previous release"
+        helm rollback "$RELEASE" --namespace "$NAMESPACE" --wait --timeout 10m
+        helm history "$RELEASE" --namespace "$NAMESPACE" --max 5
+        echo "::error title=deploy::smoke test failed on ${DEPLOY_ENV}; rolled back to the previous release"
         exit 1

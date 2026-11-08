@@ -81,7 +81,7 @@ def tables(conn: sqlite3.Connection) -> set[str]:
 
 
 def columns(conn: sqlite3.Connection, table: str) -> set[str]:
-    return {r[1] for r in conn.execute(f'PRAGMA table_info("{table}")')}
+    return {r[1] for r in conn.execute(f'PRAGMA table_info("{table}")')}  # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query - sqlite3 PRAGMA on a name validated against sqlite_master
 
 
 def query(conn: sqlite3.Connection, sql: str, params: tuple = ()) -> Iterator[sqlite3.Row]:

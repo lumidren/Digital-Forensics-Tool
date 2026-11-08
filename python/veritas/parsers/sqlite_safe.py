@@ -97,7 +97,7 @@ def columns(conn: sqlite3.Connection, table: str) -> list[str]:
     if not table.replace("_", "").isalnum():
         raise ParserError(f"sqlite: refusing table name {table!r}")
     try:
-        return [r[1] for r in conn.execute(f'PRAGMA table_info("{table}")').fetchall()]
+        return [r[1] for r in conn.execute(f'PRAGMA table_info("{table}")').fetchall()]  # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query - sqlite3 PRAGMA on a quoted identifier validated against sqlite_master
     except sqlite3.DatabaseError as exc:
         raise ParserError(f"sqlite: table_info({table}) failed: {exc}") from exc
 

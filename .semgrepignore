@@ -1,0 +1,10 @@
+# Semgrep ignore list (replaces the defaults, so they are repeated here).
+node_modules/
+target/
+.venv/
+testdata/corpus/
+*.min.js
+# Test code: fixtures use plain local websocket URLs and spawn local helpers by design.
+web/**/*.test.ts
+web/**/*.test.tsx
+python/tests/

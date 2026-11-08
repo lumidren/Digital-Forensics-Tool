@@ -296,7 +296,7 @@ def parse_webview(source, *, evidence_path: str = "", evidence_sha256: str = "")
             for table in ("password", "httpauth"):
                 if table not in names:
                     continue
-                for row in conn.execute(f'SELECT * FROM "{table}" ORDER BY _id'):  # nosec B608 - table name chosen from a fixed tuple
+                for row in conn.execute(f'SELECT * FROM "{table}" ORDER BY _id'):  # nosec B608 - table name chosen from a fixed tuple  # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query - sqlite3 with a table name from a fixed tuple
                     attrs = {
                         "id": col(row, "_id"), "table": table, "host": text(col(row, "host")),
                         "realm": text(col(row, "realm")), "username": text(col(row, "username")),

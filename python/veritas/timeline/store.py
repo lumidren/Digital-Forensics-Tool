@@ -227,9 +227,9 @@ class SqliteTimelineStore:
     def search(self, case_id: str, query: Query) -> SearchResult:
         c = self._conn()
         where, params = self._where(case_id, query)
-        total = c.execute(f"SELECT COUNT(*) FROM events e WHERE {where}", params).fetchone()[0]  # nosec B608 - identifiers are fixed column names; values are bound parameters or escaped
+        total = c.execute(f"SELECT COUNT(*) FROM events e WHERE {where}", params).fetchone()[0]  # nosec B608 - identifiers are fixed column names; values are bound parameters or escaped  # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query - fixed column names; all values are bound parameters
         order = "DESC" if query.descending else "ASC"
-        rows = c.execute(
+        rows = c.execute(  # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query - fixed column names; all values are bound parameters
             f"SELECT * FROM events e WHERE {where} ORDER BY e.timestamp {order}, e.data_type, e.evidence_path, e.offset, e.id LIMIT ? OFFSET ?",  # nosec B608 - identifiers are fixed column names; values are bound parameters or escaped
             params + [max(0, min(query.limit, 10_000)), max(0, query.offset)],
         ).fetchall()
@@ -241,7 +241,7 @@ class SqliteTimelineStore:
         c = self._conn()
         q = dataclasses.replace(query, include_untimed=False)
         where, params = self._where(case_id, q)
-        rows = c.execute(
+        rows = c.execute(  # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query - fixed column names; all values are bound parameters
             f"SELECT (e.timestamp / ?) * ? AS b, COUNT(*) FROM events e WHERE {where} GROUP BY b ORDER BY b",  # nosec B608 - identifiers are fixed column names; values are bound parameters or escaped
             [bucket_ns, bucket_ns] + params,
         ).fetchall()
@@ -252,7 +252,7 @@ class SqliteTimelineStore:
             raise ValueError(f"facet column not allowed: {column}")
         c = self._conn()
         where, params = self._where(case_id, query)
-        rows = c.execute(
+        rows = c.execute(  # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query - fixed column names; all values are bound parameters
             f"SELECT e.{column}, COUNT(*) AS n FROM events e WHERE {where} GROUP BY e.{column} ORDER BY n DESC, e.{column} LIMIT ?",  # nosec B608 - identifiers are fixed column names; values are bound parameters or escaped
             params + [limit],
         ).fetchall()
@@ -270,7 +270,7 @@ class SqliteTimelineStore:
         c = self._conn()
         q = query or Query(include_untimed=True, limit=10**9)
         where, params = self._where(case_id, q)
-        cur = c.execute(f"SELECT * FROM events e WHERE {where} ORDER BY e.timestamp, e.data_type, e.evidence_path, e.offset, e.id", params)  # nosec B608 - identifiers are fixed column names; values are bound parameters or escaped
+        cur = c.execute(f"SELECT * FROM events e WHERE {where} ORDER BY e.timestamp, e.data_type, e.evidence_path, e.offset, e.id", params)  # nosec B608 - identifiers are fixed column names; values are bound parameters or escaped  # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query - fixed column names; all values are bound parameters
         for row in cur:
             yield self._row_to_stored(row, c)
 

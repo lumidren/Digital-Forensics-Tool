@@ -228,7 +228,7 @@ def _sector_cipher(spec: str, key: bytes, sector_size: int, iv_tweak: int = 0) -
             for i in range(0, len(data), sector_size):
                 n = (first + iv_tweak + i // sector_size) & ((1 << (8 * width)) - 1)
                 iv = n.to_bytes(width, "little").ljust(16, b"\0")
-                d = Cipher(algorithms.AES(key), modes.CBC(iv)).decryptor()
+                d = Cipher(algorithms.AES(key), modes.CBC(iv)).decryptor()  # nosemgrep: python.cryptography.security.mode-without-authentication.crypto-mode-without-authentication - LUKS mandates AES-XTS/CBC; decrypting evidence, not protecting data
                 out += d.update(data[i:i + sector_size]) + d.finalize()
             return bytes(out)
         return dec

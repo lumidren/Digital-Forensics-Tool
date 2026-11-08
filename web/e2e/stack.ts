@@ -66,7 +66,7 @@ function password(): string {
 }
 
 function run(cmd: string, args: string[], env: NodeJS.ProcessEnv, cwd = REPO_DIR): string {
-  const r = spawnSync(cmd, args, { cwd, env, encoding: "utf8", shell: false, maxBuffer: 64 * 1024 * 1024 });
+  const r = spawnSync(cmd, args, { cwd, env, encoding: "utf8", shell: false, maxBuffer: 64 * 1024 * 1024 });  // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process - test harness spawning fixed local commands
   if (r.status !== 0) {
     throw new Error(`${cmd} ${args.join(" ")} failed (${r.status}):\n${r.stdout}\n${r.stderr}`);
   }
@@ -80,7 +80,7 @@ function start(
   cwd: string,
   logFile: string,
 ): ChildProcess {
-  const child = spawn(cmd, args, {
+  const child = spawn(cmd, args, {  // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process - test harness spawning fixed local commands
     cwd,
     env,
     stdio: ["ignore", "pipe", "pipe"],

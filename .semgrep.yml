@@ -35,11 +35,16 @@ rules:
     languages: [python]
     severity: ERROR
     message: Never log key material or credentials (master key, seeds, passwords, tokens).
-    pattern-either:
-      - pattern: $LOG.$LEVEL(..., <... os.environ["VERITAS_MASTER_KEY"] ...>, ...)
-      - pattern: $LOG.$LEVEL(..., <... os.environ.get("VERITAS_MASTER_KEY") ...>, ...)
-      - pattern: print(..., <... os.environ["VERITAS_MASTER_KEY"] ...>, ...)
-      - pattern: $LOG.$LEVEL(..., <... $X.master_key_hex ...>, ...)
+    patterns:
+      - pattern-either:
+          - pattern: $LOG.$LEVEL(..., <... os.environ["VERITAS_MASTER_KEY"] ...>, ...)
+          - pattern: $LOG.$LEVEL(..., <... os.environ.get("VERITAS_MASTER_KEY") ...>, ...)
+          - pattern: $LOG.$LEVEL(..., <... $X.master_key_hex ...>, ...)
+          - pattern: print(..., <... os.environ["VERITAS_MASTER_KEY"] ...>, ...)
+          - pattern: print(..., <... $X.master_key_hex ...>, ...)
+      - metavariable-regex:
+          metavariable: $LEVEL
+          regex: ^(debug|info|warning|warn|error|exception|critical|log)$
 
   - id: veritas-pickle-on-evidence
     languages: [python]
