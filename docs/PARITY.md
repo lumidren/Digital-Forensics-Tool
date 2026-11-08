@@ -9,6 +9,7 @@ equal for the same record. CI fails if any field's ratio drops below `parity/bas
 
 | Parser | Reference | Samples | Records (ours / ref) | Fields | Agreement |
 |---|---|---|---|---|---|
+| aff4 | pyaff4 0.34 | 10 | 10 / 10 | 8 | 100.00% |
 | evtx | libevtx-python 20260705 | 2 | 5203 / 5203 | 8 | 100.00% |
 | ewf | libewf (pyewf) 20260924 | 8 | 8 / 8 | 7 | 100.00% |
 | fs_apfs | pyfsapfs 20261030 | 1 | 10 / 10 | 20 | 100.00% |
@@ -77,10 +78,30 @@ equal for the same record. CI fails if any field's ratio drops below `parity/bas
 | regf | libregf-python 20260526; dissect.regf 3.14 | 11 | 165270 / 165270 | 7 | 99.26% |
 | registry_artifacts | independent Python decoders over libregf-python 20260526 raw values | 5 | 471 / 471 | 13 | 100.00% |
 | shellitems | libfwsi-python 20260522 | 8 | 94 / 94 | 9 | 100.00% |
+| volatility3 | vol CLI -r json (same Volatility build) | 1 | 1199 / 1199 | 3 | 100.00% |
 
-**Overall field agreement: 99.41% over 1483226 comparisons.**
+**Overall field agreement: 99.41% over 1484490 comparisons.**
 
 ## Field-level detail
+
+### aff4
+
+Reference: pyaff4 0.34
+
+Samples: `ours:dfvfs/ntfs.raw:deflate:cis=2048`, `ours:dfvfs/ext2.raw:snappy:cis=16`, `ours:dfvfs/fat12.raw:stored:cis=64`, `ours:random:deflate:cis=8`, `ours:tiny:snappy:cis=2048`, `reference:pyaff4:dfvfs/ntfs.raw:zlib:chunk=32768:cis=1024`, `reference:pyaff4:dfvfs/ext2.raw:snappy:chunk=32768:cis=8`, `reference:pyaff4:random:stored:chunk=32768:cis=16`, `reference:pyaff4:random:zlib:chunk=65536:cis=3`, `reference:pyaff4:tiny:zlib:chunk=32768:cis=1024`
+
+| Field | Agree | Total | Ratio |
+|---|---|---|---|
+| chunk_layout | 10 | 10 | 100.00% |
+| compression_method | 5 | 5 | 100.00% |
+| md5 | 10 | 10 | 100.00% |
+| media_bytes | 10 | 10 | 100.00% |
+| media_size | 10 | 10 | 100.00% |
+| sha1 | 10 | 10 | 100.00% |
+| sha256 | 5 | 5 | 100.00% |
+| verify | 5 | 5 | 100.00% |
+
+Notes: Direction 1: AFF4 Standard v1.0 containers written by veritas-aff4 (ImageStream behind a linear aff4:Map, deflate/zlib, snappy and stored chunks) opened with pyaff4. Direction 2: containers written with pyaff4's API (zlib, snappy and stored ImageStreams, aff4:Map, aff4:Image with MD5/SHA-1 aff4:hash literals) read by veritas-aff4. raw-deflate (RFC 1951, Evimetry) is not compared because pyaff4 cannot read it; LZ4 is read-only in veritas-aff4 and pyaff4's LZ4 writer prefixes a size header that the AFF4 convention does not use. pyaff4 0.34 was installed without its exact pins (rdflib 7, pycryptodome 3, python-snappy).
 
 ### evtx
 
@@ -1097,4 +1118,18 @@ Samples: `plaso/NTUSER-WIN7.DAT`, `plaso/NTUSER.DAT`, `plaso/NeroInfoTool.lnk`, 
 | name | 55 | 55 | 100.00% |
 
 Notes: 31 ID lists (LNK targets, jump-list LNK streams, ShellBags BagMRU blobs). Times compared at 1 s resolution (FAT); lone surrogates normalized to U+FFFD. 
+
+### volatility3
+
+Reference: vol CLI -r json (same Volatility build)
+
+Samples: `pat-2009-12-06.mddramimage`
+
+| Field | Agree | Total | Ratio |
+|---|---|---|---|
+| windows.dlllist | 1148 | 1148 | 100.00% |
+| windows.info | 23 | 23 | 100.00% |
+| windows.pslist | 28 | 28 | 100.00% |
+
+Notes: windows.netscan: inprocess=['windows.netscan: NotImplementedError: This version of Windows is not supported: 5.1 15.2600!'] cli=['windows.netscan: RuntimeError: vol exited 1:   File "C:\\Users\\mgoma\\Desktop\\Security Assignments\\Digital-Forensics-Tool\\.venv\\Lib\\site-packages\\volatility3\\framework\\plugins\\windows\\netscan.py", line 318, in determine_tcpip_version |     raise NotImplementedError( | NotImplementedError: This version of Windows is not supported: 5.1 15.2600!']
 
