@@ -2,5 +2,7 @@ line-length = 120
 target-version = "py312"
 
 [lint]
+# Explicit, so a ruff upgrade that widens its defaults does not change the policy.
+select = ["E4", "E7", "E9", "F"]
 # Short loop names (l) and small assigned lambdas are accepted house style.
 ignore = ["E741", "E731"]
