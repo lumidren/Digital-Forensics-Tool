@@ -78,7 +78,7 @@ sys.exit(main(sys.argv[1:]))
 
 def _apply_windows_job_limit(proc: subprocess.Popen, memory_mb: int) -> bool:
     """Put the child in a Job Object with a per-process memory cap and kill-on-close."""
-    if platform.system() != "Windows":
+    if sys.platform != "win32":  # sys.platform (not platform.system()) so mypy skips this on Linux
         return False
     import ctypes
     from ctypes import wintypes
