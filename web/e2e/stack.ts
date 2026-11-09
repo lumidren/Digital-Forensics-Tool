@@ -34,13 +34,22 @@ export interface StackState {
   users: { admin: UserCreds; alice: UserCreds; bob: UserCreds };
 }
 
+/** Python that has the API installed: `VERITAS_PYTHON`, else the repo's `.venv`, else `python3`/`python`
+ * on PATH (CI installs the API into the runner's Python). */
 function python(): string {
+  if (process.env.VERITAS_PYTHON) return process.env.VERITAS_PYTHON;
   const candidates = IS_WIN
     ? [join(REPO_DIR, ".venv", "Scripts", "python.exe")]
     : [join(REPO_DIR, ".venv", "bin", "python"), join(REPO_DIR, ".venv", "bin", "python3")];
   const found = candidates.find((p) => existsSync(p));
-  if (!found) throw new Error(`Python virtualenv not found under ${REPO_DIR}/.venv`);
-  return found;
+  if (found) return found;
+  for (const cmd of IS_WIN ? ["python"] : ["python3", "python"]) {
+    const probe = spawnSync(cmd, ["-c", "import veritas.api"], { stdio: "ignore", shell: false }); // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process - fixed interpreter probe
+    if (probe.status === 0) return cmd;
+  }
+  throw new Error(
+    `no Python with the Veritas API: set VERITAS_PYTHON, create ${REPO_DIR}/.venv or pip install -e python`,
+  );
 }
 
 export function freePort(preferred = 0): Promise<number> {
@@ -66,7 +75,7 @@ function password(): string {
 }
 
 function run(cmd: string, args: string[], env: NodeJS.ProcessEnv, cwd = REPO_DIR): string {
-  const r = spawnSync(cmd, args, { cwd, env, encoding: "utf8", shell: false, maxBuffer: 64 * 1024 * 1024 });  // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process - test harness spawning fixed local commands
+  const r = spawnSync(cmd, args, { cwd, env, encoding: "utf8", shell: false, maxBuffer: 64 * 1024 * 1024 }); // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process - test harness spawning fixed local commands
   if (r.status !== 0) {
     throw new Error(`${cmd} ${args.join(" ")} failed (${r.status}):\n${r.stdout}\n${r.stderr}`);
   }
@@ -80,7 +89,8 @@ function start(
   cwd: string,
   logFile: string,
 ): ChildProcess {
-  const child = spawn(cmd, args, {  // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process - test harness spawning fixed local commands
+  // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process - test harness spawning fixed local commands
+  const child = spawn(cmd, args, {
     cwd,
     env,
     stdio: ["ignore", "pipe", "pipe"],
