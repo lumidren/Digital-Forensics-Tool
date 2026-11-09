@@ -199,7 +199,7 @@ export function FindingsPage() {
                 {examiner.allowed ? "Run analytics to propose findings from the timeline." : null}
               </EmptyState>
             ) : (
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+              <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
                 <nav aria-label="Findings by state" className="grid min-w-0 content-start gap-3">
                   {groups.map((g) => (
                     <section key={g.state} aria-labelledby={`fg-${g.state}`}>

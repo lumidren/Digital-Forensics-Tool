@@ -168,10 +168,10 @@ export function FindingDetail({
   return (
     <article
       aria-labelledby="finding-title"
-      className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4"
+      className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 [overflow-wrap:anywhere]"
       data-testid="finding-detail"
     >
-      <header className="grid gap-2">
+      <header className="grid grid-cols-[minmax(0,1fr)] gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <SeverityBadge severity={finding.severity} />
           <StateBadge state={finding.state} />
