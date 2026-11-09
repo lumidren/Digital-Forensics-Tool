@@ -204,25 +204,27 @@ export function AreaChart({
       {footer ? (
         <figcaption className="text-muted-foreground mt-1.5 pl-9 text-xs">{footer}</figcaption>
       ) : null}
-      <table className="sr-only">
-        <caption>{label}</caption>
-        <thead>
-          <tr>
-            <th scope="col">Period</th>
-            <th scope="col">{valueLabel}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {points
-            .filter((p) => p.value > 0)
-            .map((p) => (
-              <tr key={p.label}>
-                <td>{p.label}</td>
-                <td>{p.value}</td>
-              </tr>
-            ))}
-        </tbody>
-      </table>
+      <div className="sr-only">
+        <table>
+          <caption>{label}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Period</th>
+              <th scope="col">{valueLabel}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {points
+              .filter((p) => p.value > 0)
+              .map((p) => (
+                <tr key={p.label}>
+                  <td>{p.label}</td>
+                  <td>{p.value}</td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
     </figure>
   );
 }
