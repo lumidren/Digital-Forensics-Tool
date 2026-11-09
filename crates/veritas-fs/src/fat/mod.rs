@@ -270,7 +270,7 @@ impl FatFs {
             FatType::Fat32 => (0x0FFF_FFF8, 0x0FFF_FFF7),
             FatType::ExFat => (0xFFFF_FFF8, 0xFFFF_FFF7),
         };
-        if v < 2 || v >= eoc || v == bad || v > self.cluster_count + 1 {
+        if v < 2 || v >= eoc || v == bad || u64::from(v) > self.max_cluster() {
             None
         } else {
             Some(v)
@@ -296,11 +296,19 @@ impl FatFs {
         self.fat_entry(c).is_some_and(|v| v != 0)
     }
 
+    /// Highest valid cluster number (clusters are numbered from 2). Widened to u64 because a
+    /// crafted boot sector can claim `u32::MAX` clusters.
+    fn max_cluster(&self) -> u64 {
+        u64::from(self.cluster_count) + 1
+    }
+
     pub fn cluster_offset(&self, c: u32) -> Option<u64> {
-        if c < 2 || c > self.cluster_count + 1 {
+        if c < 2 || u64::from(c) > self.max_cluster() {
             return None;
         }
-        Some(self.data_offset + (c as u64 - 2) * self.cluster_size)
+        (u64::from(c) - 2)
+            .checked_mul(self.cluster_size)?
+            .checked_add(self.data_offset)
     }
 
     /// Follow a FAT chain (loop- and length-checked).

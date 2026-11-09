@@ -185,3 +185,26 @@ fn fat_malformed_boot_is_error() {
     assert!(FatFs::open(MemSource::source(d)).is_err());
     assert!(FatFs::open(MemSource::source(vec![0u8; 100])).is_err());
 }
+
+/// Regression (fuzz `image` crash): an exFAT boot sector claiming u32::MAX clusters made the
+/// cluster bounds check overflow. Opening and walking it must return results or errors, not panic.
+#[test]
+fn exfat_with_u32_max_clusters_does_not_overflow() {
+    let mut b = vec![0u8; 64 * 1024];
+    b[3..11].copy_from_slice(b"EXFAT   ");
+    b[0x50..0x54].copy_from_slice(&24u32.to_le_bytes()); // FAT at sector 24
+    b[0x54..0x58].copy_from_slice(&8u32.to_le_bytes()); // FAT length 8 sectors
+    b[0x58..0x5C].copy_from_slice(&32u32.to_le_bytes()); // data area at sector 32
+    b[0x5C..0x60].copy_from_slice(&u32::MAX.to_le_bytes()); // cluster count
+    b[0x60..0x64].copy_from_slice(&u32::MAX.to_le_bytes()); // root directory cluster
+    b[0x6C] = 9; // 512-byte sectors
+    b[0x6D] = 0; // 1 sector per cluster
+    b[510] = 0x55;
+    b[511] = 0xAA;
+    if let Ok(fs) = FatFs::open(MemSource::source(b)) {
+        assert_eq!(fs.kind, FatType::ExFat);
+        assert!(fs.cluster_offset(u32::MAX).is_some());
+        let _ = fs.next_cluster(u32::MAX);
+        let _ = fs.chain(u32::MAX, 16);
+    }
+}
