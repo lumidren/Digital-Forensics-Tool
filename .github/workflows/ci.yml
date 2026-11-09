@@ -30,6 +30,12 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - uses: actions/cache@v4
+        with:
+          path: testdata/corpus
+          key: corpus-${{ hashFiles('testdata/MANIFEST.json') }}
+      - name: Fetch the pinned test corpus (sha256-verified)
+        run: python3 testdata/fetch.py
       - name: cargo fmt
         run: cargo fmt --all -- --check
       # THREAT:T7.4 Cargo.lock is committed; every cargo invocation in CI uses --locked so a dependency
@@ -37,6 +43,8 @@ jobs:
       - name: cargo clippy (deny warnings)
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: cargo test
+        env:
+          VERITAS_REQUIRE_CORPUS: "1"
         run: cargo test --workspace --locked
 
   rust-coverage:
@@ -49,10 +57,18 @@ jobs:
         with:
           components: llvm-tools-preview
       - uses: Swatinem/rust-cache@v2
+      - uses: actions/cache@v4
+        with:
+          path: testdata/corpus
+          key: corpus-${{ hashFiles('testdata/MANIFEST.json') }}
+      - name: Fetch the pinned test corpus (sha256-verified)
+        run: python3 testdata/fetch.py
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-llvm-cov
       - run: cargo llvm-cov --workspace --locked --summary-only --fail-under-lines 78
+        env:
+          VERITAS_REQUIRE_CORPUS: "1"
 
   cargo-audit:
     name: cargo-audit
@@ -227,7 +243,7 @@ jobs:
             for target in $(cd "$crate" && cargo +nightly fuzz list); do
               found=$((found + 1))
               echo "::group::fuzz $crate $target"
-              (cd "$crate" && cargo +nightly fuzz run "$target" -- -max_total_time=60 -rss_limit_mb=4096)
+              (cd "$crate" && cargo +nightly fuzz run --target x86_64-unknown-linux-gnu "$target" -- -max_total_time=60 -rss_limit_mb=4096)
               echo "::endgroup::"
             done
           done < <(find crates -mindepth 2 -maxdepth 2 -type d -name fuzz -exec test -f '{}/Cargo.toml' ';' -print)
@@ -341,8 +357,9 @@ jobs:
       # THREAT:T7.1 Vulnerable dependencies (fs) and misconfigurations (Dockerfiles, Helm, Kubernetes,
       # Terraform) of severity HIGH or CRITICAL fail the build; accepted risks live in .trivyignore.
       - name: Trivy fs (dependencies and secrets)
-        uses: aquasecurity/trivy-action@v0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
+          version: v0.76.2
           scan-type: fs
           scan-ref: .
           scanners: vuln,secret
@@ -352,8 +369,9 @@ jobs:
           trivyignores: .trivyignore
           skip-dirs: testdata/corpus,target,web/node_modules
       - name: Trivy config (IaC)
-        uses: aquasecurity/trivy-action@v0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
+          version: v0.76.2
           scan-type: config
           scan-ref: .
           severity: HIGH,CRITICAL
@@ -467,8 +485,12 @@ jobs:
       # MinIO needs a "server /data" command, which service containers cannot pass, so it runs here.
       - name: Start MinIO
         run: |
+          # SSE-S3 (the store's default) needs a KMS; a throwaway single key is enough for CI.
+          kms_key="veritas-ci:$(head -c 32 /dev/urandom | base64)"
+          echo "::add-mask::$kms_key"
           docker run -d --name minio -p 9000:9000 \
             -e MINIO_ROOT_USER="$AWS_ACCESS_KEY_ID" -e MINIO_ROOT_PASSWORD="$AWS_SECRET_ACCESS_KEY" \
+            -e MINIO_KMS_SECRET_KEY="$kms_key" \
             alpine/minio:RELEASE.2025-10-15T17-29-55Z server /home/minio/data
           for _ in $(seq 1 60); do
             curl -fsS http://127.0.0.1:9000/minio/health/live && exit 0
