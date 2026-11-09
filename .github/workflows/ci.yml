@@ -470,7 +470,7 @@ jobs:
           docker run -d --name minio -p 9000:9000 \
             -e MINIO_ROOT_USER="$AWS_ACCESS_KEY_ID" -e MINIO_ROOT_PASSWORD="$AWS_SECRET_ACCESS_KEY" \
             alpine/minio:RELEASE.2025-10-15T17-29-55Z server /home/minio/data
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             curl -fsS http://127.0.0.1:9000/minio/health/live && exit 0
             sleep 2
           done
