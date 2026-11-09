@@ -101,7 +101,7 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          pip install -e "python[dev,cluster]"
+          pip install -e "python[dev,cluster,parity]"
       - name: Fetch the pinned test corpus (sha256-verified)
         run: python testdata/fetch.py
       - name: ruff
