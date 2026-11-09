@@ -27,7 +27,8 @@ jobs:
       packages: write
       id-token: write
     strategy:
-      fail-fast: true
+      # Build and scan every image even when one fails, so one run shows every problem.
+      fail-fast: false
       matrix:
         image: [api, worker, web, agent]
     env:
