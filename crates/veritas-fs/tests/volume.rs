@@ -116,3 +116,25 @@ fn file_system_detection_per_volume() {
     assert_eq!(k("dfvfs/mbr.raw"), vec![FsKind::Ext, FsKind::Ext]);
     assert_eq!(k("dfvfs/apfs_encrypted.dmg"), vec![FsKind::Apfs]);
 }
+
+/// Regression (fuzz `image` crash): a GPT entry spanning LBA 0..=u64::MAX overflowed the sector
+/// count. It must parse to a saturated length, not panic.
+#[test]
+fn gpt_entry_spanning_every_lba_does_not_overflow() {
+    let mut d = vec![0u8; 512 * 4];
+    let h = 512;
+    d[h..h + 8].copy_from_slice(b"EFI PART");
+    d[h + 12..h + 16].copy_from_slice(&92u32.to_le_bytes()); // header size
+    d[h + 72..h + 80].copy_from_slice(&2u64.to_le_bytes()); // entries at LBA 2
+    d[h + 80..h + 84].copy_from_slice(&1u32.to_le_bytes()); // one entry
+    d[h + 84..h + 88].copy_from_slice(&128u32.to_le_bytes()); // entry size
+    let e = 1024;
+    d[e] = 0xAF; // any non-zero partition type GUID
+    d[e + 32..e + 40].copy_from_slice(&0u64.to_le_bytes()); // first LBA
+    d[e + 40..e + 48].copy_from_slice(&u64::MAX.to_le_bytes()); // last LBA
+    let src = veritas_fs::io::MemSource::source(d);
+    let vs = volume::gpt::parse(src.as_ref()).expect("GPT parses");
+    assert_eq!(vs.partitions.len(), 1);
+    assert_eq!(vs.partitions[0].num_sectors, u64::MAX);
+    assert_eq!(vs.partitions[0].length, u64::MAX);
+}

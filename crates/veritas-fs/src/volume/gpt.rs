@@ -88,7 +88,8 @@ fn parse_with_sector(src: &dyn ReadAt, ss: u64) -> Result<VolumeSystem> {
         if last < first {
             continue;
         }
-        let n = last - first + 1;
+        // A crafted entry can span 0..=u64::MAX; saturate like the byte offsets below.
+        let n = (last - first).saturating_add(1);
         let name = utf16le(&e[56..128], true);
         if parts.len() >= MAX_PARTITIONS {
             break;
