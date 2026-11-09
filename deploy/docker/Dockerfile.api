@@ -14,7 +14,7 @@ ENV PATH=/opt/venv/bin:$PATH
 WORKDIR /src
 COPY python/ /src/python/
 RUN pip install --upgrade pip==26.3 setuptools==84.2.1 wheel==0.48.0 \
- && pip install "/src/python[cluster]" opentelemetry-exporter-otlp-proto-http==1.27.0 opentelemetry-instrumentation-fastapi==0.48b0 \
+ && pip install "/src/python[cluster]" opentelemetry-exporter-otlp-proto-http==1.45.2 opentelemetry-instrumentation-fastapi==0.66b2 \
  && python -m compileall -q /opt/venv/lib \
  && pip check
 
@@ -35,6 +35,7 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends postgresql-client-16 \
  && apt-get purge -y --auto-remove curl gnupg \
  && rm -rf /var/lib/apt/lists/* \
+ && /usr/local/bin/python3 -m pip uninstall -y setuptools wheel \
  && groupadd --gid 10001 veritas \
  && useradd --uid 10001 --gid 10001 --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin veritas \
  && install -d -o 10001 -g 10001 -m 0750 /var/lib/veritas

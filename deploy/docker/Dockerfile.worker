@@ -46,6 +46,7 @@ RUN apt-get update \
  && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends tini ca-certificates libssl3 \
  && rm -rf /var/lib/apt/lists/* \
+ && /usr/local/bin/python3 -m pip uninstall -y setuptools wheel \
  && groupadd --gid 10001 veritas \
  && useradd --uid 10001 --gid 10001 --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin veritas \
  && install -d -o 10001 -g 10001 -m 0750 /var/lib/veritas
