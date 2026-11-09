@@ -100,7 +100,11 @@ function start(
   const chunks: string[] = [];
   const keep = (b: Buffer) => {
     chunks.push(b.toString("utf8"));
-    writeFileSync(logFile, chunks.join(""));
+    try {
+      writeFileSync(logFile, chunks.join(""));
+    } catch {
+      /* the data dir is removed at teardown while the process may still flush its last lines */
+    }
   };
   child.stdout?.on("data", keep);
   child.stderr?.on("data", keep);
