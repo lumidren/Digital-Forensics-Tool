@@ -4,7 +4,7 @@
 # Runs as uid 10001 and works with a read-only root filesystem: it writes only to
 # /var/lib/veritas (data volume) and /tmp (emptyDir / tmpfs).
 
-FROM python:3.12.7-slim-bookworm AS build
+FROM python:3.12.16-slim-bookworm AS build
 ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 PYTHONDONTWRITEBYTECODE=1
 RUN apt-get update \
  && apt-get install -y --no-install-recommends build-essential zlib1g-dev libffi-dev \
@@ -13,19 +13,21 @@ RUN python -m venv /opt/venv
 ENV PATH=/opt/venv/bin:$PATH
 WORKDIR /src
 COPY python/ /src/python/
-RUN pip install --upgrade pip==24.2 setuptools==75.1.0 wheel==0.44.0 \
+RUN pip install --upgrade pip==26.3 setuptools==84.2.1 wheel==0.48.0 \
  && pip install "/src/python[cluster]" opentelemetry-exporter-otlp-proto-http==1.27.0 opentelemetry-instrumentation-fastapi==0.48b0 \
  && python -m compileall -q /opt/venv/lib \
  && pip check
 
-FROM python:3.12.7-slim-bookworm AS runtime
+FROM python:3.12.16-slim-bookworm AS runtime
 LABEL org.opencontainers.image.title="veritas-api" \
       org.opencontainers.image.source="https://github.com/lumidren/Digital-Forensics-Tool" \
       org.opencontainers.image.licenses="Apache-2.0"
 # postgresql-client-16 (from the PGDG repository) provides pg_dump/pg_restore matching the Postgres 16
 # server for scripts/backup; Debian bookworm ships only client 15.
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+# upgrade: pull Debian security fixes released after the base image was built (Trivy image gate).
 RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends tini ca-certificates curl gnupg \
  && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/pgdg.gpg \
  && echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list \

@@ -12,7 +12,7 @@ RUN cargo build --release --locked --workspace --bins \
  && install -d /out \
  && for b in veritas veritas-verify fs-tool veritas-artifacts-dump ewf-tool; do install -m 0755 "target/release/$b" /out/; done
 
-FROM python:3.12.7-slim-bookworm AS build
+FROM python:3.12.16-slim-bookworm AS build
 ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 PYTHONDONTWRITEBYTECODE=1
 RUN apt-get update \
  && apt-get install -y --no-install-recommends build-essential zlib1g-dev libffi-dev libssl-dev curl ca-certificates \
@@ -21,7 +21,7 @@ RUN python -m venv /opt/venv
 ENV PATH=/opt/venv/bin:$PATH
 WORKDIR /src
 COPY python/ /src/python/
-RUN pip install --upgrade pip==24.2 setuptools==75.1.0 wheel==0.44.0 \
+RUN pip install --upgrade pip==26.3 setuptools==84.2.1 wheel==0.48.0 \
  && pip install "/src/python[cluster]" \
  && python -m compileall -q /opt/venv/lib \
  && pip check \
@@ -37,11 +37,13 @@ RUN SYMDIR="$(python -c 'import os, volatility3.symbols as s; print(os.path.dirn
  && for p in ${VOL3_SYMBOL_PACKS}; do cp "${p}.zip" "${SYMDIR}/"; done \
  && rm -f /tmp/vol3/*.zip /tmp/vol3/SHA256SUMS
 
-FROM python:3.12.7-slim-bookworm AS runtime
+FROM python:3.12.16-slim-bookworm AS runtime
 LABEL org.opencontainers.image.title="veritas-worker" \
       org.opencontainers.image.source="https://github.com/lumidren/Digital-Forensics-Tool" \
       org.opencontainers.image.licenses="Apache-2.0"
+# upgrade: pull Debian security fixes released after the base image was built (Trivy image gate).
 RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends tini ca-certificates libssl3 \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --gid 10001 veritas \
