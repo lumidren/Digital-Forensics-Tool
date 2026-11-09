@@ -5,10 +5,26 @@ use std::path::{Path, PathBuf};
 use veritas_aff4::zip::ZipWriter;
 use veritas_aff4::{Aff4Error, Aff4Options, Aff4Reader, Aff4Writer, CaseDetails, Compression};
 
-fn corpus(rel: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
+/// Corpus file, or `None` (test skipped) when it has not been fetched; `VERITAS_REQUIRE_CORPUS`
+/// turns a missing file into a failure, as in the other corpus tests.
+fn corpus(rel: &str) -> Option<PathBuf> {
+    let p = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../testdata/corpus")
-        .join(rel)
+        .join(rel);
+    if p.exists() {
+        return Some(p);
+    }
+    if std::env::var("VERITAS_REQUIRE_CORPUS").is_ok() {
+        panic!(
+            "corpus file {} missing (run testdata/fetch.py)",
+            p.display()
+        );
+    }
+    eprintln!(
+        "skipping: corpus file {} missing (run testdata/fetch.py)",
+        p.display()
+    );
+    None
 }
 
 fn data(len: usize, seed: u64, compressible: bool) -> Vec<u8> {
@@ -144,7 +160,10 @@ fn random_access_matches_source() {
 fn corpus_images_roundtrip() {
     let dir = tempfile::tempdir().unwrap();
     for name in ["dfvfs/ntfs.raw", "dfvfs/ext2.raw"] {
-        let src = std::fs::read(corpus(name)).unwrap();
+        let Some(path) = corpus(name) else {
+            return;
+        };
+        let src = std::fs::read(path).unwrap();
         let p = dir.path().join(format!("{}.aff4", name.replace('/', "_")));
         let s = write(&p, &src, Aff4Options::default(), 1 << 20);
         assert!(s.container_size < src.len() as u64);

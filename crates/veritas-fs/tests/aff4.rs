@@ -4,10 +4,26 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use veritas_fs::io::{open_evidence, read_vec};
 
-fn corpus(rel: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
+/// Corpus file, or `None` (test skipped) when it has not been fetched; `VERITAS_REQUIRE_CORPUS`
+/// turns a missing file into a failure, as in the other corpus tests.
+fn corpus(rel: &str) -> Option<PathBuf> {
+    let p = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../testdata/corpus")
-        .join(rel)
+        .join(rel);
+    if p.exists() {
+        return Some(p);
+    }
+    if std::env::var("VERITAS_REQUIRE_CORPUS").is_ok() {
+        panic!(
+            "corpus file {} missing (run testdata/fetch.py)",
+            p.display()
+        );
+    }
+    eprintln!(
+        "skipping: corpus file {} missing (run testdata/fetch.py)",
+        p.display()
+    );
+    None
 }
 
 fn to_aff4(src: &Path, out: &Path) {
@@ -38,7 +54,9 @@ fn fs_tool(args: &[&str]) -> String {
 #[test]
 fn open_evidence_reads_aff4_media() {
     let dir = tempfile::tempdir().unwrap();
-    let raw = corpus("dfvfs/ntfs.raw");
+    let Some(raw) = corpus("dfvfs/ntfs.raw") else {
+        return;
+    };
     let aff4 = dir.path().join("ntfs.aff4");
     to_aff4(&raw, &aff4);
     let src = open_evidence(&aff4).unwrap();
@@ -57,7 +75,9 @@ fn open_evidence_reads_aff4_media() {
 #[test]
 fn fs_tool_lists_files_from_aff4() {
     let dir = tempfile::tempdir().unwrap();
-    let raw = corpus("dfvfs/ntfs.raw");
+    let Some(raw) = corpus("dfvfs/ntfs.raw") else {
+        return;
+    };
     let aff4 = dir.path().join("ntfs.aff4");
     to_aff4(&raw, &aff4);
     let raw_s = raw.to_string_lossy().to_string();
