@@ -126,7 +126,10 @@ jobs:
       - name: bandit
         run: bandit -r python/veritas scripts -ll -q
       - name: pip-audit
-        run: pip-audit --strict --skip-editable --progress-spinner off
+        # --strict fails on the editable project itself, so audit an exact freeze of everything else.
+        run: |
+          pip freeze --exclude-editable > "$RUNNER_TEMP/requirements.txt"
+          pip-audit --strict --disable-pip --no-deps -r "$RUNNER_TEMP/requirements.txt" --progress-spinner off
       - uses: actions/upload-artifact@v4
         with:
           name: coverage-xml
