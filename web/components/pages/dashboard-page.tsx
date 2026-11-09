@@ -418,9 +418,9 @@ export function DashboardPage() {
                   {recent.data?.entries.length ? (
                     <div className="relative">
                       <span aria-hidden className="bg-border absolute top-4 bottom-4 left-[13px] w-px" />
-                      <ol className="relative grid gap-0.5 text-sm" reversed>
+                      <ol className="relative grid grid-cols-[minmax(0,1fr)] gap-0.5 text-sm" reversed>
                         {[...recent.data.entries].reverse().map((e) => (
-                          <li key={e.entry_hash} className="relative flex items-center gap-2.5 py-1">
+                          <li key={e.entry_hash} className="relative flex min-w-0 items-center gap-2.5 py-1">
                             <CustodyKindIcon kind={e.kind} className="ring-card ring-2" />
                             <div className="min-w-0 flex-1">
                               <p className="flex min-w-0 items-baseline gap-2">
