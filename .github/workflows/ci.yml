@@ -288,20 +288,11 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: python/pyproject.toml
-      - name: Start the API natively (no containers)
+      # The E2E harness (web/e2e/stack.ts) starts its own API, users, seeded case and web build on free
+      # ports with a throwaway data dir; it only needs a Python with the API installed.
+      - name: Install the API for the E2E harness
         working-directory: .
-        env:
-          VERITAS_DATA_DIR: ${{ runner.temp }}/veritas
-          VERITAS_ADMIN_PASSWORD: e2e-admin-password-not-secret
-          VERITAS_USER_PASSWORD: e2e-user-password-not-secret
-        run: |
-          pip install -e python
-          python -m veritas.api.manage create-admin --id admin --name "E2E Admin"
-          python -m veritas.api.manage create-user --id examiner --name "E2E Examiner"
-          python -m veritas.api.manage create-user --id reviewer --name "E2E Reviewer"
-          nohup python -m uvicorn veritas.api.main:create_app --factory --host 127.0.0.1 --port 8000 > "$RUNNER_TEMP/api.log" 2>&1 &
-          for _ in $(seq 1 60); do curl -fsS http://127.0.0.1:8000/readyz && exit 0; sleep 1; done
-          cat "$RUNNER_TEMP/api.log"; exit 1
+        run: pip install -e python
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
       - name: Playwright E2E
