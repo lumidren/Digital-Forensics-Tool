@@ -11,3 +11,7 @@ AVD-AWS-0132
 # AVD-AWS-0053 (public load balancer): the ALB is intentionally internet-facing, fronted by AWS WAF with
 # managed rule groups and a rate limit. Owner: platform. Review: 2027-05-01.
 AVD-AWS-0053
+# KSV-0109 (secret in ConfigMap): a name-based heuristic. The only match is VERITAS_TOKEN_TTL_S, the
+# access-token lifetime in seconds, which is not a secret; real secrets come from the veritas-secrets
+# Secret / External Secrets. Owner: platform. Review: 2027-05-01.
+KSV-0109
