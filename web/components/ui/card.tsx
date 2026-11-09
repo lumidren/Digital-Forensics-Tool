@@ -6,7 +6,7 @@ export function Card({ className, ...props }: React.ComponentProps<"section">) {
     <section
       data-slot="card"
       className={cn(
-        "bg-card text-card-foreground rounded-xl border shadow-[0_1px_2px_0_rgb(0_0_0/0.04)] dark:shadow-none",
+        "bg-card text-card-foreground min-w-0 rounded-xl border shadow-[0_1px_2px_0_rgb(0_0_0/0.04)] dark:shadow-none",
         className,
       )}
       {...props}

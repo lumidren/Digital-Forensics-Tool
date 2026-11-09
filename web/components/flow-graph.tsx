@@ -184,7 +184,7 @@ export function FlowGraph({
   );
 
   return (
-    <div className="bg-card overflow-hidden rounded-xl border" role="group" aria-label={label}>
+    <div className="bg-card min-w-0 overflow-hidden rounded-xl border" role="group" aria-label={label}>
       <div style={{ height }}>
         <ReactFlow
           nodes={rfNodes}
